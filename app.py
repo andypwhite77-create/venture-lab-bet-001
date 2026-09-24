@@ -14,14 +14,24 @@ from budget import (
     usage_summary,
 )
 from collector import discover_from_jupiter
-from db import counts, init_db, recent_signals, recent_wallets, record_event, record_rpc_sample
+from db import (
+    counts,
+    init_db,
+    outcome_summary,
+    recent_outcomes,
+    recent_signals,
+    recent_wallets,
+    record_event,
+    record_rpc_sample,
+)
+from evaluator import evaluate_due_signals, evaluator_loop
 from signals import scan_convergence
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("signal-engine")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-app = FastAPI(title="Venture Lab Bet 001", version="0.4.0")
+app = FastAPI(title="Venture Lab Bet 001", version="0.5.0")
 
 HELIUS_API_KEY = os.getenv("HELIUS_API_KEY", "")
 PAPER_TRADING_ONLY = os.getenv("PAPER_TRADING_ONLY", "true").lower() == "true"
@@ -35,10 +45,13 @@ state = {
     "db_ok": False,
     "collector_ok": False,
     "signal_scanner_ok": False,
+    "evaluator_ok": False,
     "last_collection": None,
     "last_collection_result": None,
     "last_signal_scan": None,
     "last_signal_result": None,
+    "last_evaluation": None,
+    "last_evaluation_result": None,
     "last_error": None,
     "paper_trading_only": PAPER_TRADING_ONLY,
 }
@@ -135,7 +148,7 @@ async def startup_event():
         await init_db()
         state["db_ok"] = True
         await ensure_budget_schema()
-        await record_event("info", "startup", "Signal engine research build started", {"version": "0.4.0"})
+        await record_event("info", "startup", "Signal engine research build started", {"version": "0.5.0"})
     except Exception as exc:
         state["db_ok"] = False
         state["last_error"] = repr(exc)
@@ -145,7 +158,8 @@ async def startup_event():
     asyncio.create_task(heartbeat())
     asyncio.create_task(collection_loop())
     asyncio.create_task(signal_loop())
-    log.info("Signal engine v0.4 started in paper-trading-only mode")
+    asyncio.create_task(evaluator_loop(state))
+    log.info("Signal engine v0.5 started in paper-trading-only mode")
 
 
 @app.get("/health")
@@ -157,6 +171,7 @@ async def health():
         "db_ok": state["db_ok"],
         "collector_ok": state["collector_ok"],
         "signal_scanner_ok": state["signal_scanner_ok"],
+        "evaluator_ok": state["evaluator_ok"],
         "paper_trading_only": PAPER_TRADING_ONLY,
     }
 
@@ -167,6 +182,7 @@ async def status():
     if state["db_ok"]:
         snapshot["counts"] = await counts()
         snapshot["rpc_budget"] = await usage_summary()
+        snapshot["outcome_summary"] = await outcome_summary()
     return snapshot
 
 
@@ -189,6 +205,18 @@ async def signals_recent(limit: int = 20):
     return {"signals": await recent_signals(limit)}
 
 
+@app.get("/outcomes/recent")
+async def outcomes_recent(limit: int = 50):
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 200")
+    return {"outcomes": await recent_outcomes(limit)}
+
+
+@app.get("/outcomes/summary")
+async def outcomes_summary_endpoint():
+    return {"summary": await outcome_summary()}
+
+
 @app.get("/rpc-check")
 async def rpc_check():
     slot = await rpc_call("getSlot")
@@ -209,3 +237,10 @@ async def signals_run_once():
         raise HTTPException(status_code=403, detail="research guard disabled")
     created = await scan_convergence(window_minutes=30, min_wallets=3)
     return {"ok": True, "created": created}
+
+
+@app.post("/outcomes/run-once")
+async def outcomes_run_once():
+    if not PAPER_TRADING_ONLY:
+        raise HTTPException(status_code=403, detail="research guard disabled")
+    return {"ok": True, **(await evaluate_due_signals())}
