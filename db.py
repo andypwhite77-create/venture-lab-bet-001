@@ -1,7 +1,6 @@
 import json
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 
 import asyncpg
 
@@ -41,6 +40,8 @@ CREATE TABLE IF NOT EXISTS observed_transactions (
 );
 CREATE INDEX IF NOT EXISTS idx_observed_transactions_wallet_time
     ON observed_transactions(wallet, block_time DESC);
+CREATE INDEX IF NOT EXISTS idx_observed_transactions_time
+    ON observed_transactions(block_time DESC);
 
 CREATE TABLE IF NOT EXISTS signal_events (
     id BIGSERIAL PRIMARY KEY,
@@ -53,6 +54,8 @@ CREATE TABLE IF NOT EXISTS signal_events (
     reference_price DOUBLE PRECISION,
     payload JSONB NOT NULL DEFAULT '{}'::jsonb
 );
+CREATE INDEX IF NOT EXISTS idx_signal_events_name_mint_time
+    ON signal_events(signal_name, mint, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS paper_trades (
     id BIGSERIAL PRIMARY KEY,
@@ -123,7 +126,7 @@ async def upsert_wallet(address: str, source: str):
     async with connection() as conn:
         await conn.execute(
             """
-            INSERT INTO wallets(address, source) VALUES($1,$2)
+            INSERT INTO wallets(address, source, tx_count) VALUES($1,$2,1)
             ON CONFLICT(address) DO UPDATE SET
               last_seen=NOW(),
               tx_count=wallets.tx_count+1,
@@ -161,6 +164,63 @@ async def save_transaction(summary: dict):
             summary.get("success", True), summary.get("native_delta_lamports"),
             json.dumps(summary.get("token_deltas", [])), json.dumps(summary.get("raw_summary", {})),
         )
+
+
+async def recent_received_tokens(window_minutes: int = 30):
+    async with connection() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT t.signature, t.wallet, t.block_time,
+                   d.elem->>'mint' AS mint,
+                   (d.elem->>'delta')::double precision AS delta
+            FROM observed_transactions t
+            CROSS JOIN LATERAL jsonb_array_elements(t.token_deltas) AS d(elem)
+            WHERE t.success = TRUE
+              AND t.wallet IS NOT NULL
+              AND t.block_time >= NOW() - ($1 * INTERVAL '1 minute')
+              AND (d.elem->>'delta')::double precision > 0
+            ORDER BY t.block_time DESC
+            """,
+            window_minutes,
+        )
+        return [dict(r) for r in rows]
+
+
+async def signal_exists_recently(signal_name: str, mint: str, window_minutes: int) -> bool:
+    async with connection() as conn:
+        return bool(await conn.fetchval(
+            """
+            SELECT 1 FROM signal_events
+            WHERE signal_name=$1 AND mint=$2
+              AND created_at >= NOW() - ($3 * INTERVAL '1 minute')
+            LIMIT 1
+            """,
+            signal_name, mint, window_minutes,
+        ))
+
+
+async def create_signal_event(signal_name: str, mint: str, direction: str, confidence: float, payload=None, wallet=None, reference_price=None):
+    async with connection() as conn:
+        return await conn.fetchval(
+            """
+            INSERT INTO signal_events(signal_name,wallet,mint,direction,confidence,reference_price,payload)
+            VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)
+            RETURNING id
+            """,
+            signal_name, wallet, mint, direction, confidence, reference_price, json.dumps(payload or {}),
+        )
+
+
+async def recent_signals(limit: int = 50):
+    async with connection() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id,created_at,signal_name,wallet,mint,direction,confidence,reference_price,payload
+            FROM signal_events ORDER BY created_at DESC LIMIT $1
+            """,
+            limit,
+        )
+        return [dict(r) for r in rows]
 
 
 async def counts():
