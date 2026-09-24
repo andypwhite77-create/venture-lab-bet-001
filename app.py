@@ -6,14 +6,22 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import FastAPI, HTTPException
 
+from budget import (
+    assert_budget_available,
+    ensure_budget_schema,
+    estimate_credits,
+    record_rpc_usage,
+    usage_summary,
+)
 from collector import discover_from_jupiter
 from db import counts, init_db, recent_signals, recent_wallets, record_event, record_rpc_sample
 from signals import scan_convergence
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("signal-engine")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
-app = FastAPI(title="Venture Lab Bet 001", version="0.3.0")
+app = FastAPI(title="Venture Lab Bet 001", version="0.4.0")
 
 HELIUS_API_KEY = os.getenv("HELIUS_API_KEY", "")
 PAPER_TRADING_ONLY = os.getenv("PAPER_TRADING_ONLY", "true").lower() == "true"
@@ -39,6 +47,11 @@ state = {
 async def rpc_call(method: str, params=None):
     if not RPC_URL:
         raise RuntimeError("HELIUS_API_KEY is not configured")
+
+    estimated = estimate_credits(method)
+    if state["db_ok"]:
+        await assert_budget_available(estimated)
+
     payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or []}
     async with httpx.AsyncClient(timeout=25.0) as client:
         response = await client.post(RPC_URL, json=payload)
@@ -46,7 +59,10 @@ async def rpc_call(method: str, params=None):
         body = response.json()
         if "error" in body:
             raise RuntimeError(str(body["error"]))
-        return body.get("result")
+
+    if state["db_ok"]:
+        await record_rpc_usage(method, estimated)
+    return body.get("result")
 
 
 async def heartbeat():
@@ -56,6 +72,7 @@ async def heartbeat():
             state["latest_slot"] = slot
             state["last_rpc_check"] = datetime.now(timezone.utc).isoformat()
             state["rpc_ok"] = True
+            state["last_error"] = None
             if state["db_ok"]:
                 await record_rpc_sample(slot)
             log.info("Helius RPC healthy; latest slot=%s", slot)
@@ -75,6 +92,7 @@ async def collection_loop():
             state["collector_ok"] = True
             state["last_collection"] = datetime.now(timezone.utc).isoformat()
             state["last_collection_result"] = result
+            state["last_error"] = None
         except Exception as exc:
             state["collector_ok"] = False
             state["last_error"] = repr(exc)
@@ -94,6 +112,7 @@ async def signal_loop():
             state["signal_scanner_ok"] = True
             state["last_signal_scan"] = datetime.now(timezone.utc).isoformat()
             state["last_signal_result"] = {"created": len(created), "signals": created}
+            state["last_error"] = None
             if created:
                 await record_event("info", "signal_created", f"Created {len(created)} convergence signal(s)", {"signals": created})
                 log.info("Created %s convergence signal(s)", len(created))
@@ -115,7 +134,8 @@ async def startup_event():
     try:
         await init_db()
         state["db_ok"] = True
-        await record_event("info", "startup", "Signal engine research build started", {"version": "0.3.0"})
+        await ensure_budget_schema()
+        await record_event("info", "startup", "Signal engine research build started", {"version": "0.4.0"})
     except Exception as exc:
         state["db_ok"] = False
         state["last_error"] = repr(exc)
@@ -125,7 +145,7 @@ async def startup_event():
     asyncio.create_task(heartbeat())
     asyncio.create_task(collection_loop())
     asyncio.create_task(signal_loop())
-    log.info("Signal engine v0.3 started in paper-trading-only mode")
+    log.info("Signal engine v0.4 started in paper-trading-only mode")
 
 
 @app.get("/health")
@@ -146,7 +166,13 @@ async def status():
     snapshot = dict(state)
     if state["db_ok"]:
         snapshot["counts"] = await counts()
+        snapshot["rpc_budget"] = await usage_summary()
     return snapshot
+
+
+@app.get("/budget")
+async def budget_status():
+    return await usage_summary()
 
 
 @app.get("/wallets/recent")
