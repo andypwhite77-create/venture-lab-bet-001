@@ -57,6 +57,21 @@ CREATE TABLE IF NOT EXISTS signal_events (
 CREATE INDEX IF NOT EXISTS idx_signal_events_name_mint_time
     ON signal_events(signal_name, mint, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS signal_outcomes (
+    id BIGSERIAL PRIMARY KEY,
+    signal_event_id BIGINT NOT NULL REFERENCES signal_events(id) ON DELETE CASCADE,
+    horizon_minutes INTEGER NOT NULL,
+    measured_at TIMESTAMPTZ NOT NULL,
+    price DOUBLE PRECISION NOT NULL,
+    raw_return_pct DOUBLE PRECISION,
+    assumed_cost_bps DOUBLE PRECISION NOT NULL DEFAULT 0,
+    net_return_pct DOUBLE PRECISION,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(signal_event_id, horizon_minutes)
+);
+CREATE INDEX IF NOT EXISTS idx_signal_outcomes_horizon
+    ON signal_outcomes(horizon_minutes, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS paper_trades (
     id BIGSERIAL PRIMARY KEY,
     signal_event_id BIGINT REFERENCES signal_events(id),
@@ -223,6 +238,81 @@ async def recent_signals(limit: int = 50):
         return [dict(r) for r in rows]
 
 
+async def due_signal_outcomes(horizons_minutes, limit: int = 100):
+    async with connection() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT s.id AS signal_id, s.created_at, s.mint, s.reference_price, h.horizon_minutes
+            FROM signal_events s
+            CROSS JOIN UNNEST($1::int[]) AS h(horizon_minutes)
+            LEFT JOIN signal_outcomes o
+              ON o.signal_event_id=s.id AND o.horizon_minutes=h.horizon_minutes
+            WHERE s.mint IS NOT NULL
+              AND o.id IS NULL
+              AND NOW() >= s.created_at + (h.horizon_minutes * INTERVAL '1 minute')
+            ORDER BY s.created_at ASC, h.horizon_minutes ASC
+            LIMIT $2
+            """,
+            list(horizons_minutes), limit,
+        )
+        return [dict(r) for r in rows]
+
+
+async def set_signal_reference_price_if_missing(signal_event_id: int, price: float):
+    async with connection() as conn:
+        await conn.execute(
+            "UPDATE signal_events SET reference_price=COALESCE(reference_price,$2) WHERE id=$1",
+            signal_event_id, price,
+        )
+
+
+async def record_signal_outcome(signal_event_id: int, horizon_minutes: int, measured_at, price: float, raw_return_pct, assumed_cost_bps: float, net_return_pct):
+    async with connection() as conn:
+        await conn.execute(
+            """
+            INSERT INTO signal_outcomes(
+              signal_event_id,horizon_minutes,measured_at,price,raw_return_pct,assumed_cost_bps,net_return_pct
+            ) VALUES($1,$2,$3,$4,$5,$6,$7)
+            ON CONFLICT(signal_event_id,horizon_minutes) DO NOTHING
+            """,
+            signal_event_id, horizon_minutes, measured_at, price,
+            raw_return_pct, assumed_cost_bps, net_return_pct,
+        )
+
+
+async def outcome_summary():
+    async with connection() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT horizon_minutes,
+                   COUNT(*) AS samples,
+                   AVG(raw_return_pct) AS avg_raw_return_pct,
+                   AVG(net_return_pct) AS avg_net_return_pct,
+                   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY net_return_pct) AS median_net_return_pct,
+                   AVG(CASE WHEN net_return_pct > 0 THEN 1.0 ELSE 0.0 END) AS net_win_rate
+            FROM signal_outcomes
+            GROUP BY horizon_minutes
+            ORDER BY horizon_minutes
+            """
+        )
+        return [dict(r) for r in rows]
+
+
+async def recent_outcomes(limit: int = 100):
+    async with connection() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT o.id,o.signal_event_id,s.signal_name,s.mint,s.created_at AS signal_created_at,
+                   o.horizon_minutes,o.measured_at,o.price,o.raw_return_pct,o.assumed_cost_bps,o.net_return_pct
+            FROM signal_outcomes o
+            JOIN signal_events s ON s.id=o.signal_event_id
+            ORDER BY o.measured_at DESC LIMIT $1
+            """,
+            limit,
+        )
+        return [dict(r) for r in rows]
+
+
 async def counts():
     async with connection() as conn:
         row = await conn.fetchrow("""
@@ -230,6 +320,7 @@ async def counts():
             (SELECT COUNT(*) FROM wallets) AS wallets,
             (SELECT COUNT(*) FROM observed_transactions) AS transactions,
             (SELECT COUNT(*) FROM signal_events) AS signals,
+            (SELECT COUNT(*) FROM signal_outcomes) AS signal_outcomes,
             (SELECT COUNT(*) FROM paper_trades) AS paper_trades,
             (SELECT COUNT(*) FROM rpc_samples) AS rpc_samples
         """)
