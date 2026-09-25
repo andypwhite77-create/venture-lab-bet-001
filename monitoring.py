@@ -55,6 +55,18 @@ def health_alerts(state: dict, budget: dict | None = None) -> list[str]:
     if signal_age is None or signal_age > 420:
         alerts.append("Signal scanner has not completed successfully in the last 7 minutes")
 
+    research_age = age_seconds(state.get("last_research_cycle"))
+    if research_age is None or research_age > 420:
+        alerts.append("Research strategy loop has not completed successfully in the last 7 minutes")
+
+    evaluation_age = age_seconds(state.get("last_evaluation"))
+    if evaluation_age is None or evaluation_age > 420:
+        alerts.append("Outcome evaluator has not completed successfully in the last 7 minutes")
+
+    path_age = age_seconds(state.get("last_path_sample"))
+    if path_age is None or path_age > 420:
+        alerts.append("Trade price-path sampler has not completed successfully in the last 7 minutes")
+
     if state.get("last_error"):
         alerts.append(f"Latest engine error: {state['last_error']}")
 

@@ -25,15 +25,18 @@ from db import (
     record_event,
     record_rpc_sample,
 )
-from evaluator import evaluate_due_signals, evaluator_loop
+from evaluator import evaluate_due_research, evaluate_due_signals, evaluator_loop
 from monitoring import health_alerts, send_telegram, telegram_enabled
+from path_sampler import path_sampler_loop, sample_active_paths
 from signals import scan_convergence
+from research import research_loop, run_research_cycle
+from research_db import ensure_research_schema, price_path_counts, recent_candidates, research_counts, research_scoreboard
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("signal-engine")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-app = FastAPI(title="Venture Lab Bet 001", version="0.6.0")
+app = FastAPI(title="Venture Lab Bet 001", version="1.0.0")
 
 HELIUS_API_KEY = os.getenv("HELIUS_API_KEY", "")
 PAPER_TRADING_ONLY = os.getenv("PAPER_TRADING_ONLY", "true").lower() == "true"
@@ -48,12 +51,18 @@ state = {
     "collector_ok": False,
     "signal_scanner_ok": False,
     "evaluator_ok": False,
+    "research_ok": False,
+    "path_sampler_ok": False,
     "last_collection": None,
     "last_collection_result": None,
     "last_signal_scan": None,
     "last_signal_result": None,
     "last_evaluation": None,
     "last_evaluation_result": None,
+    "last_research_cycle": None,
+    "last_research_result": None,
+    "last_path_sample": None,
+    "last_path_result": None,
     "last_error": None,
     "paper_trading_only": PAPER_TRADING_ONLY,
     "telegram_enabled": telegram_enabled(),
@@ -176,7 +185,8 @@ async def startup_event():
         await init_db()
         state["db_ok"] = True
         await ensure_budget_schema()
-        await record_event("info", "startup", "Signal engine research build started", {"version": "0.6.0"})
+        await ensure_research_schema()
+        await record_event("info", "startup", "Venture Lab multi-strategy research engine started", {"version": "1.0.0"})
     except Exception as exc:
         state["db_ok"] = False
         state["last_error"] = repr(exc)
@@ -187,19 +197,24 @@ async def startup_event():
     asyncio.create_task(collection_loop())
     asyncio.create_task(signal_loop())
     asyncio.create_task(evaluator_loop(state))
+    asyncio.create_task(research_loop(state))
+    asyncio.create_task(path_sampler_loop(state))
     asyncio.create_task(monitoring_loop())
-    log.info("Signal engine v0.6 started in paper-trading-only mode")
+    log.info("Venture Lab v1.0 multi-strategy research engine started in shadow mode")
 
     if telegram_enabled():
         try:
-            await send_telegram("Venture Lab signal engine v0.6 started — paper/research mode only.")
+            await send_telegram("Venture Lab v1.0 research engine started — shadow/paper mode only.")
         except Exception as exc:
             log.warning("Startup Telegram notification failed: %r", exc)
 
 
 @app.get("/health")
 async def health():
-    ok = state["rpc_ok"] and state["db_ok"]
+    ok = all(state[k] for k in (
+        "rpc_ok", "db_ok", "collector_ok", "signal_scanner_ok",
+        "evaluator_ok", "research_ok", "path_sampler_ok",
+    ))
     return {
         "ok": ok,
         "rpc_ok": state["rpc_ok"],
@@ -207,6 +222,8 @@ async def health():
         "collector_ok": state["collector_ok"],
         "signal_scanner_ok": state["signal_scanner_ok"],
         "evaluator_ok": state["evaluator_ok"],
+        "research_ok": state["research_ok"],
+        "path_sampler_ok": state["path_sampler_ok"],
         "paper_trading_only": PAPER_TRADING_ONLY,
     }
 
@@ -218,21 +235,30 @@ async def status():
         snapshot["counts"] = await counts()
         snapshot["rpc_budget"] = await usage_summary()
         snapshot["outcome_summary"] = await outcome_summary()
+        snapshot["research_counts"] = await research_counts()
+        snapshot["research_scoreboard"] = await research_scoreboard()
+        snapshot["price_path_counts"] = await price_path_counts()
     return snapshot
 
 
 @app.get("/monitoring")
 async def monitoring_status():
     budget = await usage_summary() if state["db_ok"] else None
+    alerts = health_alerts(state, budget)
+    components_ok = all(state[k] for k in (
+        "rpc_ok", "db_ok", "collector_ok", "signal_scanner_ok",
+        "evaluator_ok", "research_ok", "path_sampler_ok",
+    ))
     return {
-        "healthy": bool(state["rpc_ok"] and state["db_ok"] and not state["active_alerts"]),
+        "healthy": bool(components_ok and not alerts),
         "telegram_enabled": telegram_enabled(),
-        "alerts": health_alerts(state, budget),
+        "alerts": alerts,
         "counts": await counts() if state["db_ok"] else {},
         "budget": budget,
         "last_collection": state["last_collection"],
         "last_signal_scan": state["last_signal_scan"],
         "last_evaluation": state["last_evaluation"],
+        "last_research_cycle": state["last_research_cycle"],
         "latest_slot": state["latest_slot"],
     }
 
@@ -304,4 +330,30 @@ async def signals_run_once():
 async def outcomes_run_once():
     if not PAPER_TRADING_ONLY:
         raise HTTPException(status_code=403, detail="research guard disabled")
-    return {"ok": True, **(await evaluate_due_signals())}
+    return {"ok": True, "signals": await evaluate_due_signals(), "research": await evaluate_due_research()}
+
+
+@app.post("/research/run-once")
+async def research_run_once():
+    if not PAPER_TRADING_ONLY:
+        raise HTTPException(status_code=403, detail="research guard disabled")
+    return {"ok": True, **(await run_research_cycle())}
+
+
+@app.get("/research/candidates")
+async def research_candidates(limit: int = 50, shadow_only: bool = False):
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 200")
+    return {"candidates": await recent_candidates(limit, shadow_only)}
+
+
+@app.get("/research/scoreboard")
+async def research_scoreboard_endpoint():
+    return {"counts": await research_counts(), "scoreboard": await research_scoreboard()}
+
+
+@app.post("/research/sample-paths")
+async def research_sample_paths():
+    if not PAPER_TRADING_ONLY:
+        raise HTTPException(status_code=403, detail="research guard disabled")
+    return {"ok": True, **(await sample_active_paths())}
