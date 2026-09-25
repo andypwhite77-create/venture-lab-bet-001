@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 
 from budget import (
     assert_budget_available,
@@ -25,13 +26,14 @@ from db import (
     record_rpc_sample,
 )
 from evaluator import evaluate_due_signals, evaluator_loop
+from monitoring import health_alerts, send_telegram, telegram_enabled
 from signals import scan_convergence
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("signal-engine")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-app = FastAPI(title="Venture Lab Bet 001", version="0.5.0")
+app = FastAPI(title="Venture Lab Bet 001", version="0.6.0")
 
 HELIUS_API_KEY = os.getenv("HELIUS_API_KEY", "")
 PAPER_TRADING_ONLY = os.getenv("PAPER_TRADING_ONLY", "true").lower() == "true"
@@ -54,6 +56,8 @@ state = {
     "last_evaluation_result": None,
     "last_error": None,
     "paper_trading_only": PAPER_TRADING_ONLY,
+    "telegram_enabled": telegram_enabled(),
+    "active_alerts": [],
 }
 
 
@@ -129,6 +133,12 @@ async def signal_loop():
             if created:
                 await record_event("info", "signal_created", f"Created {len(created)} convergence signal(s)", {"signals": created})
                 log.info("Created %s convergence signal(s)", len(created))
+                if telegram_enabled():
+                    await send_telegram(
+                        "Venture Lab: new convergence signal(s)\n"
+                        f"Created: {len(created)}\n"
+                        "Research/paper mode only."
+                    )
         except Exception as exc:
             state["signal_scanner_ok"] = False
             state["last_error"] = repr(exc)
@@ -140,6 +150,24 @@ async def signal_loop():
         await asyncio.sleep(120)
 
 
+async def monitoring_loop():
+    await asyncio.sleep(45)
+    previous = set()
+    while True:
+        try:
+            budget = await usage_summary() if state["db_ok"] else None
+            alerts = health_alerts(state, budget)
+            state["active_alerts"] = alerts
+            current = set(alerts)
+            new_alerts = current - previous
+            if new_alerts and telegram_enabled():
+                await send_telegram("Venture Lab alert\n" + "\n".join(f"• {a}" for a in sorted(new_alerts)))
+            previous = current
+        except Exception as exc:
+            log.warning("Monitoring loop failed: %r", exc)
+        await asyncio.sleep(60)
+
+
 @app.on_event("startup")
 async def startup_event():
     if not PAPER_TRADING_ONLY:
@@ -148,7 +176,7 @@ async def startup_event():
         await init_db()
         state["db_ok"] = True
         await ensure_budget_schema()
-        await record_event("info", "startup", "Signal engine research build started", {"version": "0.5.0"})
+        await record_event("info", "startup", "Signal engine research build started", {"version": "0.6.0"})
     except Exception as exc:
         state["db_ok"] = False
         state["last_error"] = repr(exc)
@@ -159,7 +187,14 @@ async def startup_event():
     asyncio.create_task(collection_loop())
     asyncio.create_task(signal_loop())
     asyncio.create_task(evaluator_loop(state))
-    log.info("Signal engine v0.5 started in paper-trading-only mode")
+    asyncio.create_task(monitoring_loop())
+    log.info("Signal engine v0.6 started in paper-trading-only mode")
+
+    if telegram_enabled():
+        try:
+            await send_telegram("Venture Lab signal engine v0.6 started — paper/research mode only.")
+        except Exception as exc:
+            log.warning("Startup Telegram notification failed: %r", exc)
 
 
 @app.get("/health")
@@ -184,6 +219,32 @@ async def status():
         snapshot["rpc_budget"] = await usage_summary()
         snapshot["outcome_summary"] = await outcome_summary()
     return snapshot
+
+
+@app.get("/monitoring")
+async def monitoring_status():
+    budget = await usage_summary() if state["db_ok"] else None
+    return {
+        "healthy": bool(state["rpc_ok"] and state["db_ok"] and not state["active_alerts"]),
+        "telegram_enabled": telegram_enabled(),
+        "alerts": health_alerts(state, budget),
+        "counts": await counts() if state["db_ok"] else {},
+        "budget": budget,
+        "last_collection": state["last_collection"],
+        "last_signal_scan": state["last_signal_scan"],
+        "last_evaluation": state["last_evaluation"],
+        "latest_slot": state["latest_slot"],
+    }
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    return """<!doctype html>
+<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Venture Lab</title>
+<style>body{font-family:system-ui;margin:24px;background:#10131a;color:#e8edf5}pre{white-space:pre-wrap;background:#171c26;padding:16px;border-radius:12px}h1{font-size:22px}</style>
+</head><body><h1>Venture Lab — Research Engine</h1><p>Paper-trading mode. Auto-refreshes every 15 seconds.</p><pre id='out'>Loading…</pre>
+<script>async function go(){try{let r=await fetch('/monitoring');let j=await r.json();document.getElementById('out').textContent=JSON.stringify(j,null,2)}catch(e){document.getElementById('out').textContent=String(e)}}go();setInterval(go,15000)</script></body></html>"""
 
 
 @app.get("/budget")
