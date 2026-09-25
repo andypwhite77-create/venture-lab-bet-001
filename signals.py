@@ -2,12 +2,13 @@ from collections import defaultdict
 from datetime import timedelta
 
 from db import create_signal_event, recent_received_tokens, signal_exists_recently
+from marketdata import fetch_prices
 
 # Common quote / base assets we do not want to treat as accumulation targets.
 IGNORE_MINTS = {
     "So11111111111111111111111111111111111111112",  # wrapped SOL
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
-    "Es9vMFrzaCERmJfrF4H2FYD2Q9S7D3Yj5YVyn8FcJ9m",   # USDT
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",   # USDT
 }
 
 
@@ -51,12 +52,15 @@ async def scan_convergence(window_minutes: int = 30, min_wallets: int = 3):
             "events": bucket["events"][-20:],
             "research_only": True,
         }
+        prices = await fetch_prices([mint])
+        reference_price = prices.get(mint)
         signal_id = await create_signal_event(
             signal_name="wallet_convergence_v1",
             mint=mint,
             direction="long_candidate",
             confidence=confidence,
             payload=payload,
+            reference_price=reference_price,
         )
         created.append({
             "id": signal_id,

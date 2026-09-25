@@ -114,7 +114,7 @@ async def discover_from_jupiter(rpc_call, log, batch_size: int = 2):
                 signature,
                 {
                     "encoding": "jsonParsed",
-                    "maxSupportedTransactionVersion": 0,
+                    "maxSupportedTransactionVersion": 1,
                     "commitment": "confirmed",
                 },
             ],
