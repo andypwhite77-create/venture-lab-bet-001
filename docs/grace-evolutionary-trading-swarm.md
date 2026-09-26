@@ -1,402 +1,134 @@
 # Grace Evolutionary Trading Swarm
 
-Status: concept / architecture note
-Date: 2026-09-25
+Status: implemented prospective paper experiment
+Updated: 2026-09-26
 
 ## Core idea
 
-Turn the current Solana paper-trading experiment into an evolutionary swarm of many small, tightly constrained trading bots coordinated by Grace.
+Build a market research organism rather than one giant AI trader. A central sensing layer observes the market; many simple structured genomes (“ants”) interpret that shared environment; strategy families compete; a small Core/Queen proposes experiments; a separate Sceptic attacks them; deterministic software controls validation, risk, execution and authority.
 
-The goal is not to build one giant AI trader. The goal is to build a research-and-allocation system that continuously discovers, challenges, tests, promotes, scales down, retires, and replaces small strategy bots.
+The long-run objective is a research factory that discovers, tests, kills and reproduces small positive-expectancy behaviours without requiring a human to hand-design the eventual winning strategy.
 
-Intelligence lives at the colony level. Individual bots stay deliberately simple.
+## What is now running
+
+The prototype has moved beyond the original concept note. It now runs continuously on a VPS with PostgreSQL and Docker Compose. A persistent paper daemon survives restarts. The forward population contains momentum, reversal and wallet-convergence families and has been around 89 distinct genomes during the initial run.
+
+The colony can originate its own prospective paper intents. Each intent records candidate, family, exact contributing genome IDs and consensus count, requests an executable Jupiter quote, passes through deterministic risk limits, enters an execution ledger with `broadcast=false`, and is subsequently marked using later independent market prices.
+
+This is deliberately separate from the older external wallet-convergence signal stream. Historical external signals are not falsely labelled as having been authored by an ant.
+
+## Current paper-risk envelope
+
+The initial colony-native run uses:
+
+- 0.005 SOL nominal paper position size;
+- 0.1 SOL aggregate simulated exposure ceiling;
+- no real transaction broadcasting;
+- modelled execution friction;
+- executable quote capture before acceptance;
+- deterministic duplicate/exposure protection.
+
+The risk gate has already demonstrated a refusal when aggregate exposure reached its ceiling. The colony cannot increase its own allocation.
+
+The 0.1 SOL ceiling is an exposure allowance, not yet a complete cash-account bankroll. Until proper account accounting is implemented, performance should be described as P&L generated under that exposure envelope rather than a rigorous return on a £9 account.
+
+## Performance telemetry
+
+A live read-only dashboard is available at `https://colony.cobaltindustrial.tech/dashboard`. It displays colony-native bets, number marked, win rate, cumulative net P&L, SOL-to-GBP equivalent, ant population, real transaction count, equity/P&L curve, bloodline results, attributed trades and Queen/Sceptic state. Bloodline net values are displayed in both SOL and GBP.
+
+“Marked” means a paper bet has been repriced against a later live market price and therefore has a measurable mark-to-market P&L. It does not yet mean a strategy-defined exit has closed the position. Future versions should explicitly separate OPEN, MARKED/MTM and CLOSED.
+
+The dashboard is intentionally observational. The public gateway does not expose signing or trading-control endpoints.
 
 ## Economic objective
 
-The experiment starts from a deliberately tiny amount of external capital.
+The eventual experiment is whether tiny external capital can grow without repeated owner injections while paying for its own infrastructure. Permanent accounting should track original external capital, additional owner capital, equity, realised/unrealised P&L, withdrawals, data/model/server costs, drawdown and return per pound of external capital.
 
-The long-run ideal is:
+The earlier £25-per-bot/£100 benchmark was a useful conceptual convention but is not the accounting model of the current colony-native run. The implemented paper run instead uses the SOL exposure limits above. Do not mix the two when reporting results.
 
-- bots begin with tiny allocations such as £25;
-- successful bots compound their own capital rather than requiring repeated owner injections;
-- profitable bots contribute part of profits to a colony treasury;
-- the treasury funds new probationary bots;
-- the swarm grows primarily from internally generated capital;
-- external capital introduced remains tiny relative to eventual equity and withdrawals.
+## Evolutionary objective
 
-The important accounting metrics should therefore include:
+Failure is necessary. Weak genomes should lose reproductive opportunity; useful descendants should gain it. But the system must distinguish strategy failure from infrastructure blindness.
 
-- original external capital introduced;
-- additional owner capital introduced;
-- current colony equity;
-- cumulative realised profit;
-- cumulative withdrawn profit;
-- total infrastructure/data/model costs;
-- net system income after all costs;
-- return generated per £ of external capital introduced.
+A concrete example occurred when the Helius research-credit governor reached its configured 32,000-credit daily ceiling. Wallet observations stopped updating, so wallet-convergence genomes ceased firing while momentum and reversal continued. That is not evidence that wallet convergence failed. The correct response is to repair/optimise the sensor, expose sensor staleness and prevent blind periods from affecting fitness.
 
-The original £100 benchmark should remain visible permanently even if the system grows far beyond it.
+The desired causal chain is:
 
-## Current benchmark convention
+`genome → decision → executable quote → outcome → fitness → reproduction`
 
-For human-readable updates, maintain a running hypothetical benchmark in which each core bot began with £25.
+The strongest evidence for the architecture would not be one profitable early batch. It would be that fitness measured on past prospective observations predicts performance on unseen future observations, and that later descendants prospectively outperform their ancestors.
 
-Unless deliberately changed later, use the same fixed 15-minute exit convention for comparability and include assumed trading friction.
+## Ecological specialisation
 
-Each update should include:
+Do not assume one globally superior family must emerge. Different assets and regimes may support different niches: persistent trends may favour momentum; choppy/mean-reverting markets may favour reversal; wallet accumulation may be useful as a separate sensor; cross-sensory descendants may discover combinations that none of the original families encode.
 
-- £25-per-bot running balances;
-- total £100 benchmark balance;
-- trade count per strategy;
-- current best and worst behaviours;
-- emerging patterns worth watching;
-- explicit warning when sample sizes remain small.
+Time horizon may itself evolve. A mature ecology could contain second/minute scalpers, short reversal specialists and longer momentum lineages. Any rapid-trading behaviour must survive realistic spread, slippage, priority fees, failed transactions, latency and adverse selection. High turnover is not rewarded unless net expectancy remains positive after those costs.
 
-## Grace as research director
+Raw win rate is therefore secondary. A 43% strategy can be excellent if its winners dominate; a 60% strategy can be economically useless if its losses are larger. Fitness should focus on expectancy after friction, return distribution and risk.
 
-Grace should not directly improvise live trades.
+## Core / Queen
 
-Grace's role is to:
+The Core is a small research director, not an unconstrained trader. It consumes compressed state, proposes falsifiable experiments and mutations, identifies underexplored regions and allocates bounded research attention. It does not hold signing authority.
 
-1. ingest observed market and bot data;
-2. identify candidate patterns;
-3. formulate falsifiable strategy hypotheses;
-4. generate a precise strategy specification;
-5. submit it to adversarial review;
-6. spin up a paper-only bot when approved;
-7. monitor forward performance;
-8. promote, demote, retire, or replace bots under deterministic rules.
+Inference failure is fail-closed. A recent connection failure produced `inference_error`; because no valid Core proposal existed, the Sceptic returned `core_failed` rather than inventing a judgement. Technical failure, genuine Sceptic rejection and successful Queen decisions should be distinct telemetry states.
 
-A proposed strategy should include at minimum:
+## Sceptic
 
-- strategy/version ID;
-- entry conditions;
-- exit conditions;
-- stop conditions;
-- maximum holding time;
-- liquidity requirements;
-- cost/slippage assumptions;
-- sample on which the idea was discovered;
-- status: untested, paper, probation, live, reduced, retired.
+The Sceptic independently attacks sample size, multiple testing, leakage, survivorship bias, transaction-cost assumptions, outlier dependence, concentration, regime dependence and weak falsifiability. Its purpose is to force better experiments, not to veto by personality.
 
-## The Sceptic
+A real rejection should contain a valid Core proposal, a substantive Sceptic objection and a deterministic validation outcome. Infrastructure failure is not disagreement.
 
-Grace includes a separate sceptic LLM whose job is to disagree with proposals and force Grace to reason its decisions.
+## Central sensing architecture
 
-The sceptic should attack:
+External providers feed one central environment rather than every ant independently calling APIs. This keeps costs bounded and gives all genomes comparable evidence. Ants evolve how to interpret observations, not how to purchase data.
 
-- sample size;
-- overfitting;
-- multiple-hypothesis/data-mining bias;
-- leakage/look-ahead bias;
-- survivorship bias;
-- transaction-cost assumptions;
-- slippage assumptions;
-- dependence on one or two outliers;
-- concentration in one token, liquidity bucket, hour, day, or regime;
-- fragile parameter choices;
-- alternative explanations;
-- poor falsifiability.
+The sensor layer should expose facts plus health metadata: values, age, coverage, confidence/provider state. Missing data must be `unavailable/stale`, never silently converted into a meaningful zero.
 
-The sceptic's purpose is not to be right. Its purpose is to make weak ideas uncomfortable.
+Additional APIs are most valuable as redundant independent eyes and failover. They should be added after measuring coverage and cost, not simply to compensate for inefficient polling.
 
-Grace must answer objections with evidence. Where possible, the sceptic should propose explicit falsification tests rather than generic criticism.
+## Validation ladder
 
-Important design principle: the sceptic should be as independent from Grace's prior reasoning and enthusiasm as practical, reducing anchoring.
+The intended ladder remains:
 
-## Validation and promotion ladder
+Discovery → prospective shadow/paper → frozen out-of-sample paper → tiny live probation → limited live → production.
 
-A strategy should never move directly from discovery to live money.
+Promotion must be deterministic and evidence-gated. Candidate criteria include positive expectancy after stressed costs, adequate sample size, acceptable drawdown/tail loss, limited outlier dependence, robustness across regimes and stable behaviour after freezing.
 
-Suggested ladder:
+The current experiment is still in prospective paper mode. Real broadcasts remain zero.
 
-Discovery
-→ historical hypothesis
-→ shadow/paper test
-→ frozen out-of-sample paper test
-→ tiny live probation
-→ limited live
-→ production
+## Experimental discipline
 
-Promotion must depend on both elapsed time and number of qualifying trades. A week containing only a handful of trades is not sufficient evidence.
+Do not tune thresholds because a bloodline is losing. Do not lower qualification standards to create more activity. Do not choose exits retrospectively because they make results attractive. Infrastructure bugs can be fixed, but strategy changes must create a new version rather than rewrite the baseline.
 
-Promotion criteria should be deterministic and auditable, not based on an LLM's confidence alone.
+Useful observation checkpoints are approximately 100, 250, 500 and 1,000 marked colony-native bets. At each checkpoint inspect net expectancy after friction, median outcome, profit factor, drawdown, tail risk, consensus size, family/genome separation, regime dependence, correlation and prospective predictive power of fitness.
 
-Candidate criteria may include:
+Early green P&L is interesting but statistically weak. The experiment should be allowed to fail and adapt.
 
-- positive net expectancy;
-- positive median return;
-- profitability after stressed transaction costs;
-- minimum sample size;
-- acceptable maximum drawdown;
-- acceptable tail loss;
-- no dependence on a single exceptional winner;
-- acceptable profit factor;
-- performance across different hours/days/regimes;
-- stable behaviour after rules are frozen;
-- successful forward/holdout performance.
+## Capital and blast-radius containment
 
-## Dynamic capital allocation
+No ant, Queen or Sceptic controls its own stake. A deterministic allocator/governor owns capital ceilings, paper/live state, exposure limits, loss limits and kill switches. No leverage or averaging-down capability should be introduced casually. Capital increases should be slow and reductions fast.
 
-Bots should not decide their own stake size.
+When real-money probation is eventually justified, it should use genuinely trivial capital. The first purpose of live execution is to test whether paper assumptions survive actual fills, latency, fees and slippage, not to maximise income.
 
-A separate allocator/risk engine controls capital.
+## Graveyard and memory
 
-Example capital ladder:
+Failed genomes and experiments should be preserved permanently with exact rules, version hashes, outcomes, market context, objections and retirement reasons. The colony should be able to answer “have we tried this before?” and use autopsies to generate descendants that address identifiable failure modes.
 
-- base: £10;
-- strong: £15;
-- very strong: £25;
-- exceptional: £50 maximum.
+## Near-term engineering priorities
 
-The exact values are placeholders and should be evidence-based later.
-
-Sizing should consider more than win streaks. Inputs may include:
-
-- rolling expectancy;
-- rolling median return;
-- rolling profit factor;
-- maximum drawdown;
-- current loss streak;
-- volatility of returns;
-- liquidity quality;
-- realised slippage;
-- sample size in the current window;
-- deviation from validation-period behaviour;
-- overall colony exposure.
-
-Capital increases should be slow and capital reductions fast.
-
-For example, a bot might need many strong trades to move upward but only one or two significant losses, a drawdown breach, or abnormal behaviour to step down quickly.
-
-## Blast-radius containment
-
-Assume every bot can eventually be wrong, buggy, compromised, overfit, or exposed to the wrong regime.
-
-Each bot therefore gets a deliberately tiny blast radius.
-
-Possible controls:
-
-- hard per-trade cap;
-- hard daily loss cap;
-- hard total drawdown cap;
-- no leverage by default;
-- no averaging down;
-- no permission to change its own risk limits;
-- no access to the master treasury;
-- no ability to grant itself more authority;
-- automatic disable on anomalous behaviour;
-- forced return to paper after specified breaches.
-
-Cultural/logging convention:
-
-`BOT_37_ROGUE_TRADE_ERROR -> SHOOT_BEHIND_SHED`
-
-This means isolate/disable the bot, preserve telemetry, diagnose the cause, and prevent recurrence. It is deliberately humorous language for a very real containment policy.
-
-## Distributed swarm architecture
-
-If the system grows, distribute it across several small servers/regions/providers for resilience and isolation.
-
-Benefits:
-
-- one server failure does not stop the colony;
-- one compromised machine cannot reach all capital;
-- strategy families can be isolated;
-- deployments can be staged;
-- operational risk is compartmentalised.
-
-The system should remain fully auditable and compliant. Distribution is for resilience and containment, not concealment.
-
-Possible layout:
-
-Grace / Sceptic / Validator
-→ policy engine
-→ capital allocator
-→ multiple isolated strategy servers
-→ tiny deterministic bots
-→ broker/exchange execution layer
-
-Each server should receive only the credentials and permissions it absolutely needs.
-
-## Evolutionary population model
-
-The swarm should have a finite number of live trading slots and paper-testing slots.
-
-Initial concept:
-
-- 6 live traders;
-- 10 paper traders.
-
-Every evaluation cycle, paper bots compete for survival and promotion.
-
-The bottom two paper bots are retired and two new bots are developed from fresh hypotheses.
-
-Do not rank bots only by raw weekly P&L. That would overreward luck and punish lower-frequency strategies.
-
-A paper-bot fitness score should consider:
-
-- net expectancy after costs;
-- median return;
-- drawdown;
-- tail risk;
-- consistency;
-- profit factor;
-- sample size;
-- dependence on outliers;
-- regime diversity;
-- capital efficiency.
-
-New bots should receive a protected minimum trial period and/or minimum number of qualifying trades before they can be culled.
-
-The strongest paper bot may challenge the weakest live bot, but promotion still requires passing a fixed promotion gate. Being first in a bad cohort is not enough.
-
-Retired bots should go into a permanent graveyard rather than being deleted.
-
-The graveyard should preserve:
-
-- exact rules;
-- strategy/version hash;
-- all results;
-- reason for retirement;
-- market conditions/regime;
-- sceptic objections;
-- failed validation tests.
-
-This prevents Grace from accidentally reinventing failed strategies later.
-
-## Population growth
-
-The colony expands only after the existing population proves stable enough to support it.
-
-Example stages:
-
-Seed colony:
-- 6 live;
-- 10 paper.
-
-Established colony:
-- 10 live;
-- 15 paper.
-
-Possible later mature colony:
-- 20 live;
-- 30 paper.
-
-Expansion is evidence-gated rather than ambition-gated.
-
-The preferred scaling path is breadth before size: find more genuinely independent edges before massively increasing capital behind one strategy.
-
-## Strategy independence
-
-Multiple bots only provide real diversification if their edge drivers are genuinely different.
-
-Five copies of the same reversal strategy are effectively one bet wearing five hats.
-
-The system should prefer diversity across:
-
-- strategy family;
-- time horizon;
-- data source;
-- market regime;
-- market/instrument;
-- execution style;
-- signal driver.
-
-## The research factory model
-
-The long-term target is not one magical strategy.
-
-The target is a machine that continuously manufactures small, boring positive-expectancy strategies.
-
-Grace finds experiments.
-The Sceptic attacks them.
-The Validator enforces fixed evidence rules.
-Paper bots collect forward evidence.
-Probation bots receive tiny real allocations.
-The allocator slowly rewards durable performance.
-Weak bots are starved, demoted, or retired.
-Successful bots fund the next generation.
-
-## Guard against false discovery
-
-An autonomous system capable of testing thousands of patterns will inevitably discover apparently amazing patterns by chance.
-
-Therefore:
-
-- exploratory data and validation data must be separated;
-- once a rule enters forward validation it should be frozen;
-- strategy/version fingerprints should be stored permanently;
-- holdout sets should be used where practical;
-- future data should be the ultimate arbiter;
-- multiple-testing bias must be treated as a core system risk;
-- parameter robustness matters more than finding the single best historical parameter;
-- every promoted strategy should survive harsher-than-expected costs and slippage.
-
-The guiding principle is: you cannot overfit tomorrow.
-
-## Grace intelligence vs execution intelligence
-
-Grace may be imaginative at the research layer.
-
-The money layer should be deliberately boring.
-
-A deterministic execution bot should do little more than verify that:
-
-- the strategy is approved;
-- the signal is valid;
-- capital is available;
-- exposure is below limits;
-- daily loss is below limits;
-- liquidity/slippage checks pass;
-- the exact pre-approved trade is still valid.
-
-Otherwise it does nothing.
-
-The component holding money should never have free-form authority to invent a new action.
-
-## Live probation concept
-
-If paper performance remains stable through the planned observation period, the first live trial should use genuinely trivial capital.
-
-Example concept discussed:
-
-- £25 total starting live capital;
-- tiny per-trade caps;
-- no leverage;
-- no averaging down;
-- hard daily loss limit;
-- automatic return to paper on abnormal behaviour;
-- no bot can increase its own allocation.
-
-The point is not to prove profitability quickly. The point is to validate that paper assumptions survive contact with real execution, fees, fills, latency, and slippage without creating meaningful financial risk.
-
-## Milestone philosophy
-
-Minimum-wage-equivalent income is considered a gold-standard long-run outcome, not a near-term expectation.
-
-At £12/hour continuously, 24/7 would be £2,016/week before tax and running costs, so even fractions of that would be economically meaningful.
-
-Suggested progression:
-
-- pay its own server/data/model costs for three consecutive months;
-- produce £100/month net;
-- produce £250/month net;
-- continue upward only if returns remain durable and risk limits do not loosen;
-- treat minimum-wage-equivalent net income as a major mature-system milestone.
-
-Measure net system income after fees, slippage, data, servers, model/API costs, and losses from retired bots.
+1. Optimise on-chain collection so the wallet sensor consumes fewer Helius credits.
+2. Add explicit sensor health/staleness and prevent missing inputs from affecting strategy fitness.
+3. Implement real paper-account accounting: starting equity, free cash, open exposure, realised/unrealised P&L, ROI, peak equity and maximum drawdown.
+4. Separate OPEN/MTM/CLOSED and eventually allow holding period/exit behaviour to evolve.
+5. Feed attributed outcomes back into genome/family fitness and reproduction.
+6. Improve Queen inference timeout/failover while keeping fail-closed semantics.
+7. Add redundant market/on-chain providers when measured need justifies them.
+8. Keep real-money execution disabled until prospective evidence clears fixed promotion gates.
 
 ## Core philosophy
 
 Do not build one genius trader.
 
-Build a colony of tiny, disposable, tightly constrained traders under a sceptical research-and-risk system.
+Build an ecology of tiny, disposable, tightly constrained traders inside a sceptical research-and-risk system.
 
-Intelligence at the colony level.
-Simplicity at the ant level.
-Increase slowly.
-Decrease quickly.
-Preserve every failure.
-Make every promotion earn its capital.
-Let profitable generations fund the next generation.
+One nervous system gathers reality. Many simple brains interpret it. Evolution decides which interpretations deserve descendants. The Queen directs research, not money. The governor controls authority. Preserve every failure. Let future data arbitrate every claim.
