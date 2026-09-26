@@ -115,3 +115,9 @@ Autonomous reproduction of bounded workers is permitted. Autonomous reproduction
 Can a small central intelligence plus adversarial review supervise a population of simple, disposable, tightly bounded agents that discovers robust positive-expectancy behaviour more efficiently than deterministic/random evolution alone?
 
 If the answer survives prospective testing, the architecture is relevant beyond trading: Grace can supervise specialist colonies whose workers are cheap, narrow and replaceable while authority remains deterministic and bounded.
+
+## Gen-3 → Gen-4 selection law (frozen 2026-09-26)
+
+The first active reproduction law is frozen before Gen 4 exists. Only evidence-qualified ants may enter selection. Reproductive access is limited to the top 49% within comparable niches, ranked primarily by prospective net economic performance after friction and capital-at-risk, with penalties for drawdown/tail loss and controls for evidence quality. Rare/sparse families receive diversity protection; inactivity caused by missing sensors is not failure.
+
+Weak qualified performers are demoted to shadow/paper and retained permanently rather than deleted. Capital privilege rises slowly with demonstrated economic fitness and falls faster after poor/tail outcomes. Descendants begin in paper probation. A 5–10% exploration reserve preserves mutation/diversity. Gen 4 is created at one recorded cutoff and may only be judged on future observations. Global capital limits, live promotion and constitutional authority remain deterministic and cannot evolve.
