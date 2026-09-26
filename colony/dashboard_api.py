@@ -1,6 +1,15 @@
-import json
+import json, os, time, urllib.request
 from db import connection
 from colony.execution_ledger import summary
+_fx={'rate':None,'at':0}
+def _sol_gbp():
+ now=time.time()
+ if _fx['rate'] is not None and now-_fx['at']<300:return _fx['rate']
+ try:
+  req=urllib.request.Request('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=gbp',headers={'x-cg-demo-api-key':os.getenv('COINGECKO_API_KEY','')})
+  with urllib.request.urlopen(req,timeout=4) as r: rate=float(json.load(r)['solana']['gbp'])
+  _fx.update(rate=rate,at=now);return rate
+ except Exception:return _fx['rate']
 async def _run(conn,run_id):
  trades=await conn.fetch('''SELECT intent_id,created_at,mint,side,notional,status,reason,quote,entry_price,mark_price,gross_pnl,friction_cost,net_pnl,broadcast FROM colony_execution_ledger WHERE run_id=$1 ORDER BY id DESC LIMIT 60''',run_id)
  curve=await conn.fetch('''SELECT created_at,net_pnl FROM colony_execution_ledger WHERE run_id=$1 AND net_pnl IS NOT NULL ORDER BY id''',run_id)
@@ -20,7 +29,10 @@ async def snapshot():
   fam=await c.fetch('''SELECT quote->'attribution'->>'family' family,count(*) trades,
    count(*) FILTER(WHERE net_pnl>0) wins,coalesce(sum(net_pnl),0) net
    FROM colony_execution_ledger WHERE run_id='colony-native-v1' GROUP BY 1 ORDER BY net DESC''')
-  return {'external':external,'native':native,'signals':[dict(x) for x in signals],
+  rate=_sol_gbp()
+  families=[dict(x) for x in fam]
+  for x in families:x['net_gbp']=float(x['net'])*rate if rate is not None else None
+  return {'external':external,'native':native,'sol_gbp':rate,'signals':[dict(x) for x in signals],
    'genomes':[dict(x) for x in genomes],'events':[dict(x) for x in events],
    'mind':[dict(x) for x in mind],'experiments':[dict(x) for x in exps],
-   'lineage':[dict(x) for x in lineage],'family_performance':[dict(x) for x in fam]}
+   'lineage':[dict(x) for x in lineage],'family_performance':families}
