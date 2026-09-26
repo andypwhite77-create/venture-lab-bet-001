@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timezone
 
 import httpx
+from rpc_provider import rpc_call as provider_rpc_call, configured as rpc_configured
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
@@ -47,6 +48,8 @@ state = {
     "last_rpc_check": None,
     "latest_slot": None,
     "rpc_ok": False,
+    "rpc_provider": None,
+    "rpc_configured": rpc_configured(),
     "db_ok": False,
     "collector_ok": False,
     "signal_scanner_ok": False,
@@ -71,24 +74,9 @@ state = {
 
 
 async def rpc_call(method: str, params=None):
-    if not RPC_URL:
-        raise RuntimeError("HELIUS_API_KEY is not configured")
-
-    estimated = estimate_credits(method)
-    if state["db_ok"]:
-        await assert_budget_available(estimated)
-
-    payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or []}
-    async with httpx.AsyncClient(timeout=25.0) as client:
-        response = await client.post(RPC_URL, json=payload)
-        response.raise_for_status()
-        body = response.json()
-        if "error" in body:
-            raise RuntimeError(str(body["error"]))
-
-    if state["db_ok"]:
-        await record_rpc_usage(method, estimated)
-    return body.get("result")
+    result, provider = await provider_rpc_call(method, params, db_ok=state["db_ok"])
+    state["rpc_provider"] = provider
+    return result
 
 
 async def heartbeat():
@@ -101,7 +89,7 @@ async def heartbeat():
             state["last_error"] = None
             if state["db_ok"]:
                 await record_rpc_sample(slot)
-            log.info("Helius RPC healthy; latest slot=%s", slot)
+            log.info("Solana RPC healthy provider=%s latest slot=%s", state.get("rpc_provider"), slot)
         except Exception as exc:
             state["rpc_ok"] = False
             state["last_error"] = repr(exc)
