@@ -2,6 +2,8 @@
 import asyncio
 from colony.sensors import snapshot
 from colony.execution_reconcile import pending,reconcile
+from colony.execution_reality import roundtrip
+from colony.execution_ledger import record_reality
 async def _price(mint):
  s=await snapshot(mint)
  vals=[float(x['price_usd']) for x in s['sources'] if x.get('ok') and x.get('price_usd')]
@@ -16,7 +18,10 @@ async def mark_pending(run_id='paper-livequote-v1',slippage_bps=100):
   if entry<=0:continue
   price,sources=await _price(r['mint'])
   if not price:continue
-  pnl=await reconcile(r['intent_id'],entry,price,slippage_bps,0.0)
-  out.append({'intent_id':r['intent_id'],'entry_price':entry,'mark_price':price,'pnl':pnl,'sources':sources['source_count']})
+  reality=roundtrip(r['mint'],q,float(r['notional']))
+  network_floor=0.0 # deliberately zero until empirically measured; never invent fees
+  pnl=await reconcile(r['intent_id'],entry,price,slippage_bps,network_floor)
+  await record_reality(r['intent_id'],reality,(pnl or {}).get('friction_cost',0.0))
+  out.append({'intent_id':r['intent_id'],'entry_price':entry,'mark_price':price,'pnl':pnl,'execution_reality':reality,'sources':sources['source_count']})
   await asyncio.sleep(.15)
  return out

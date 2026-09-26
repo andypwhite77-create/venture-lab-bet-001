@@ -12,7 +12,7 @@ async def record(run_id):
         # Shadow rank uses only matured, mint-deduplicated outcomes available at this cutoff.
         rows=await conn.fetch("""SELECT e.genome_id,e.family,count(DISTINCT e.mint) n,avg(o.net_return_pct) ret
           FROM colony_forward_entries e JOIN LATERAL (SELECT net_return_pct FROM research_outcomes
-          WHERE candidate_id=e.candidate_id ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+          WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
           WHERE e.run_id=$1 AND e.candidate_id<=$2 GROUP BY e.genome_id,e.family""",run_id,cutoff)
         if not rows:return {'recorded':False,'reason':'no_matured_evidence'}
         ordered=sorted(rows,key=lambda r:float(r['ret']),reverse=True); total=len(ordered)

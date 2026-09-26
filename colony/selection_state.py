@@ -8,7 +8,7 @@ async def snapshot():
  async with connection() as c:
   genomes=await c.fetch("SELECT genome_id,family,status FROM colony_genomes WHERE generation=3")
   rows=await c.fetch("""SELECT e.genome_id,e.mint,o.net_return_pct FROM colony_forward_entries e
-   JOIN LATERAL (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id
+   JOIN LATERAL (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at
     ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true WHERE e.run_id=$1""",RUN)
  by=defaultdict(list)
  for r in rows: by[r['genome_id']].append((r['mint'],float(r['net_return_pct'])))
