@@ -1,0 +1,4 @@
+colony.cobaltindustrial.tech {
+    encode zstd gzip
+    reverse_proxy app:8000
+}
