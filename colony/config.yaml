@@ -1,0 +1,22 @@
+colony_id: investment-v2
+cycle_minutes: 240
+population:
+  scouts: 100
+  challengers: 20
+  contenders: 5
+  live: 0
+selection:
+  minimum_exploration_fraction: 0.20
+  minimum_novelty_fraction: 0.10
+  maximum_family_fraction: 0.40
+  frozen_validation_hours: 48
+intelligence:
+  core_role: colony_governor
+  skeptic_role: falsification_critic
+  core_model_target: qwen3-8b-q4
+  skeptic_model_target: independent-4b-q4
+  sequential_loading: true
+resources:
+  cpu_cores: 4
+  ram_gb: 16
+  api_provider_budgeting: true

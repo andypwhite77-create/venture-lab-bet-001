@@ -132,3 +132,21 @@ Do not build one genius trader.
 Build an ecology of tiny, disposable, tightly constrained traders inside a sceptical research-and-risk system.
 
 One nervous system gathers reality. Many simple brains interpret it. Evolution decides which interpretations deserve descendants. The Queen directs research, not money. The governor controls authority. Preserve every failure. Let future data arbitrate every claim.
+
+## Frozen Gen-3 → Gen-4 reproductive constitution (2026-09-26)
+
+This rule is recorded before Gen 4 is permitted to exist. Gen 3 remains the immutable founder baseline (100 genomes: 46 reversal, 33 momentum, 11 wallet convergence, 10 order flow). The purpose is to prevent retrospective movement of the selection target.
+
+Economic success is the ultimate pressure, but raw wins or raw cash alone are not sufficient fitness measures. Selection is based on prospective net economic return after modelled friction, conditioned on capital at risk, downside/tail behaviour and evidence quality. Repeated observations of the same asset cannot manufacture confidence.
+
+Reproductive access is restricted to the top 49% of evidence-qualified performers within comparable ecological niches/families. An ant must first have sufficient independent mature evidence; sparse specialists are not killed merely for trading less often. Family/diversity protection prevents a temporarily dominant high-frequency family from extinguishing rarer useful strategies.
+
+Capital privilege follows evidence slowly and asymmetrically. Proven profitable behaviour can earn incremental increases in maximum notional; poor evidence reduces it; catastrophic/tail-loss behaviour reduces it much faster. New descendants begin in paper probation. No genome, Queen or Sceptic can change global capital ceilings or promote itself to live money.
+
+At each generation checkpoint, weak evidence-qualified performers lose reproductive/live-capital privileges and are demoted to shadow/paper rather than erased. Their genomes and subsequent paper performance remain in the permanent graveyard so regime-dependent strategies can demonstrate renewed usefulness. Catastrophic genomes may be permanently barred from live capital while still retained for research provenance.
+
+At least 5–10% of new-generation capacity is reserved for exploration/mutation rather than direct exploitation of current leaders. This protects diversity and reduces premature convergence on a temporary local optimum.
+
+Gen 4 may only be instantiated after the runtime is stable and the evidence gate is satisfied. Generation creation is a discrete frozen event: calculate Gen-3 fitness using information available at the cutoff, record breeders/culls and hashes, instantiate Gen 4, then evaluate Gen 4 only on observations that occur after its birth. Gen-4 outcomes cannot alter the recorded Gen-3 selection decision.
+
+The primary evolutionary test is not whether Gen 4 makes money in isolation. It is whether descendants prospectively outperform their parents and the frozen Gen-3 baseline after friction and risk. Failure to do so is evidence against the current evolutionary mechanism and must not be hidden by retuning the historical generation.

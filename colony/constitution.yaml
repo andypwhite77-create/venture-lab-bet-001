@@ -1,0 +1,27 @@
+version: 1
+identity: domain-agnostic experimental colony
+principle: "Expert ants, not expert traders."
+mutable:
+  - experiment_parameters
+  - population_allocation
+  - hypotheses
+  - worker_genomes
+immutable_without_human_authority:
+  - live_trading_permission
+  - capital_limits
+  - credential_permissions
+  - network_permissions
+  - promotion_requirements
+  - kill_switch
+fitness_states:
+  extinction: "below minimum survival target"
+  stressed: "below target; conserve and explore"
+  viable: "meets minimum target"
+  thriving: "consistently exceeds target"
+  reproductive: "survives frozen out-of-sample validation"
+safety:
+  live_execution: false
+  core_may_trade: false
+  skeptic_may_trade: false
+  workers_default: paper_only
+  constitution_self_modification: false
