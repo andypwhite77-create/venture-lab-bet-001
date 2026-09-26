@@ -150,3 +150,21 @@ At least 5–10% of new-generation capacity is reserved for exploration/mutation
 Gen 4 may only be instantiated after the runtime is stable and the evidence gate is satisfied. Generation creation is a discrete frozen event: calculate Gen-3 fitness using information available at the cutoff, record breeders/culls and hashes, instantiate Gen 4, then evaluate Gen 4 only on observations that occur after its birth. Gen-4 outcomes cannot alter the recorded Gen-3 selection decision.
 
 The primary evolutionary test is not whether Gen 4 makes money in isolation. It is whether descendants prospectively outperform their parents and the frozen Gen-3 baseline after friction and risk. Failure to do so is evidence against the current evolutionary mechanism and must not be hidden by retuning the historical generation.
+
+## Gen-4 constitutional amendment: adversarial controls (2026-09-26)
+
+This amendment is frozen while zero Gen-3 genomes are evidence-qualified and before Gen 4 exists. It strengthens the evidentiary standard without selecting a known winner.
+
+Distinct mint addresses are not treated as independent trials. Qualification requires effective independent evidence across time blocks and market states, with shared SOL beta, volatility/liquidity regime and common routing/liquidity exposure treated as dependence. The original 20-distinct-asset count remains a minimum diversity check, not proof of 20 independent trials. Effective-evidence weighting must be defined/versioned before it can unlock reproduction.
+
+Reproduction requires two gates in order: (1) absolute economic viability after friction/risk/evidence requirements; then (2) relative ranking within comparable viable niches. Family diversity protection cannot force a negative-expectancy family to breed. Non-viable families remain preserved in shadow/graveyard and may requalify prospectively in a later regime.
+
+At every reproductive generation, create a matched random-control population alongside fitness-selected offspring. Gen N+1-E uses the frozen evolutionary selection law; Gen N+1-C is produced without parental fitness information using a recorded random seed and otherwise matched mutation/recombination machinery. Parents continue prospectively as an additional benchmark. All populations receive the same future observations and execution model.
+
+Claims of evolutionary improvement require evolved descendants to outperform both the parent benchmark and matched random-control descendants prospectively after friction/risk. Improvement shared by evolved and control descendants is not evidence that fitness selection caused the gain.
+
+Null benchmarks must include, where technically applicable, random-time, random-direction, market-beta and simple deterministic momentum/reversal controls. Inference must respect temporal/regime clustering and report effect sizes and uncertainty rather than rely on raw trade count or a single p-value. Multiple-comparison/winner's-curse risk from selecting elites must be explicitly included in interpretation.
+
+Experimental provenance is epoch-based. Record code hash, sensor/data schema version, genome constitution version, fitness/selection version, execution-model version, provider configuration and time boundaries. A material change to inputs, decisions, execution economics, fitness or measurement closes the current evaluation epoch and begins a new one. Operational changes proven not to alter experimental semantics do not erase otherwise valid evidence.
+
+No arbitrary correlation cliff (for example correlation >0.7 = one trial), fixed trade-count claim, or hand-labelled number of regimes is constitutionalised here. Dependence and statistical power must be estimated from observed structure and versioned before use. This prevents replacing one naive threshold with another.
