@@ -121,3 +121,9 @@ If the answer survives prospective testing, the architecture is relevant beyond 
 The first active reproduction law is frozen before Gen 4 exists. Only evidence-qualified ants may enter selection. Reproductive access is limited to the top 49% within comparable niches, ranked primarily by prospective net economic performance after friction and capital-at-risk, with penalties for drawdown/tail loss and controls for evidence quality. Rare/sparse families receive diversity protection; inactivity caused by missing sensors is not failure.
 
 Weak qualified performers are demoted to shadow/paper and retained permanently rather than deleted. Capital privilege rises slowly with demonstrated economic fitness and falls faster after poor/tail outcomes. Descendants begin in paper probation. A 5–10% exploration reserve preserves mutation/diversity. Gen 4 is created at one recorded cutoff and may only be judged on future observations. Global capital limits, live promotion and constitutional authority remain deterministic and cannot evolve.
+
+## Gen-4 adversarial-control amendment (frozen 2026-09-26)
+
+Before Gen 4 exists, the reproductive constitution is strengthened: 20 distinct assets remain a minimum diversity check but no longer imply 20 independent trials. Reproduction is additionally locked behind a versioned effective-independent-evidence model accounting for temporal/regime clustering, SOL beta and shared liquidity/routing exposure.
+
+Absolute economic viability precedes family-relative ranking; diversity protection may preserve a failing family in shadow but may not force it to breed. Every evolved generation must have a matched random-selection control generation and the parent generation must continue as a prospective benchmark. Null controls, block-aware inference, multiple-comparison correction/interpretation and epoch provenance are mandatory before claiming evolutionary improvement.
