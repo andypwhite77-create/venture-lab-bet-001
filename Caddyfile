@@ -1,4 +1,10 @@
 colony.cobaltindustrial.tech {
     encode zstd gzip
-    reverse_proxy app:8000
+    @allowed path /dashboard /colony/live
+    handle @allowed {
+        reverse_proxy app:8000
+    }
+    handle {
+        respond "Not Found" 404
+    }
 }

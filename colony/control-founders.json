@@ -1,0 +1,110 @@
+[
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    }
+  }
+]

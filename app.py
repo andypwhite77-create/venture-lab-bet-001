@@ -263,15 +263,16 @@ async def monitoring_status():
     }
 
 
+@app.get("/colony/live")
+async def colony_live():
+    from colony.dashboard_api import snapshot
+    return await snapshot()
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
-    return """<!doctype html>
-<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>Venture Lab</title>
-<style>body{font-family:system-ui;margin:24px;background:#10131a;color:#e8edf5}pre{white-space:pre-wrap;background:#171c26;padding:16px;border-radius:12px}h1{font-size:22px}</style>
-</head><body><h1>Venture Lab — Research Engine</h1><p>Paper-trading mode. Auto-refreshes every 15 seconds.</p><pre id='out'>Loading…</pre>
-<script>async function go(){try{let r=await fetch('/monitoring');let j=await r.json();document.getElementById('out').textContent=JSON.stringify(j,null,2)}catch(e){document.getElementById('out').textContent=String(e)}}go();setInterval(go,15000)</script></body></html>"""
-
+    from pathlib import Path
+    return HTMLResponse(Path("colony/dashboard.html").read_text())
 
 @app.get("/budget")
 async def budget_status():
