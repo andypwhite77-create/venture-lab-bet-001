@@ -1,7 +1,7 @@
 import json
 from colony.evolve import load_seeds, make_generation, summary
 from colony.genome import genome_id
-from fitness import score
+from colony.fitness import score
 
 def test_generation_is_reproducible():
     a = make_generation(load_seeds(), 40, seed=42)
