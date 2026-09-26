@@ -7,6 +7,7 @@ from colony.sensory_worker import process_senses
 from colony.observer import persist as persist_observer
 from colony.proposer import propose
 from colony.shadow_orchestrator import cycle as shadow_cycle
+from colony.spep_worker import process as process_spep
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 
@@ -16,6 +17,8 @@ async def main():
         try:
             result=await process()
             logging.info('forward_colony %s',result)
+            spep=await process_spep(result.get('run')) if result.get('run') else {}
+            logging.info('spep %s',spep)
             controls=await process_controls()
             logging.info('control_colonies %s',controls)
             senses=await process_senses()
