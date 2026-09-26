@@ -3,8 +3,8 @@ from __future__ import annotations
 import json, os, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from evaluator import matches
-from genome import genome_id
+from colony.evaluator import matches
+from colony.genome import genome_id
 
 def flatten(row: dict) -> dict:
     out = {}

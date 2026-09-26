@@ -1,17 +1,12 @@
-from ecology import replacement_budget, should_replace, outlier_budget
+from colony.ecology import pressures
 
-def test_slow_turnover():
-    assert replacement_budget(100) == 2
-    assert replacement_budget(20) == 1
+def test_evidence_gates_pressure():
+    assert pressures(.1,0)["evidence_weight"] == 0
+    assert pressures(.1,30)["evidence_weight"] == 1
 
-def test_successful_ants_are_stable():
-    assert not should_replace({"state":"viable","fitness":.01},10)
-    assert not should_replace({"state":"stressed","fitness":-.2},1)
-    assert should_replace({"state":"stressed","fitness":-.2},4)
+def test_elites_gain_reproductive_access():
+    assert pressures(.1,30)["reproductive_access"] > 0
+    assert pressures(.5,30)["reproductive_access"] == 0
 
-def test_outliers_start_tiny():
-    assert outlier_budget({"independent_entities":2,"novelty":.9}) == 0
-    assert outlier_budget({"independent_entities":4,"novelty":.7}) == 3
-
-if __name__=='__main__':
-    test_slow_turnover(); test_successful_ants_are_stable(); test_outliers_start_tiny(); print('ecology tests: PASS')
+def test_tail_loss_forces_replacement_pressure():
+    assert pressures(.2,30,.2)["replacement_pressure"] == 1

@@ -1,6 +1,6 @@
 import json
-from evolve import load_seeds, make_generation, summary
-from genome import genome_id
+from colony.evolve import load_seeds, make_generation, summary
+from colony.genome import genome_id
 from fitness import score
 
 def test_generation_is_reproducible():

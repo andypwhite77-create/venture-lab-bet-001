@@ -1,9 +1,9 @@
 """Score a generation on archived 15-minute outcomes, deduplicated by token."""
 import json, subprocess, sys
 from pathlib import Path
-from evaluator import matches
-from genome import genome_id
-from replay import flatten
+from colony.evaluator import matches
+from colony.genome import genome_id
+from colony.replay import flatten
 from selection import ant_metrics, select, reproduce, classify
 
 ROOT=Path(__file__).resolve().parent

@@ -1,10 +1,10 @@
 """Generation scorer honoring each ant's evolved hold-time gene."""
 import csv, io, json, subprocess
 from pathlib import Path
-from evaluator import matches
-from genome import genome_id
+from colony.evaluator import matches
+from colony.genome import genome_id
 from horizons import outcome_for_hold
-from replay import flatten
+from colony.replay import flatten
 from selection import ant_metrics, select, reproduce, classify
 ROOT=Path(__file__).resolve().parent
 SQL="""COPY (SELECT c.id,c.mint,c.features::text,c.market::text,o.horizon_minutes,o.net_return_pct FROM research_candidates c JOIN research_outcomes o ON o.candidate_id=c.id ORDER BY c.created_at,o.horizon_minutes) TO STDOUT WITH CSV"""

@@ -1,4 +1,4 @@
-from evolve import load_seeds
+from colony.evolve import load_seeds
 from speciation import evaluate_proposal
 
 def proposal(independent=12, observations=40):

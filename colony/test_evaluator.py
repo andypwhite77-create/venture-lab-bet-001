@@ -1,6 +1,6 @@
-from evaluator import matches
-from evolve import load_seeds, make_generation
-from replay import evaluate
+from colony.evaluator import matches
+from colony.evolve import load_seeds, make_generation
+from colony.replay import evaluate
 
 def test_known_matches():
     seeds=load_seeds()
