@@ -7,7 +7,7 @@ async def score_entries(conn, table, key_col, key):
     rows=await conn.fetch(f"""SELECT e.genome_id,e.family,e.mint,e.hold_minutes,e.candidate_id,
       o.horizon_minutes,o.net_return_pct FROM {table} e JOIN LATERAL (
         SELECT horizon_minutes,net_return_pct FROM research_outcomes
-        WHERE candidate_id=e.candidate_id ORDER BY abs(horizon_minutes-e.hold_minutes),horizon_minutes LIMIT 1
+        WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at ORDER BY abs(horizon_minutes-e.hold_minutes),horizon_minutes LIMIT 1
       ) o ON true WHERE e.{key_col}=$1""",key)
     grouped={}
     for r in rows: grouped.setdefault((r['genome_id'],r['family']),[]).append((r['mint'],float(r['net_return_pct'])))

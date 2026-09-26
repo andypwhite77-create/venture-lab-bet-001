@@ -11,14 +11,14 @@ async def ledger(plan_id):
             vals=[float(r['net_return_pct']) for r in rows]
             return (sum(vals)/len(vals),len(vals)) if vals else (None,0)
         child=await conn.fetch("""SELECT o.net_return_pct FROM colony_shadow_entries e JOIN LATERAL
-          (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+          (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
           WHERE e.shadow_descendant_id=ANY($1::bigint[])""",[k['id'] for k in kids])
         parent_ids=[x for k in kids for x in k['parent_ids']]
         parents=await conn.fetch("""SELECT o.net_return_pct FROM colony_forward_entries e JOIN LATERAL
-          (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+          (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
           WHERE e.run_id=$1 AND e.candidate_id>$2 AND e.genome_id=ANY($3::text[])""",p['run_id'],p['evidence_cutoff'],parent_ids)
         frozen=await conn.fetch("""SELECT o.net_return_pct FROM colony_forward_entries e JOIN LATERAL
-          (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+          (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
           WHERE e.run_id=$1 AND e.candidate_id>$2""",p['run_id'],p['evidence_cutoff'])
         cm,cn=mean(child); pm,pn=mean(parents); fm,fn=mean(frozen)
         edge_parent=round(cm-pm,4) if cm is not None and pm is not None else None
