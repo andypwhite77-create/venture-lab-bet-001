@@ -8,7 +8,11 @@ async def ensure_schema():
    run_id TEXT,mint TEXT,side TEXT,notional DOUBLE PRECISION,status TEXT NOT NULL,reason TEXT,
    quote JSONB,fill JSONB,entry_price DOUBLE PRECISION,mark_price DOUBLE PRECISION,
    gross_pnl DOUBLE PRECISION,friction_cost DOUBLE PRECISION,net_pnl DOUBLE PRECISION,
-   mode TEXT NOT NULL DEFAULT 'simulated',broadcast BOOLEAN NOT NULL DEFAULT false)''')
+   mode TEXT NOT NULL DEFAULT 'simulated',broadcast BOOLEAN NOT NULL DEFAULT false,
+   execution_reality JSONB,friction_ratio DOUBLE PRECISION,executable_edge_sol DOUBLE PRECISION)''')
+  await c.execute("ALTER TABLE colony_execution_ledger ADD COLUMN IF NOT EXISTS execution_reality JSONB")
+  await c.execute("ALTER TABLE colony_execution_ledger ADD COLUMN IF NOT EXISTS friction_ratio DOUBLE PRECISION")
+  await c.execute("ALTER TABLE colony_execution_ledger ADD COLUMN IF NOT EXISTS executable_edge_sol DOUBLE PRECISION")
 async def record(intent,result,quote=None,run_id=None):
  await ensure_schema()
  async with connection() as c:
@@ -32,3 +36,12 @@ async def summary(run_id=None):
    count(*) FILTER(WHERE status='rejected') rejected,coalesce(sum(net_pnl),0) net_pnl,
    avg(net_pnl) FILTER(WHERE net_pnl IS NOT NULL) avg_net FROM colony_execution_ledger {where}''',*args)
   return dict(r)
+
+async def record_reality(intent_id,reality,friction_cost=0.0):
+ import json
+ async with connection() as c:
+  r=await c.fetchrow('SELECT notional FROM colony_execution_ledger WHERE intent_id=$1',intent_id)
+  if not r:return
+  n=float(r['notional'] or 0); edge=reality.get('gross_edge_sol') if reality.get('ok') else None
+  ratio=(float(friction_cost)/n if n else None)
+  await c.execute('UPDATE colony_execution_ledger SET execution_reality=$2::jsonb,friction_ratio=$3,executable_edge_sol=$4 WHERE intent_id=$1',intent_id,json.dumps(reality),ratio,edge)

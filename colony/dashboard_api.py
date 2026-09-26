@@ -12,7 +12,7 @@ def _sol_gbp():
   _fx.update(rate=rate,at=now);return rate
  except Exception:return _fx['rate']
 async def _run(conn,run_id):
- trades=await conn.fetch('''SELECT intent_id,created_at,mint,side,notional,status,reason,quote,entry_price,mark_price,gross_pnl,friction_cost,net_pnl,broadcast FROM colony_execution_ledger WHERE run_id=$1 ORDER BY id DESC LIMIT 60''',run_id)
+ trades=await conn.fetch('''SELECT intent_id,created_at,mint,side,notional,status,reason,quote,entry_price,mark_price,gross_pnl,friction_cost,net_pnl,broadcast,execution_reality,friction_ratio,executable_edge_sol FROM colony_execution_ledger WHERE run_id=$1 ORDER BY id DESC LIMIT 60''',run_id)
  curve=await conn.fetch('''SELECT created_at,net_pnl FROM colony_execution_ledger WHERE run_id=$1 AND net_pnl IS NOT NULL ORDER BY id''',run_id)
  out=[]
  for r in trades:
