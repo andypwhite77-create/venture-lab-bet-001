@@ -3,6 +3,7 @@ import json,hashlib
 from db import connection
 from colony.spep import VERSION,event_id,decision,twins
 from colony.genome import genome_id
+from colony.spep_value import participation_action
 
 async def process(run_id='fwd-g3-20260926T084022Z',limit=250):
  async with connection() as c:
@@ -20,6 +21,7 @@ async def process(run_id='fwd-g3-20260926T084022Z',limit=250):
      VALUES($1,$2,$3,$4,$5,$6::jsonb,$7) ON CONFLICT DO NOTHING''',eid,VERSION,r['id'],r['created_at'],r['mint'],obs,oh); ne+=int(got.endswith('1'))
    for g in pop:
     gid=genome_id(g); a=decision(g,r); t=twins(a,eid,gid)
-    got=await c.execute('''INSERT INTO colony_spep_decisions(event_id,genome_id,population,family,original_action,mirror_action,random_action)
-      VALUES($1,$2,'gen3-parent',$3,$4,$5,$6) ON CONFLICT DO NOTHING''',eid,gid,g['family'],t['original'],t['mirror'],t['random_direction']);nd+=int(got.endswith('1'))
+    pa=participation_action(eid,gid,a!='abstain')
+    got=await c.execute('''INSERT INTO colony_spep_decisions(event_id,genome_id,population,family,original_action,mirror_action,random_action,participation_action)
+      VALUES($1,$2,'gen3-parent',$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING''',eid,gid,g['family'],t['original'],t['mirror'],t['random_direction'],pa);nd+=int(got.endswith('1'))
   return {'events':ne,'decisions':nd,'events_seen':len(rows),'genomes':len(pop),'generator':VERSION}

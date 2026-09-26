@@ -8,6 +8,7 @@ from colony.observer import persist as persist_observer
 from colony.proposer import propose
 from colony.shadow_orchestrator import cycle as shadow_cycle
 from colony.spep_worker import process as process_spep
+from colony.spep_mark import mark as mark_spep
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 
@@ -19,6 +20,8 @@ async def main():
             logging.info('forward_colony %s',result)
             spep=await process_spep(result.get('run')) if result.get('run') else {}
             logging.info('spep %s',spep)
+            spep_marks=await mark_spep()
+            logging.info('spep_marks %s',spep_marks)
             controls=await process_controls()
             logging.info('control_colonies %s',controls)
             senses=await process_senses()
