@@ -28,8 +28,6 @@ async def evaluate_due_signals():
             continue
         reference = row.get("reference_price")
         if reference is None:
-            # Do not invent a historical entry price at the first outcome horizon.
-            # New signals record a contemporaneous reference at creation time.
             continue
         raw = ((price / float(reference)) - 1.0) * 100.0 if reference else None
         cost_bps = 60.0

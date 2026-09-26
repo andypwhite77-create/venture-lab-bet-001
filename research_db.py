@@ -39,6 +39,15 @@ CREATE TABLE IF NOT EXISTS research_outcomes (
 CREATE INDEX IF NOT EXISTS idx_research_outcomes_horizon
     ON research_outcomes(horizon_minutes, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS research_price_path (
+    id BIGSERIAL PRIMARY KEY,
+    candidate_id BIGINT NOT NULL REFERENCES research_candidates(id) ON DELETE CASCADE,
+    observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    price DOUBLE PRECISION NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_research_price_path_candidate_time
+    ON research_price_path(candidate_id, observed_at ASC);
+
 CREATE TABLE IF NOT EXISTS market_snapshots (
     id BIGSERIAL PRIMARY KEY,
     observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -220,3 +229,39 @@ async def research_scoreboard():
             """
         )
     return [dict(r) for r in rows]
+
+
+async def active_shadow_candidates(max_age_minutes: int = 240):
+    async with connection() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id,mint,created_at,entry_price,strategy
+            FROM research_candidates
+            WHERE shadow_trade=TRUE
+              AND entry_price IS NOT NULL
+              AND created_at >= NOW() - ($1 * INTERVAL '1 minute')
+            ORDER BY created_at ASC
+            """,
+            max_age_minutes,
+        )
+    return [dict(r) for r in rows]
+
+
+async def record_price_path(candidate_id: int, price: float):
+    async with connection() as conn:
+        await conn.execute(
+            "INSERT INTO research_price_path(candidate_id,price) VALUES($1,$2)",
+            candidate_id, float(price),
+        )
+
+
+async def price_path_counts():
+    async with connection() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT COUNT(*) AS samples,
+                   COUNT(DISTINCT candidate_id) AS candidates
+            FROM research_price_path
+            """
+        )
+    return dict(row)

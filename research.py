@@ -9,9 +9,9 @@ from research_db import candidate_exists_recently, create_candidate, recent_toke
 log = logging.getLogger("signal-engine.research")
 
 IGNORE_MINTS = {
-    "So11111111111111111111111111111111111111112",  # WSOL
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
-    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
+    "So11111111111111111111111111111111111111112",
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
 }
 
 STRATEGIES = {
@@ -122,8 +122,6 @@ async def run_research_cycle():
     stats = _window_stats(rows, now)
     created = []
 
-    # Bots A/B first derive candidates from on-chain observations. A single
-    # GeckoTerminal multi-token request then supplies contemporaneous prices.
     ab_specs = []
     for mint, s in stats.items():
         f = _features(s)
@@ -144,8 +142,6 @@ async def run_research_cycle():
         if item:
             created.append(item)
 
-    # Bots C/D use a single market-wide trending-pool request. This makes them
-    # independent of the sparse Jupiter wallet sampler and keeps API load low.
     trending = await fetch_trending_market_snapshots(limit=20)
     for mint, market in trending.items():
         if mint in IGNORE_MINTS:
@@ -167,7 +163,6 @@ async def run_research_cycle():
             "dex_buy_ratio_m5": round(dex_ratio, 4),
         }
 
-        # Bot C: temporary downside dislocation with returning buy pressure.
         if pc5 <= -5.0 and liq >= 50_000 and dex_ratio >= 0.52:
             is_trade = pc5 <= -8.0 and liq >= 100_000 and dex_ratio >= 0.58 and pc1h > -25.0
             score = _clip(0.30 + min(abs(pc5), 20) / 50 + min(liq, 500_000) / 2_500_000 + 0.15 * dex_ratio)
@@ -178,7 +173,6 @@ async def run_research_cycle():
             if item:
                 created.append(item)
 
-        # Bot D: continuation where price, turnover and buy-side participation agree.
         if pc5 >= 1.0 and pc1h >= 2.0 and liq >= 50_000 and vol_liq >= 0.01 and dex_ratio >= 0.55:
             is_trade = pc5 >= 3.0 and pc1h >= 5.0 and liq >= 100_000 and vol_liq >= 0.02 and dex_ratio >= 0.60
             score = _clip(0.25 + min(pc5, 15) / 60 + min(pc1h, 30) / 120 + min(vol_liq, 0.25) + 0.12 * dex_ratio)

@@ -18,6 +18,19 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
   app:
     build: .
     restart: unless-stopped
@@ -42,5 +55,41 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  paper:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "colony.paper_daemon"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  colony:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "colony.forward_loop"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
+  caddy_data:
+  caddy_config:
   postgres_data:

@@ -27,9 +27,10 @@ from db import (
 )
 from evaluator import evaluate_due_research, evaluate_due_signals, evaluator_loop
 from monitoring import health_alerts, send_telegram, telegram_enabled
+from path_sampler import path_sampler_loop, sample_active_paths
 from signals import scan_convergence
 from research import research_loop, run_research_cycle
-from research_db import ensure_research_schema, recent_candidates, research_counts, research_scoreboard
+from research_db import ensure_research_schema, price_path_counts, recent_candidates, research_counts, research_scoreboard
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("signal-engine")
@@ -51,6 +52,7 @@ state = {
     "signal_scanner_ok": False,
     "evaluator_ok": False,
     "research_ok": False,
+    "path_sampler_ok": False,
     "last_collection": None,
     "last_collection_result": None,
     "last_signal_scan": None,
@@ -59,6 +61,8 @@ state = {
     "last_evaluation_result": None,
     "last_research_cycle": None,
     "last_research_result": None,
+    "last_path_sample": None,
+    "last_path_result": None,
     "last_error": None,
     "paper_trading_only": PAPER_TRADING_ONLY,
     "telegram_enabled": telegram_enabled(),
@@ -194,6 +198,7 @@ async def startup_event():
     asyncio.create_task(signal_loop())
     asyncio.create_task(evaluator_loop(state))
     asyncio.create_task(research_loop(state))
+    asyncio.create_task(path_sampler_loop(state))
     asyncio.create_task(monitoring_loop())
     log.info("Venture Lab v1.0 multi-strategy research engine started in shadow mode")
 
@@ -206,7 +211,10 @@ async def startup_event():
 
 @app.get("/health")
 async def health():
-    ok = state["rpc_ok"] and state["db_ok"]
+    ok = all(state[k] for k in (
+        "rpc_ok", "db_ok", "collector_ok", "signal_scanner_ok",
+        "evaluator_ok", "research_ok", "path_sampler_ok",
+    ))
     return {
         "ok": ok,
         "rpc_ok": state["rpc_ok"],
@@ -215,6 +223,7 @@ async def health():
         "signal_scanner_ok": state["signal_scanner_ok"],
         "evaluator_ok": state["evaluator_ok"],
         "research_ok": state["research_ok"],
+        "path_sampler_ok": state["path_sampler_ok"],
         "paper_trading_only": PAPER_TRADING_ONLY,
     }
 
@@ -228,16 +237,22 @@ async def status():
         snapshot["outcome_summary"] = await outcome_summary()
         snapshot["research_counts"] = await research_counts()
         snapshot["research_scoreboard"] = await research_scoreboard()
+        snapshot["price_path_counts"] = await price_path_counts()
     return snapshot
 
 
 @app.get("/monitoring")
 async def monitoring_status():
     budget = await usage_summary() if state["db_ok"] else None
+    alerts = health_alerts(state, budget)
+    components_ok = all(state[k] for k in (
+        "rpc_ok", "db_ok", "collector_ok", "signal_scanner_ok",
+        "evaluator_ok", "research_ok", "path_sampler_ok",
+    ))
     return {
-        "healthy": bool(state["rpc_ok"] and state["db_ok"] and not state["active_alerts"]),
+        "healthy": bool(components_ok and not alerts),
         "telegram_enabled": telegram_enabled(),
-        "alerts": health_alerts(state, budget),
+        "alerts": alerts,
         "counts": await counts() if state["db_ok"] else {},
         "budget": budget,
         "last_collection": state["last_collection"],
@@ -248,15 +263,16 @@ async def monitoring_status():
     }
 
 
+@app.get("/colony/live")
+async def colony_live():
+    from colony.dashboard_api import snapshot
+    return await snapshot()
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
-    return """<!doctype html>
-<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>Venture Lab</title>
-<style>body{font-family:system-ui;margin:24px;background:#10131a;color:#e8edf5}pre{white-space:pre-wrap;background:#171c26;padding:16px;border-radius:12px}h1{font-size:22px}</style>
-</head><body><h1>Venture Lab — Research Engine</h1><p>Paper-trading mode. Auto-refreshes every 15 seconds.</p><pre id='out'>Loading…</pre>
-<script>async function go(){try{let r=await fetch('/monitoring');let j=await r.json();document.getElementById('out').textContent=JSON.stringify(j,null,2)}catch(e){document.getElementById('out').textContent=String(e)}}go();setInterval(go,15000)</script></body></html>"""
-
+    from pathlib import Path
+    return HTMLResponse(Path("colony/dashboard.html").read_text())
 
 @app.get("/budget")
 async def budget_status():
@@ -335,3 +351,10 @@ async def research_candidates(limit: int = 50, shadow_only: bool = False):
 @app.get("/research/scoreboard")
 async def research_scoreboard_endpoint():
     return {"counts": await research_counts(), "scoreboard": await research_scoreboard()}
+
+
+@app.post("/research/sample-paths")
+async def research_sample_paths():
+    if not PAPER_TRADING_ONLY:
+        raise HTTPException(status_code=403, detail="research guard disabled")
+    return {"ok": True, **(await sample_active_paths())}

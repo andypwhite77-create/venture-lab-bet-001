@@ -4,11 +4,10 @@ from datetime import timedelta
 from db import create_signal_event, recent_received_tokens, signal_exists_recently
 from marketdata import fetch_prices
 
-# Common quote / base assets we do not want to treat as accumulation targets.
 IGNORE_MINTS = {
-    "So11111111111111111111111111111111111111112",  # wrapped SOL
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
-    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",   # USDT
+    "So11111111111111111111111111111111111111112",
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
 }
 
 

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import httpx
@@ -86,34 +87,46 @@ def normalize_trending_pool(pool: dict) -> dict:
     }
 
 
+async def _get_json(url: str, attempts: int = 3):
+    headers = {"User-Agent": "Mozilla/5.0 venture-lab-research", "Accept": "application/json"}
+    last_exc = None
+    for attempt in range(attempts):
+        try:
+            async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                return response.json() or {}
+        except Exception as exc:
+            last_exc = exc
+            if attempt + 1 < attempts:
+                await asyncio.sleep(1.0 * (2 ** attempt))
+    raise last_exc
+
+
 async def fetch_market_snapshots(mints) -> dict[str, dict]:
-    ids = sorted({m for m in mints if m})[:MAX_MULTI]
+    ids = sorted({m for m in mints if m})
     if not ids:
         return {}
-    headers = {"User-Agent": "Mozilla/5.0 venture-lab-research", "Accept": "application/json"}
-    try:
-        async with httpx.AsyncClient(timeout=12.0, headers=headers) as client:
-            response = await client.get(GECKO_MULTI_URL.format(addresses=",".join(ids)))
-            response.raise_for_status()
-            items = (response.json() or {}).get("data") or []
-        rows = [normalize_token(item) for item in items]
-        return {row["mint"]: row for row in rows if row.get("mint") and row.get("price_usd")}
-    except Exception as exc:
-        log.warning("Token multi-market snapshot failed: %r", exc)
-        return {}
+    result = {}
+    for offset in range(0, len(ids), MAX_MULTI):
+        chunk = ids[offset:offset + MAX_MULTI]
+        try:
+            body = await _get_json(GECKO_MULTI_URL.format(addresses=",".join(chunk)))
+            rows = [normalize_token(item) for item in (body.get("data") or [])]
+            result.update({row["mint"]: row for row in rows if row.get("mint") and row.get("price_usd")})
+        except Exception as exc:
+            log.warning("Token multi-market snapshot failed after retries: %r", exc)
+    return result
 
 
 async def fetch_trending_market_snapshots(limit: int = 20) -> dict[str, dict]:
-    headers = {"User-Agent": "Mozilla/5.0 venture-lab-research", "Accept": "application/json"}
     try:
-        async with httpx.AsyncClient(timeout=12.0, headers=headers) as client:
-            response = await client.get(GECKO_TRENDING_URL)
-            response.raise_for_status()
-            pools = (response.json() or {}).get("data") or []
+        body = await _get_json(GECKO_TRENDING_URL)
+        pools = body.get("data") or []
         rows = [normalize_trending_pool(pool) for pool in pools[:limit]]
         return {row["mint"]: row for row in rows if row.get("mint") and row.get("price_usd")}
     except Exception as exc:
-        log.warning("Trending market snapshot failed: %r", exc)
+        log.warning("Trending market snapshot failed after retries: %r", exc)
         return {}
 
 

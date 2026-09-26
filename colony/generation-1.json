@@ -1,0 +1,3408 @@
+[
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1813019195,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1421657153,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 1,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 414838032,
+      "changed": [
+        "hold_minutes",
+        "buy_wallets_30_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 3,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1837440259,
+      "changed": [
+        "hold_minutes",
+        "buy_wallets_30_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.345627,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1554096592,
+      "changed": [
+        "flow_ratio_15_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 976191991,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -7.835386,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 12,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 909826633,
+      "changed": [
+        "price_change_m5_max",
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -7.520353,
+      "dex_buy_ratio_m5_min": 0.616643,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 219537958,
+      "changed": [
+        "price_change_m5_max",
+        "dex_buy_ratio_m5_min",
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.206623,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 822271044,
+      "changed": [
+        "price_change_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 14,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1331661624,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.005,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1835206385,
+      "changed": [
+        "volume_liquidity_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.027335,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 454582713,
+      "changed": [
+        "flow_ratio_15_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 1,
+      "flow_ratio_15_min": 1.100083,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1679008109,
+      "changed": [
+        "flow_ratio_15_min",
+        "buy_wallets_30_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 13,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1738387496,
+      "changed": [
+        "hold_minutes",
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 558432833,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 12,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1135063844,
+      "changed": [
+        "hold_minutes",
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.032599,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1018935691,
+      "changed": [
+        "cooldown_minutes",
+        "volume_liquidity_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1531299425,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 453752092,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1161027338,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.575699,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1823358035,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.920408,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 411673442,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.619376,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 982419075,
+      "changed": [
+        "price_change_m5_max"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.081051,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1489260662,
+      "changed": [
+        "flow_ratio_15_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.594046,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1270602082,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.648605,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1942447121,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 13,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1801137740,
+      "changed": [
+        "hold_minutes",
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 4.950526,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1228277425,
+      "changed": [
+        "cooldown_minutes",
+        "price_change_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 991745929,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.706471,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1064870150,
+      "changed": [
+        "price_change_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1117150143,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 3,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 284281502,
+      "changed": [
+        "buy_wallets_30_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 1,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1565083329,
+      "changed": [
+        "buy_wallets_30_min",
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1359961678,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.335385,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 765197932,
+      "changed": [
+        "buy_acceleration_min"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 657400076,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -7.210979,
+      "dex_buy_ratio_m5_min": 0.528843,
+      "hold_minutes": 18,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 253400223,
+      "changed": [
+        "hold_minutes",
+        "dex_buy_ratio_m5_min",
+        "price_change_m5_max"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 843358910,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.158546,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1698817101,
+      "changed": [
+        "hold_minutes",
+        "volume_liquidity_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.946582,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1450936465,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.721157,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 721475836,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 14,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 245854299,
+      "changed": [
+        "cooldown_minutes",
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.430927,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1707469837,
+      "changed": [
+        "buy_acceleration_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.168049,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1322114345,
+      "changed": [
+        "flow_ratio_15_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1009512766,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1159071371,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.830802,
+      "dex_buy_ratio_m5_min": 0.710437,
+      "hold_minutes": 14,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1031942320,
+      "changed": [
+        "price_change_m5_max",
+        "hold_minutes",
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 28180535,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 13,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 469692966,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 691195738,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.781964,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 617790913,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.728379,
+      "dex_buy_ratio_m5_min": 0.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 2023611797,
+      "changed": [
+        "dex_buy_ratio_m5_min",
+        "price_change_m5_max"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.755291,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 675277709,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.787158,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1024815891,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 4.78546,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 371961429,
+      "changed": [
+        "price_change_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 4.803821,
+      "volume_liquidity_m5_min": 0.020857,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1147284545,
+      "changed": [
+        "volume_liquidity_m5_min",
+        "price_change_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.252803,
+      "hold_minutes": 14,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1875581209,
+      "changed": [
+        "hold_minutes",
+        "volume_liquidity_m5_min",
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.127297,
+      "hold_minutes": 13,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1804327303,
+      "changed": [
+        "hold_minutes",
+        "volume_liquidity_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.165619,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 222801306,
+      "changed": [
+        "flow_ratio_15_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -9.124058,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1317399485,
+      "changed": [
+        "price_change_m5_max"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.714774,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1633766883,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 17,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1363907827,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.744065,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 482817965,
+      "changed": [
+        "hold_minutes",
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1027809052,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.821095,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 12,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1959696337,
+      "changed": [
+        "cooldown_minutes",
+        "hold_minutes",
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 423600354,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 14,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 701271716,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 11,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1606482096,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.558227,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 408757180,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.545405,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 219768424,
+      "changed": [
+        "flow_ratio_15_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.502469,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1146985894,
+      "changed": [
+        "hold_minutes",
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 511376064,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.227368,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 591186528,
+      "changed": [
+        "flow_ratio_15_min"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.097657,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1023855999,
+      "changed": [
+        "volume_liquidity_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 2109946538,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.780714,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1020851746,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 3,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 735114355,
+      "changed": [
+        "buy_wallets_30_min",
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 14,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1219900873,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.242834,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 1041365640,
+      "changed": [
+        "flow_ratio_15_min",
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 1088924655,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1834495451,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1742458977,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 305183760,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.347026,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 675948988,
+      "changed": [
+        "price_change_m5_max"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.672927,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1593684558,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 17,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 158034738,
+      "changed": [
+        "hold_minutes",
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "momentum",
+    "parameters": {
+      "price_change_m5_min": 5.0,
+      "volume_liquidity_m5_min": 0.04,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_min": [
+        1,
+        30
+      ],
+      "volume_liquidity_m5_min": [
+        0.005,
+        1
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_3055e7a41c036f55",
+      "seed": 875508925,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.62,
+      "hold_minutes": 15,
+      "cooldown_minutes": 1
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1748834233,
+      "changed": [
+        "cooldown_minutes"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.5,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 831231094,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 18,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 529922570,
+      "changed": [
+        "hold_minutes"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 1,
+      "flow_ratio_15_min": 0.967677,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 633121572,
+      "changed": [
+        "buy_wallets_30_min",
+        "flow_ratio_15_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.58892,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 1227754144,
+      "changed": [
+        "buy_acceleration_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.99,
+      "buy_acceleration_min": 1.60655,
+      "hold_minutes": 16,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 392826858,
+      "changed": [
+        "dex_buy_ratio_m5_min",
+        "hold_minutes",
+        "buy_acceleration_min"
+      ]
+    }
+  },
+  {
+    "family": "reversal",
+    "parameters": {
+      "price_change_m5_max": -8.0,
+      "dex_buy_ratio_m5_min": 0.596755,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "price_change_m5_max": [
+        -30,
+        -2
+      ],
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.95
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_28f11ccf5e41fdb8",
+      "seed": 1462102955,
+      "changed": [
+        "dex_buy_ratio_m5_min"
+      ]
+    }
+  },
+  {
+    "family": "order_flow",
+    "parameters": {
+      "dex_buy_ratio_m5_min": 0.8,
+      "buy_acceleration_min": 1.351511,
+      "hold_minutes": 15,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "dex_buy_ratio_m5_min": [
+        0.5,
+        0.99
+      ],
+      "buy_acceleration_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_60512f1e8b973296",
+      "seed": 470490016,
+      "changed": [
+        "buy_acceleration_min"
+      ]
+    }
+  },
+  {
+    "family": "wallet_convergence",
+    "parameters": {
+      "buy_wallets_30_min": 2,
+      "flow_ratio_15_min": 1.2,
+      "hold_minutes": 11,
+      "cooldown_minutes": 0
+    },
+    "bounds": {
+      "buy_wallets_30_min": [
+        1,
+        12
+      ],
+      "flow_ratio_15_min": [
+        0.5,
+        8
+      ],
+      "hold_minutes": [
+        1,
+        60
+      ],
+      "cooldown_minutes": [
+        0,
+        240
+      ]
+    },
+    "mutation": {
+      "parent": "g_c1bbad29244a3ef7",
+      "seed": 506182804,
+      "changed": [
+        "cooldown_minutes",
+        "hold_minutes"
+      ]
+    }
+  }
+]
