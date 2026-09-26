@@ -1,6 +1,7 @@
 import json, os, time, urllib.request
 from db import connection
 from colony.execution_ledger import summary
+from colony.selection_state import snapshot as selection_snapshot
 _fx={'rate':None,'at':0}
 def _sol_gbp():
  now=time.time()
@@ -32,7 +33,8 @@ async def snapshot():
   rate=_sol_gbp()
   families=[dict(x) for x in fam]
   for x in families:x['net_gbp']=float(x['net'])*rate if rate is not None else None
-  return {'external':external,'native':native,'sol_gbp':rate,'signals':[dict(x) for x in signals],
+  selection=await selection_snapshot()
+  return {'external':external,'native':native,'sol_gbp':rate,'selection':selection,'signals':[dict(x) for x in signals],
    'genomes':[dict(x) for x in genomes],'events':[dict(x) for x in events],
    'mind':[dict(x) for x in mind],'experiments':[dict(x) for x in exps],
    'lineage':[dict(x) for x in lineage],'family_performance':families}
