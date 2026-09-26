@@ -3,8 +3,60 @@ name: Deploy to VPS
 on:
   workflow_dispatch:
 
+concurrency:
+  group: venture-lab-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Automatic deployment paused while Grace colony recovery is reconciled."
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Refuse incomplete colony source
+        run: |
+          test -f colony/forward_loop.py
+          test -f colony/paper_daemon.py
+          test -f colony/config.yaml
+          test -f colony/constitution.yaml
+          count=$(find colony -type f | wc -l)
+          test "$count" -ge 50
+
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Sync application files safely
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          rsync -az \
+            --exclude '.git/' \
+            --exclude '.env' \
+            --exclude '.env.save' \
+            --exclude '__pycache__/' \
+            -e 'ssh -i ~/.ssh/id_ed25519' \
+            ./ "$VPS_USER@$VPS_HOST:/home/deploy/venture-lab/"
+
+      - name: Rebuild, restart and verify
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "$VPS_USER@$VPS_HOST" '
+            set -e
+            cd /home/deploy/venture-lab
+            test -f colony/forward_loop.py
+            test -f colony/paper_daemon.py
+            bash deploy.sh
+            docker compose ps
+          '
