@@ -32,7 +32,11 @@ def render(j):
     signals=''.join(f"<div><b>#{x.get('id')}</b> {escape(str(x.get('direction')))} {escape(str(x.get('mint','')))[:8]}…</div>" for x in j.get('signals',[]))
     experiments=''.join(f"<div><span class=pill>{escape(str(x.get('experiment_type')))}</span> {escape(str(x.get('status')))}</div>" for x in j.get('experiments',[])) or 'None'
     events=''.join(f"<div><b>{escape(str(x.get('event_type')))}</b></div>" for x in j.get('events',[]))
-    return cards_html,_svg(curve),fam,pop,evo,rows,mind,signals,experiments,events,ext
+    cs=j.get('capital_shadow') or {}; fc=cs.get('family_counts') or {}
+    famcounts=' • '.join(f"{escape(str(k))}: {v}" for k,v in sorted(fc.items())) or '—'
+    roster=''.join(f"<tr><td>{r.get('rank')}</td><td>{escape(str(r.get('family')))}</td><td>{escape(str(r.get('genome_id')))[:12]}…</td><td>{_f(r.get('fitness'),3)}</td><td>{r.get('evidence_n')}</td><td>{escape(str(r.get('slot_source')))}</td></tr>" for r in cs.get('roster',[]))
+    capital=f"<div class=grid><div class=card><div class=muted>SHADOW SLOTS</div><div class=num>{cs.get('active_slots',0)}</div></div><div class=card><div class=muted>EARNED SLOTS</div><div class=num>{cs.get('earned_slots',0)}</div></div><div class=card><div class=muted>GROWTH RESERVE</div><div class=num>£{_f(cs.get('growth_reserve_gbp'),2)}</div></div><div class=card><div class=muted>LOCKED PROFIT</div><div class=num>£{_f(cs.get('locked_profit_gbp'),2)}</div></div></div><p class=muted>Simulation only • £{_f(cs.get('starter_gbp'),2)} starter-risk unit • {int(float(cs.get('growth_share',0))*100)}% of realised profit to growth • family cap {int(float(cs.get('max_family_fraction',0))*100)}% • {famcounts}</p><div class=scroll><table><thead><tr><th>#</th><th>Family</th><th>Genome</th><th>Fitness</th><th>Evidence</th><th>Slot</th></tr></thead><tbody>{roster}</tbody></table></div>"
+    return cards_html,_svg(curve),fam,pop,evo,rows,mind,signals,experiments,events,ext,capital
 
 def _trade_row(x,native):
     a=x.get('attribution') or {};family=escape(str(a.get('family','—'))) if native else ''
