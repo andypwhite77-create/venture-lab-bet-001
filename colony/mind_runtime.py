@@ -27,7 +27,7 @@ def _compact(evidence):
     # original packet so it can verify parents, controls and bloodline state instead of
     # judging a proposal without its grounding evidence.
     base=evidence.get('evidence') if isinstance(evidence.get('evidence'),dict) else evidence
-    keep=['identity','authority','run_id','generation','frozen','evidence_cutoff','entries','shadow_plans','capital_doctrine','reproduction_doctrine','bloodline_ecology','queen_experiment_mandate','candidate_parents']
+    keep=['identity','authority','run_id','generation','frozen','evidence_cutoff','entries','shadow_plans','capital_doctrine','reproduction_doctrine','bloodline_ecology','colony_drives','queen_experiment_mandate','candidate_parents']
     out={k:base.get(k) for k in keep if k in base}
     out['independent_opportunities']=base.get('independent_opportunities')
     nc=base.get('niche_candidates') or []

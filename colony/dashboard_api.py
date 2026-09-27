@@ -4,6 +4,7 @@ from colony.selection_state import snapshot as selection_snapshot
 from colony.capital_shadow import snapshot as capital_shadow_snapshot
 from colony.queen_scouts import summary as queen_scout_summary
 from colony.biology_ecology import snapshot as biology_snapshot
+from colony.drives import snapshot as drives_snapshot
 _fx={'rate':None,'at':0}
 def _sol_gbp():
  now=time.time()
@@ -49,4 +50,5 @@ async def snapshot():
  payload['capital_shadow']=capital_shadow_snapshot(selection, native['summary'].get('net_pnl',0), rate)
  payload['queen_scouts']=await queen_scout_summary()
  payload['biology']=await biology_snapshot()
+ payload['drives']=await drives_snapshot()
  return payload
