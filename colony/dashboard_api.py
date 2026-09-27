@@ -34,8 +34,13 @@ async def snapshot():
   rate=await asyncio.to_thread(_sol_gbp)
   families=[dict(x) for x in fam]
   for x in families:x['net_gbp']=float(x['net'])*rate if rate is not None else None
-  selection=await selection_snapshot()
-  return {'external':external,'native':native,'sol_gbp':rate,'selection':selection,'signals':[dict(x) for x in signals],
+  payload={'external':external,'native':native,'sol_gbp':rate,'signals':[dict(x) for x in signals],
    'genomes':[dict(x) for x in genomes],'events':[dict(x) for x in events],
    'mind':[dict(x) for x in mind],'experiments':[dict(x) for x in exps],
    'lineage':[dict(x) for x in lineage],'family_performance':families}
+ # IMPORTANT: release the dashboard DB connection before selection telemetry, which
+ # acquires its own connection. Otherwise concurrent dashboard requests can exhaust
+ # the small asyncpg pool and deadlock each other.
+ selection=await selection_snapshot()
+ payload['selection']=selection
+ return payload
