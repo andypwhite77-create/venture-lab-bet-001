@@ -28,8 +28,8 @@ def render(j):
     es=j.get('selection') or {}; evo=f"<div class=card style='margin:6px 0'><b>{escape(str(es.get('mode','—')))}</b><br>Evidence gate: <b>{escape(str(es.get('qualify_n','—')))}</b> distinct assets minimum<br>Effective evidence: <b>{escape(str(es.get('effective_evidence_model','—')))}</b><br>Qualified: <b>{es.get('qualified',0)}</b> • Breeding eligible: <b>{es.get('breeding_eligible',0)}</b></div>"
     bio=j.get('biology') or {}; lines=[]
     for b in bio.get('bloodlines',[]):
-        lines.append(f"<div><span class=pill>{escape(str(b.get('family')))}</span> workers <b>{b.get('workers',0)}</b> • nursery <b>{b.get('nursery',0)}</b> • ready <b>{b.get('evidence_ready_workers',0)}</b> • repro credit <b>{b.get('reproductive_credit',0)}</b> • capacity <b>{b.get('justified_worker_capacity',0)}</b>/50</div>")
-    evo += f"<div class=card style='margin:6px 0'><b>Eusocial lifecycle</b><br>Fixed population: <b>no</b> • workers {bio.get('current_workers',0)} • nursery {bio.get('current_nursery',0)} • evidence-justified capacity {bio.get('evidence_justified_capacity',0)}<br>{''.join(lines)}</div>"
+        lines.append(f"<div><span class=pill>{escape(str(b.get('family')))}</span> workers <b>{b.get('workers',0)}</b> • nursery <b>{b.get('nursery',0)}</b> • paper <b>{b.get('paper',0)}</b> • live-ready <b>{b.get('live_ready',0)}</b> • repro credit <b>{b.get('reproductive_credit',0)}</b> • capacity <b>{b.get('justified_worker_capacity',0)}</b>/50</div>")
+    evo += f"<div class=card style='margin:6px 0'><b>Lifecycle: Nursery → Paper → Live</b><br>Fixed population: <b>no</b> • nursery <b>{bio.get('current_nursery',0)}</b> • paper <b>{bio.get('current_paper',0)}</b> • live-ready <b>{bio.get('current_live_ready',0)}</b> • real-live authority <b>OFF</b><br><small>Every newborn starts in nursery QC. Paper is the proving pool. Live-ready is eligibility only until real-capital authority is explicitly enabled.</small><br>{''.join(lines)}</div>"
     rows=''.join(_trade_row(x,True) for x in n.get('trades',[]))
     ext=''.join(_trade_row(x,False) for x in j['external'].get('trades',[]))
     mind=''.join(f"<div class=card style='margin:6px 0'><b>{escape(str(x.get('status')))}</b><br><small>{escape(str(x.get('core')))[:260]}</small></div>" for x in j.get('mind',[])) or 'Queen is quiet'
@@ -37,7 +37,7 @@ def render(j):
     experiments=''.join(f"<div><span class=pill>{escape(str(x.get('experiment_type')))}</span> {escape(str(x.get('status')))}</div>" for x in j.get('experiments',[])) or 'None'
     scouts=j.get('queen_scouts') or []
     if scouts:
-        experiments += '<hr><b>Queen shadow ants</b>' + ''.join(f"<div>🐜 {escape(str(x.get('genome_id')))[:12]}… ← {escape(str(x.get('parent_genome_id')))[:12]}… • n={x.get('evidence_n',0)} • mean={_f(x.get('mean_return_pct'),2)}%</div>" for x in scouts)
+        experiments += '<hr><b>Queen brood</b>' + ''.join(f"<div>🐜 <b>{escape(str(x.get('state')))}</b> • {escape(str(x.get('genome_id')))[:12]}… ← {escape(str(x.get('parent_genome_id')))[:12]}… • n={x.get('evidence_n',0)} • mean={_f(x.get('mean_return_pct'),2)}% • edge vs parent {_f(x.get('edge_vs_parent_pct'),2)}pp</div>" for x in scouts)
     events=''.join(f"<div><b>{escape(str(x.get('event_type')))}</b></div>" for x in j.get('events',[]))
     cs=j.get('capital_shadow') or {}; fc=cs.get('family_counts') or {}
     famcounts=' • '.join(f"{escape(str(k))}: {v}" for k,v in sorted(fc.items())) or '—'
