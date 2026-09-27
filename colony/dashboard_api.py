@@ -1,6 +1,5 @@
-import json, os, time, urllib.request
+import json, os, time, urllib.request, asyncio
 from db import connection
-from colony.execution_ledger import summary
 from colony.selection_state import snapshot as selection_snapshot
 _fx={'rate':None,'at':0}
 def _sol_gbp():
@@ -17,7 +16,9 @@ async def _run(conn,run_id):
  out=[]
  for r in trades:
   d=dict(r);q=d.pop('quote') or {};q=json.loads(q) if isinstance(q,str) else q;d['attribution']=q.get('attribution');out.append(d)
- return {'run_id':run_id,'summary':await summary(run_id),'trades':out,'curve':[dict(x) for x in curve]}
+
+ summ=await conn.fetchrow("""SELECT count(*) n,count(*) FILTER(WHERE status='accepted') accepted,count(*) FILTER(WHERE status='rejected') rejected,coalesce(sum(net_pnl),0) net_pnl,avg(net_pnl) FILTER(WHERE net_pnl IS NOT NULL) avg_net FROM colony_execution_ledger WHERE run_id=$1""",run_id)
+ return {'run_id':run_id,'summary':dict(summ),'trades':out,'curve':[dict(x) for x in curve]}
 async def snapshot():
  async with connection() as c:
   external=await _run(c,'paper-livequote-v1');native=await _run(c,'colony-native-v1')
@@ -30,7 +31,7 @@ async def snapshot():
   fam=await c.fetch('''SELECT quote->'attribution'->>'family' family,count(*) trades,
    count(*) FILTER(WHERE net_pnl>0) wins,coalesce(sum(net_pnl),0) net
    FROM colony_execution_ledger WHERE run_id='colony-native-v1' GROUP BY 1 ORDER BY net DESC''')
-  rate=_sol_gbp()
+  rate=await asyncio.to_thread(_sol_gbp)
   families=[dict(x) for x in fam]
   for x in families:x['net_gbp']=float(x['net'])*rate if rate is not None else None
   selection=await selection_snapshot()

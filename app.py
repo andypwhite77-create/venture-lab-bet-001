@@ -260,7 +260,7 @@ async def colony_live():
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
     from pathlib import Path
-    return HTMLResponse(Path("colony/dashboard.html").read_text())
+    return HTMLResponse(Path("colony/dashboard.html").read_text(), headers={"Cache-Control":"no-store, no-cache, must-revalidate, max-age=0","Pragma":"no-cache"})
 
 @app.get("/budget")
 async def budget_status():
