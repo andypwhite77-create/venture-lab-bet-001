@@ -2,9 +2,11 @@
 KNOWN_MECHANISMS={
  'selection':['rank_fraction','evidence_n','catastrophe_rate','age_windows','family_share','specialist_bonus'],
  'validation':['prospective_cutoff','independent_opportunities','future_return','shadow_plan'],
- 'ecology':['reproductive_access','replacement_pressure','rare_family_protection']}
+ 'ecology':['reproductive_access','replacement_pressure','rare_family_protection'],
+ 'reproduction':['bloodline_reproductive_credit','shadow_brood','parent_genome','mutation','descendant_quality','nursery_stage','extinction'],
+ 'population':['dynamic_worker_count','per_bloodline_soft_cap','evidence_justified_capacity','new_bloodline_admission']}
 ALLOWED_EXPERIMENTS={'compare_selection_rule','ablate_selection_feature','raise_evidence_requirement',
-                     'stratify_by_regime','stratify_by_niche','request_more_data'}
+                     'stratify_by_regime','stratify_by_niche','request_more_data','queen_shadow_scouts'}
 FORBIDDEN_PARAM_HINTS={'learning_rate','epochs','batch_size','optimizer','gradient','loss_function'}
 
 def mechanism_packet():
