@@ -1,7 +1,7 @@
 # Grace Evolutionary Trading Swarm
 
 Status: implemented prospective paper experiment
-Updated: 2026-09-26
+Updated: 2026-09-27
 
 ## Core idea
 
@@ -168,3 +168,17 @@ Null benchmarks must include, where technically applicable, random-time, random-
 Experimental provenance is epoch-based. Record code hash, sensor/data schema version, genome constitution version, fitness/selection version, execution-model version, provider configuration and time boundaries. A material change to inputs, decisions, execution economics, fitness or measurement closes the current evaluation epoch and begins a new one. Operational changes proven not to alter experimental semantics do not erase otherwise valid evidence.
 
 No arbitrary correlation cliff (for example correlation >0.7 = one trial), fixed trade-count claim, or hand-labelled number of regimes is constitutionalised here. Dependence and statistical power must be estimated from observed structure and versioned before use. This prevents replacing one naive threshold with another.
+
+## Colony drive model and trust ladder (2026-09-27)
+
+The trading swarm now runs on the same generic eusocial drive model intended for other Grace applications:
+
+`Acquire → Survive → Reproduce → Expand → Fission`
+
+For this colony, resource means realisable net capital after costs. Survival means avoiding catastrophic loss and retaining adaptive capacity. Reproduction means converting validated bloodline success into bounded descendants. Expansion means adding useful, non-redundant workers when evidence and resources justify it.
+
+Every new descendant follows `Birth → Nursery → Paper → Live-ready → Live`. Nursery is cheap QC and broad evidence collection; Paper is deeper prospective validation; Live-ready is eligibility only. Promotion is evidence-gated, not time-gated, so genuinely strong descendants may pass quickly without weakening standards. Real-money authority remains off until externally enabled.
+
+Failed Nursery/Paper descendants are retained as negative knowledge rather than deleted. Matched child-versus-parent evidence measures whether a mutation added value; absolute net expectancy after friction determines whether either lineage deserves scarce capital.
+
+Fission is deliberately visible but practically unreachable at present: £1,000,000 of cumulative realised profit earns eligibility to propose a daughter colony. It does not grant automatic spawn authority. A future daughter Queen would inherit validated genomes and mutation priors, failure/regime/execution memory, and the parent colony's constitutional safety/evidence rules, then begin with a small founding worker group and bounded resource pool in a distinct habitat.

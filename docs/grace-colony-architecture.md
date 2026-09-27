@@ -1,7 +1,7 @@
 # Grace Colony Architecture
 
 Status: implemented prototype / prospective paper experiment
-Updated: 2026-09-26
+Updated: 2026-09-27
 
 ## Purpose
 
@@ -127,3 +127,27 @@ Weak qualified performers are demoted to shadow/paper and retained permanently r
 Before Gen 4 exists, the reproductive constitution is strengthened: 20 distinct assets remain a minimum diversity check but no longer imply 20 independent trials. Reproduction is additionally locked behind a versioned effective-independent-evidence model accounting for temporal/regime clustering, SOL beta and shared liquidity/routing exposure.
 
 Absolute economic viability precedes family-relative ranking; diversity protection may preserve a failing family in shadow but may not force it to breed. Every evolved generation must have a matched random-selection control generation and the parent generation must continue as a prospective benchmark. Null controls, block-aware inference, multiple-comparison correction/interpretation and epoch provenance are mandatory before claiming evolutionary improvement.
+
+## Eusocial lifecycle and colony drives (2026-09-27)
+
+The architecture now treats the colony explicitly as a eusocial software organism. The generic motivational layer is:
+
+`Acquire → Survive → Reproduce → Expand → Fission`
+
+Individual ants exist to improve colony-level fitness rather than preserve themselves. Each application defines what counts as resource, survival, reproduction and fission while keeping the core colony machinery reusable.
+
+For the current trading colony, the primary resource is realisable net capital after realistic costs. Survival means avoiding catastrophic loss while preserving adaptive capacity. Reproduction converts validated bloodline success into bounded brood. Expansion adds useful, non-redundant workers when evidence and resources justify it.
+
+New descendants now move through an explicit trust ladder:
+
+`Birth → Nursery → Paper → Live-ready → Live`
+
+Every newborn starts in Nursery. Promotion is evidence-gated rather than time-gated: strong descendants may progress quickly if they accumulate sufficient independent prospective evidence, while uncertain descendants may remain in Nursery indefinitely. Paper is the deeper proving environment. Live-ready means eligible for consideration only; real-money broadcast authority remains externally controlled.
+
+Nursery and Paper failures are preserved rather than erased. Genomes, lineage, observations, matched controls and failure reasons become permanent negative knowledge. Relative improvement over a parent is useful evidence, but it is not enough by itself: a child can beat a poor parent and still have negative absolute expectancy. Absolute net performance after friction remains necessary for scarce capital.
+
+Fission remains a visible long-range drive but has an intentionally extreme threshold. In the trading application, £1,000,000 of cumulative realised profit earns eligibility to propose a daughter colony. It does not spawn one automatically; explicit human authorization remains required.
+
+A future daughter Queen would inherit three classes of compressed memory: genetic memory (validated genomes, bloodlines and mutation priors), cultural memory (failure patterns, regime knowledge and execution lessons), and constitutional memory (safety rules, evidence standards, resource limits and promotion gates). It would receive a small founding worker group and a bounded resource pool, then operate the same Acquire → Survive → Reproduce → Expand cycle in a distinct habitat.
+
+This makes the colony architecture reusable beyond trading: the domain supplies the resource and reproductive definitions; the colony supplies the motivational, evidentiary and constitutional machinery.
