@@ -22,6 +22,7 @@ def _bloodline_cards(j):
         r=roster.get(fam,{})
         trades=int(pf.get('trades') or 0);wins=int(pf.get('wins') or 0);net=float(pf.get('net') or 0)
         wr=(wins/trades*100) if trades else None
+        rate=j.get('sol_gbp'); net_gbp=(net*float(rate)) if rate is not None else None
         active=int(r.get('active') or 0);elites=int(r.get('elites') or 0);controls=int(r.get('controls') or 0);chall=int(r.get('challengers') or 0)
         state='ELITE FIELD' if elites else 'SEARCHING'
         statecls='good' if elites else 'searching'
@@ -30,7 +31,7 @@ def _bloodline_cards(j):
           <div class='bloodline-number'>{active}</div><div class='bloodline-caption'>active prospective ants</div>
           <div class='mini-grid'><div><strong>{elites}</strong><span>elite</span></div><div><strong>{controls}</strong><span>control</span></div><div><strong>{chall}</strong><span>waiting</span></div></div>
           <div class='bloodline-meta'>Stage <b>{r.get('stage_size','—')}</b> • evidence-ready <b>{len(mature)}</b> • mature median <b>{_f(statistics.median(returns) if returns else None,2)}%</b></div>
-          <div class='bloodline-meta'>Paper bets <b>{trades}</b> • win rate <b>{_f(wr,1)}%</b> • net <b class={'pos' if net>=0 else 'neg'}>{_f(net,6)} SOL</b></div>
+          <div class='bloodline-meta'>Paper bets <b>{trades}</b> • win rate <b>{_f(wr,1)}%</b> • net <b class={'pos' if net>=0 else 'neg'}>{'£'+_f(net_gbp,2) if net_gbp is not None else '—'}</b> <span class='muted'>• {_f(net,6)} SOL</span></div>
         </article>""")
     return ''.join(cards)
 
@@ -52,7 +53,7 @@ def render(j):
     roster=j.get('elite_roster',[]);active=sum(int(x.get('active') or 0) for x in roster);elites=sum(int(x.get('elites') or 0) for x in roster);chall=sum(int(x.get('challengers') or 0) for x in roster)
     real=sum(bool(x.get('broadcast')) for x in n.get('trades',[]))+sum(bool(x.get('broadcast')) for x in j['external'].get('trades',[]))
     acc=j.get('accelerator') or {};left=max(0,int(acc.get('trigger_at',25))-int(acc.get('new_mints',0)))
-    cards=[('ACTIVE ANTS',active,'prospective roster'),('QUALIFIED ELITES',elites,'earned training seats'),('CHALLENGERS',chall,'waiting for a seat'),('MARKED BETS',marked,'prospective outcomes'),('COLONY NET',f'{net:.6f} SOL',gbp or 'paper only'),('NEXT EVOLUTION',f'{left} mints','until accelerator sweep')]
+    cards=[('ACTIVE ANTS',active,'prospective roster'),('QUALIFIED ELITES',elites,'earned training seats'),('CHALLENGERS',chall,'waiting for a seat'),('MARKED BETS',marked,'prospective outcomes'),('COLONY NET',gbp or '—',f'{net:.6f} SOL' if rate is not None else 'paper only'),('NEXT EVOLUTION',f'{left} mints','until accelerator sweep')]
     cards_html=''.join(f"<div class='metric'><div class='metric-label'>{escape(k)}</div><div class='metric-value'>{escape(str(v))}</div><div class='metric-note'>{escape(str(note))}</div></div>" for k,v,note in cards)
     fam=_bloodline_cards(j)
     pop=''.join(f"<div class='roster-row'><span><span class='family-dot {x.get('family')}'></span>{escape(_label(x.get('family')))}</span><span><b>{x.get('active',0)}</b> active &nbsp; <b>{x.get('elites',0)}</b> elite &nbsp; <b>{x.get('challengers',0)}</b> queued</span></div>" for x in roster)
