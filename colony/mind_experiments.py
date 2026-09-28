@@ -28,8 +28,8 @@ async def instantiate(run_id,cutoff,core,sceptic):
             found={r['genome_id']:r['family'] for r in rows}
             if any(x not in found for x in parents): return {'created':False,'why':'parent_not_grounded'}
             if len({found[x] for x in parents})!=1: return {'created':False,'why':'mixed_bloodline'}
-            active=await c.fetchval("SELECT count(*) FROM colony_queen_scouts WHERE state='shadow'")
-            if int(active or 0)>=2: return {'created':False,'why':'active_scout_cap','cap':2}
+            active=await c.fetchval("SELECT count(*) FROM colony_queen_scouts WHERE state='nursery'")
+            if int(active or 0)>=50: return {'created':False,'why':'active_scout_cap','cap':50}
     async with connection() as c:
         eid=await c.fetchval('''INSERT INTO colony_mind_experiments(run_id,evidence_cutoff,experiment_type,proposal,sceptic)
           VALUES($1,$2,$3,$4::jsonb,$5::jsonb) RETURNING id''',run_id,cutoff,et,json.dumps(core),json.dumps(sceptic))
