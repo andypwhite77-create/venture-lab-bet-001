@@ -12,7 +12,7 @@ from colony.spep_mark import mark as mark_spep
 from colony.queen_scouts import process as process_queen_scouts, advance_lifecycle
 from colony.reversal_tournament import process as process_reversal_tournament, maybe_cull as maybe_cull_reversal
 from colony.family_tournament import process_all as process_family_tournaments, maybe_cull_all as maybe_cull_family_tournaments
-from colony.continuous_evolution import replenish as replenish_evolution, cull_obvious_failures, enforce_elite_training_only
+from colony.continuous_evolution import replenish as replenish_evolution, cull_obvious_failures, enforce_elite_training_only, challenger_turnover, challenger_queue_status
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 
@@ -41,8 +41,12 @@ async def main():
             async with connection() as _cec:
                 early=await cull_obvious_failures(_cec)
                 ce=await replenish_evolution(_cec)
+                challengers=await challenger_turnover(_cec)
+                queue_state=await challenger_queue_status(_cec)
             if early: logging.info('continuous_culls %s',early)
             if ce: logging.info('continuous_evolution %s',ce)
+            if challengers: logging.info('challenger_turnover %s',challengers)
+            logging.info('challenger_queue %s',queue_state)
             spep=await process_spep(result.get('run')) if result.get('run') else {}
             logging.info('spep %s',spep)
             spep_marks=await mark_spep()

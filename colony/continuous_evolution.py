@@ -90,6 +90,73 @@ async def replenish(conn):
             ids.add(q['genome_id']); events.append({'family':run['family'],'genome_id':q['genome_id'],'reason':'async_replacement'})
     return events
 
+
+async def challenger_turnover(conn):
+    """Let superior queued elites replace prospectively weak incumbents without rewriting evidence.
+
+    A challenger never displaces an ant on historical score alone. The incumbent must first
+    accumulate at least 12 independent prospective mints and be prospectively non-positive.
+    The challenger must also have a materially stronger historical screening score than that
+    incumbent had when admitted. Baselines are never eligible for replacement.
+    """
+    from colony.reversal_tournament import metrics as reversal_metrics
+    from colony.family_tournament import metrics as family_metrics
+    events=[]
+
+    async def maybe_rotate(family, run, table, metric_fn):
+        active=await conn.fetch(f"SELECT genome_id,baseline,cohort FROM {table} WHERE run_id=$1 AND active=true",run['run_id'])
+        if len(active) < int(run['stage_size']):
+            return
+        challenger=await _next_candidate(conn,family,{a['genome_id'] for a in active})
+        if not challenger:
+            return
+        recs=await metric_fn(conn,run['run_id'])
+        candidates=[]
+        for a in active:
+            if a['baseline'] or a['cohort']!='historical_qualified':
+                continue
+            r=recs.get(a['genome_id'],{})
+            if r.get('n',0) < 12:
+                continue
+            prospective=float(r.get('tournament_score',-999))
+            if prospective > 0:
+                continue
+            admitted=await conn.fetchval("SELECT historical_score FROM evolution_candidate_queue WHERE family=$1 AND genome_id=$2 ORDER BY id DESC LIMIT 1",family,a['genome_id'])
+            admitted=float(admitted) if admitted is not None else 0.0
+            candidates.append((prospective, admitted, a['genome_id'], r.get('n',0)))
+        if not candidates:
+            return
+        candidates.sort(key=lambda x:(x[0],x[1]))
+        prospective, admitted, loser, n = candidates[0]
+        challenger_score=float(challenger['historical_score'])
+        # Require a real historical advantage as well as incumbent prospective weakness.
+        if challenger_score < admitted + max(0.01, abs(admitted)*0.15):
+            return
+        await conn.execute(f"""UPDATE {table} SET active=false,eliminated_at=now(),
+          elimination_reason='challenger_displacement' WHERE run_id=$1 AND genome_id=$2""",run['run_id'],loser)
+        g=challenger['genome']; g=json.loads(g) if isinstance(g,str) else g
+        await conn.execute(f"""INSERT INTO {table}(run_id,genome_id,genome,cohort,baseline)
+          VALUES($1,$2,$3::jsonb,'historical_qualified',false) ON CONFLICT(run_id,genome_id)
+          DO UPDATE SET active=true, eliminated_at=NULL, elimination_reason=NULL, cohort='historical_qualified'""",
+          run['run_id'],challenger['genome_id'],json.dumps(g))
+        await conn.execute("UPDATE evolution_candidate_queue SET status='deployed',deployed_at=now(),deployed_run_id=$2 WHERE id=$1",challenger['id'],run['run_id'])
+        events.append({'family':family,'out':loser,'in':challenger['genome_id'],
+                       'incumbent_n':n,'incumbent_prospective_score':prospective,
+                       'incumbent_historical_score':admitted,'challenger_historical_score':challenger_score})
+
+    rr=await conn.fetchrow("SELECT * FROM reversal_tournament_runs WHERE status='collecting' ORDER BY created_at DESC LIMIT 1")
+    if rr:
+        await maybe_rotate('reversal',rr,'reversal_tournament_ants',reversal_metrics)
+    runs=await conn.fetch("SELECT * FROM family_tournament_runs WHERE status='collecting' ORDER BY created_at")
+    for run in runs:
+        await maybe_rotate(run['family'],run,'family_tournament_ants',family_metrics)
+    return events
+
+async def challenger_queue_status(conn):
+    rows=await conn.fetch("""SELECT family,count(*) AS waiting,max(historical_score) AS best_score
+      FROM evolution_candidate_queue WHERE status='ready' GROUP BY family ORDER BY family""")
+    return [dict(r) for r in rows]
+
 async def cull_obvious_failures(conn):
     """Continuous Darwinism: remove only overwhelming failures before stage gates."""
     from colony.reversal_tournament import metrics as reversal_metrics

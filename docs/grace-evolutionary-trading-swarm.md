@@ -209,3 +209,11 @@ A generic pattern miner now searches observed feature combinations and multiple 
 The same audit exposed and repaired an impossible wallet-convergence threshold. `flow_ratio_15` is calculated as `buys/(buys+sells)` and therefore cannot exceed 1; the previous founder threshold of 1.2 could never fire. The intended 1.2 buy:sell ratio corresponds to a buy-share threshold of approximately 0.545455. Repaired experiments are separated from earlier contaminated evidence.
 
 This changes the optimisation objective from “keep many ants busy” to “spend prospective evidence only on organisms that have earned the right to learn from it.” Broad variation still exists in the historical nursery, but scarce live-paper observation bandwidth is concentrated on controls and elites.
+
+## Elite training roster and challenger queue (2026-09-28)
+
+The prospective layer is now an elite roster rather than a random population. The mass historical nursery can breed very large populations cheaply, but only genomes that survive chronological train/validation screening and an untouched holdout audit are eligible to consume future market evidence. Every bloodline keeps an immortal founder/control.
+
+Qualified genomes beyond current capacity wait in a ranked challenger queue. A queued genome does not replace an active elite simply because its historical result is better. An incumbent becomes replaceable only after at least 12 independent prospective mints and a non-positive prospective tournament score; the challenger must also have a materially stronger historical admission score (minimum +0.01 or +15%).
+
+This makes training slots continuously competitive without contaminating the prospective experiment. The outgoing ant's evidence is preserved permanently, while the incoming challenger receives no inherited prospective credit and must prove itself from zero.

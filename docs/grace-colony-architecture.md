@@ -178,3 +178,11 @@ A generic pattern miner now searches observed feature combinations and multiple 
 The same audit exposed and repaired an impossible wallet-convergence threshold. `flow_ratio_15` is calculated as `buys/(buys+sells)` and therefore cannot exceed 1; the previous founder threshold of 1.2 could never fire. The intended 1.2 buy:sell ratio corresponds to a buy-share threshold of approximately 0.545455. Repaired experiments are separated from earlier contaminated evidence.
 
 This changes the optimisation objective from “keep many ants busy” to “spend prospective evidence only on organisms that have earned the right to learn from it.” Broad variation still exists in the historical nursery, but scarce live-paper observation bandwidth is concentrated on controls and elites.
+
+## Elite-only prospective training and challenger pressure (2026-09-28)
+
+The architecture now distinguishes unlimited cheap candidate generation from scarce prospective training capacity. Historical nurseries may generate and slaughter thousands of genomes, but only walk-forward-qualified, untouched-holdout-surviving elites may consume new market observations. Each bloodline preserves an immortal founder/control.
+
+When a bloodline is full, newly qualified elites enter a ranked challenger queue rather than being discarded. Historical score alone is never sufficient to evict an incumbent: the incumbent must first accumulate at least 12 independent prospective mints and have a non-positive prospective tournament score. The challenger must also exceed the incumbent's historical admission score by at least 0.01 or 15%, whichever is larger. Baselines are never displaced.
+
+If turnover occurs, the incumbent is archived with its prospective evidence and a `challenger_displacement` reason; the challenger starts prospective evidence from zero. Empty slots are still filled immediately from the strongest qualified queue. This preserves forward-test integrity while ensuring active training capacity remains contestable by newly discovered high performers.

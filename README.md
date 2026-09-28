@@ -218,3 +218,11 @@ Continuous evolution is asynchronous. Clearly failed prospective elites can be r
 The accelerator reruns only after at least 25 genuinely new independent mints have accumulated, rather than repeatedly mining an unchanged dataset. It also searches regime specialists and runs generic feature-pattern discovery across multiple horizons. Pattern discovery is allowed to return no robust strategy; failure to find an out-of-sample edge is treated as useful evidence rather than a reason to lower standards.
 
 A feature-definition fault was also corrected in wallet convergence: `flow_ratio_15` is a buy-share bounded to `[0,1]`, so the former `>=1.2` threshold was impossible. The corrected founder equivalent is approximately `0.545455` (the buy share corresponding to a 1.2 buy:sell ratio). Existing contaminated evidence is not silently rewritten; repaired experiments are versioned separately.
+
+## Elite prospective roster and challenger queue
+
+Prospective training capacity is now treated as scarce. Each bloodline keeps its frozen founder/control active, while non-control prospective slots are reserved for genomes that passed historical walk-forward screening and an untouched holdout audit. Broad/random nursery organisms remain archived but do not consume new market observations.
+
+Qualified genomes that cannot immediately enter an active roster remain in a ranked challenger queue ordered by historical screening score. A challenger cannot displace an incumbent on backtest strength alone. Turnover requires the incumbent to have at least 12 independent prospective mints, a non-positive prospective tournament score, and the challenger to have a materially stronger historical admission score (at least +0.01 or +15%, whichever is larger). The founder/control is never replaceable.
+
+A displaced incumbent retains its full prospective evidence and elimination reason. An incoming challenger begins with zero prospective credit. This creates persistent competitive pressure without letting retrospective optimisation rewrite forward evidence.
