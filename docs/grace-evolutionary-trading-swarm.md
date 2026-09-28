@@ -182,3 +182,16 @@ Every new descendant follows `Birth → Nursery → Paper → Live-ready → Liv
 Failed Nursery/Paper descendants are retained as negative knowledge rather than deleted. Matched child-versus-parent evidence measures whether a mutation added value; absolute net expectancy after friction determines whether either lineage deserves scarce capital.
 
 Fission is deliberately visible but practically unreachable at present: £1,000,000 of cumulative realised profit earns eligibility to propose a daughter colony. It does not grant automatic spawn authority. A future daughter Queen would inherit validated genomes and mutation priors, failure/regime/execution memory, and the parent colony's constitutional safety/evidence rules, then begin with a small founding worker group and bounded resource pool in a distinct habitat.
+
+## Bloodline inheritance and negative reproductive memory (2026-09-28)
+
+Descendant promotion now uses the bloodline as its principal evolutionary reference frame rather than requiring every child to beat its immediate parent. Parent-relative comparison remains a local mutation test, but elite parents are not forced into endless improvement.
+
+Paper descendants must first be absolutely viable: positive prospective mean return after the experiment's friction treatment and sufficient prospective evidence. They may then qualify through either of two routes. The bloodline-improvement route requires performance at or above the median prospective return of evidence-qualified mature adults in that family. The elite-inheritance route applies when the parent ranks in the top 10% of evidence-qualified adults: a descendant may preserve elite structure by remaining at or above the bloodline baseline and within 0.5 percentage points of the parent's prospective-window performance.
+
+The governing rule is: weak parents must produce improvement; elite parents may produce preservation or improvement; no descendant is promoted merely because it is less bad than a poor ancestor. Parent comparison is the local mutation test; bloodline performance is the main inheritance benchmark. Thresholds may be revised prospectively as population size and evidence mature, but may not be tuned retrospectively to rescue known descendants.
+
+Reproduction now also maintains active negative memory. Functional descendants receive phenotype fingerprints based on operative parameters rather than mutation provenance. Exact functional duplicates are not regenerated. Evidence-backed failures enter a permanent genome graveyard with lineage, evidence, return and failure reason intact. Repeated nearby failures can make a parameter-space region hostile to future breeding, while isolated failures do not automatically forbid neighbouring exploration. Historical duplicates are retained in research archive but no longer consume new Nursery evidence.
+
+This preserves abundant variation while keeping trust scarce: the colony can explore aggressively, remember what failed, and preserve already-elite structures without rewarding stagnation across the wider bloodline. Real-money authority remains disabled and separate from reproductive status.
+

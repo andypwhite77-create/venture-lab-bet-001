@@ -1,8 +1,38 @@
 from html import escape
+import statistics
 
 def _f(x,d=4):
     try:return f'{float(x):.{d}f}'
     except:return '—'
+
+def _bloodline_cards(j):
+    perf={x.get('family') or 'unknown':x for x in j.get('family_performance',[])}
+    bio={x.get('family') or 'unknown':x for x in (j.get('biology') or {}).get('bloodlines',[])}
+    ants=(j.get('selection') or {}).get('ants',[])
+    names=sorted(set(perf)|set(bio)|{a.get('family') or 'unknown' for a in ants})
+    cards=[]
+    for fam in names:
+        aa=[a for a in ants if (a.get('family') or 'unknown')==fam]
+        mature=[a for a in aa if int(a.get('n') or 0)>=20 and a.get('avg_return_pct') is not None]
+        returns=[float(a['avg_return_pct']) for a in mature]
+        median=statistics.median(returns) if returns else None
+        best=max(returns) if returns else None
+        worst=min(returns) if returns else None
+        pf=perf.get(fam,{})
+        b=bio.get(fam,{})
+        trades=int(pf.get('trades') or 0);wins=int(pf.get('wins') or 0)
+        wr=(wins/trades*100) if trades else None
+        net=float(pf.get('net') or 0)
+        cls='pos' if net>=0 else 'neg'
+        cards.append(
+          f"<div class=card style='margin:8px 0'><b>{escape(str(fam))}</b><br>"
+          f"Mature workers <b>{len(aa)}</b> • evidence-ready <b>{len(mature)}</b> • "
+          f"mature median <b>{_f(median,2)}%</b> • best <b>{_f(best,2)}%</b> • worst <b>{_f(worst,2)}%</b><br>"
+          f"Native paper bets <b>{trades}</b> • wins <b>{wins}</b> • win rate <b>{_f(wr,1)}%</b> • "
+          f"net <span class={cls}><b>{_f(net,6)} SOL</b>{'' if pf.get('net_gbp') is None else ' • £'+_f(pf.get('net_gbp'),2)}</span><br>"
+          f"Nursery <b>{b.get('nursery',0)}</b> • Paper <b>{b.get('paper',0)}</b> • Live-ready <b>{b.get('live_ready',0)}</b> • reproductive credit <b>{b.get('reproductive_credit',0)}</b>"
+          f"</div>")
+    return ''.join(cards) or 'Awaiting bloodline evidence'
 
 def _svg(curve):
     vals=[];s=0.0
@@ -23,7 +53,7 @@ def render(j):
     ants=sum(int(x.get('n') or 0) for x in j.get('genomes',[]));real=sum(bool(x.get('broadcast')) for x in n.get('trades',[]))+sum(bool(x.get('broadcast')) for x in j['external'].get('trades',[]))
     cards=[('COLONY BETS',s.get('n',0)),('MARKED',marked),('WIN RATE',f'{wins/marked*100:.1f}%' if marked else '—'),('COLONY NET',f'{net:.6f} SOL{gbp}'),('ANTS',ants),('REAL TX',real)]
     cards_html=''.join(f"<div class=card><div class=muted>{escape(str(k))}</div><div class=num>{escape(str(v))}</div></div>" for k,v in cards)
-    fam=''.join(f"<div class=card style='margin:6px 0'><b>{escape(str(x.get('family') or 'unknown'))}</b> • {x.get('trades',0)} bets • {x.get('wins',0)} wins<br><span class={'pos' if float(x.get('net') or 0)>=0 else 'neg'}>net {_f(x.get('net'),6)} SOL{'' if x.get('net_gbp') is None else ' • £'+_f(x.get('net_gbp'),2)}</span></div>" for x in j.get('family_performance',[])) or 'Awaiting marks'
+    fam=_bloodline_cards(j)
     pop=''.join(f"<div><span class=pill>{escape(str(x.get('family')))}</span> <b>{x.get('n',0)}</b> genomes</div>" for x in j.get('genomes',[]))
     es=j.get('selection') or {}; evo=f"<div class=card style='margin:6px 0'><b>{escape(str(es.get('mode','—')))}</b><br>Evidence gate: <b>{escape(str(es.get('qualify_n','—')))}</b> distinct assets minimum<br>Effective evidence: <b>{escape(str(es.get('effective_evidence_model','—')))}</b><br>Qualified: <b>{es.get('qualified',0)}</b> • Breeding eligible: <b>{es.get('breeding_eligible',0)}</b></div>"
     bio=j.get('biology') or {}; lines=[]
