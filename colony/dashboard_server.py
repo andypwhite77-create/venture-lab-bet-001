@@ -35,19 +35,52 @@ def _bloodline_cards(j):
         </article>""")
     return ''.join(cards)
 
-def _svg(curve):
-    vals=[];s=0.0
+def _chart(curve, rate, period='7d', metric='net_gbp'):
+    from datetime import datetime, timezone, timedelta
+    periods={'24h':('24 hours',timedelta(hours=24)),'7d':('7 days',timedelta(days=7)),'30d':('30 days',timedelta(days=30)),'90d':('90 days',timedelta(days=90)),'all':('All time',None)}
+    metrics={'net_gbp':'Cumulative net £','net_sol':'Cumulative net SOL','trade_gbp':'Per-bet P/L £','gross_gbp':'Cumulative gross £','friction_gbp':'Cumulative friction £','win_rate':'Cumulative win rate %'}
+    if period not in periods: period='7d'
+    if metric not in metrics: metric='net_gbp'
+    now=datetime.now(timezone.utc); delta=periods[period][1]
+    rows=[]
     for x in curve:
-        try:s+=float(x.get('net_pnl') or 0);vals.append(s)
-        except:pass
-    if not vals:return "<div class='empty-chart'>Waiting for marked colony bets…</div>"
-    lo=min(0,*vals);hi=max(0,*vals);span=hi-lo or 1;pts=[]
+        at=x.get('created_at')
+        if at and delta and at < now-delta: continue
+        rows.append(x)
+    vals=[]; net_sum=0.0; gross_sum=0.0; friction_sum=0.0; wins=0
+    for i,x in enumerate(rows,1):
+        net=float(x.get('net_pnl') or 0); gross=float(x.get('gross_pnl') or 0); friction=float(x.get('friction_cost') or 0)
+        net_sum+=net; gross_sum+=gross; friction_sum+=friction; wins+=int(net>0)
+        if metric=='net_gbp': v=net_sum*float(rate or 0)
+        elif metric=='net_sol': v=net_sum
+        elif metric=='trade_gbp': v=net*float(rate or 0)
+        elif metric=='gross_gbp': v=gross_sum*float(rate or 0)
+        elif metric=='friction_gbp': v=friction_sum*float(rate or 0)
+        else: v=wins/i*100.0
+        vals.append(v)
+    opts=''.join(f"<option value='{k}'{' selected' if k==period else ''}>{label}</option>" for k,(label,_) in periods.items())
+    mopts=''.join(f"<option value='{k}'{' selected' if k==metric else ''}>{label}</option>" for k,label in metrics.items())
+    controls=f"<form class='chart-controls' method='get'><label>Window<select name='period'>{opts}</select></label><label>Metric<select name='metric'>{mopts}</select></label><button type='submit'>Apply</button></form>"
+    if not vals:
+        return controls+"<div class='chartbox'><div class='empty-chart'>No marked bets in this window yet.</div></div>"
+    lo=min(vals); hi=max(vals)
+    if metric!='trade_gbp': lo=min(0,lo); hi=max(0,hi)
+    span=hi-lo or 1.0; pts=[]
     for i,v in enumerate(vals):
-        x=12+(i/max(1,len(vals)-1))*576;y=188-((v-lo)/span)*164;pts.append(f'{x:.1f},{y:.1f}')
-    end='goodline' if vals[-1]>=0 else 'badline'
-    return f"<svg viewBox='0 0 600 210' width='100%' height='220' class='equity'><line x1='10' y1='188' x2='590' y2='188' class='axis'/><polyline class='{end}' fill='none' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' points='{' '.join(pts)}'/></svg>"
+        x=44+(i/max(1,len(vals)-1))*536; y=184-((v-lo)/span)*156; pts.append(f'{x:.1f},{y:.1f}')
+    cls='goodline' if vals[-1]>=0 else 'badline'
+    unit='£' if metric in {'net_gbp','trade_gbp','gross_gbp','friction_gbp'} else ('%' if metric=='win_rate' else ' SOL')
+    def fmt(v):
+        if unit=='£': return f'£{v:.2f}'
+        if unit=='%': return f'{v:.1f}%'
+        return f'{v:.5f} SOL'
+    zero_y=184-((0-lo)/span)*156 if lo<=0<=hi else None
+    zero=f"<line x1='44' y1='{zero_y:.1f}' x2='580' y2='{zero_y:.1f}' class='axis'/>" if zero_y is not None else ''
+    svg=f"<svg viewBox='0 0 600 210' preserveAspectRatio='none' class='equity'>{zero}<polyline class='{cls}' fill='none' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' points='{' '.join(pts)}'/><text x='5' y='34' class='chart-label'>{escape(fmt(hi))}</text><text x='5' y='187' class='chart-label'>{escape(fmt(lo))}</text></svg>"
+    summary=f"<div class='chart-summary'><b>{escape(metrics[metric])}</b><span>{escape(periods[period][0])} • {len(vals)} marked bets • latest <b>{escape(fmt(vals[-1]))}</b></span></div>"
+    return controls+summary+f"<div class='chartbox'>{svg}</div>"
 
-def render(j):
+def render(j, chart_period="7d", chart_metric="net_gbp"):
     n=j['native'];s=n['summary'];curve=n['curve'];marked=len(curve);wins=sum(1 for x in curve if float(x.get('net_pnl') or 0)>0)
     rate=j.get('sol_gbp');net=float(s.get('net_pnl') or 0);gbp='' if rate is None else f'£{net*float(rate):.2f}'
     roster=j.get('elite_roster',[]);active=sum(int(x.get('active') or 0) for x in roster);elites=sum(int(x.get('elites') or 0) for x in roster);chall=sum(int(x.get('challengers') or 0) for x in roster)
@@ -75,7 +108,7 @@ def render(j):
     cs=j.get('capital_shadow') or {};fc=cs.get('family_counts') or {};famcounts=' • '.join(f"{escape(_label(k))}: {v}" for k,v in sorted(fc.items())) or '—'
     rost=''.join(f"<tr><td>{r.get('rank')}</td><td>{escape(_label(r.get('family')))}</td><td><code>{escape(str(r.get('genome_id')))[:12]}…</code></td><td>{_f(r.get('fitness'),3)}</td><td>{r.get('evidence_n')}</td><td>{escape(str(r.get('slot_source')))}</td></tr>" for r in cs.get('roster',[]))
     capital=f"<div class='submetrics'><div><span>Shadow slots</span><b>{cs.get('active_slots',0)}</b></div><div><span>Earned slots</span><b>{cs.get('earned_slots',0)}</b></div><div><span>Growth reserve</span><b>£{_f(cs.get('growth_reserve_gbp'),2)}</b></div><div><span>Locked profit</span><b>£{_f(cs.get('locked_profit_gbp'),2)}</b></div></div><p class=muted>{famcounts}</p><div class=scroll><table><thead><tr><th>#</th><th>Family</th><th>Genome</th><th>Fitness</th><th>Evidence</th><th>Slot</th></tr></thead><tbody>{rost}</tbody></table></div>"
-    return cards_html,_svg(curve),fam,pop,evo,rows,mind,signals,experiments,events,ext,capital
+    return cards_html,_chart(curve,rate,chart_period,chart_metric),fam,pop,evo,rows,mind,signals,experiments,events,ext,capital
 
 def _trade_row(x,native):
     a=x.get('attribution') or {};family=escape(_label(a.get('family','—'))) if native else '';ants=a.get('ants','—') if native else ''

@@ -18,7 +18,7 @@ def _sol_gbp():
 async def _run(conn,run_id):
  ids=list(run_id) if isinstance(run_id,(list,tuple)) else [run_id]
  trades=await conn.fetch('''SELECT intent_id,created_at,mint,side,notional,status,reason,quote,entry_price,mark_price,gross_pnl,friction_cost,net_pnl,broadcast,execution_reality,friction_ratio,executable_edge_sol FROM colony_execution_ledger WHERE run_id=ANY($1::text[]) ORDER BY id DESC LIMIT 60''',ids)
- curve=await conn.fetch('''SELECT created_at,net_pnl FROM colony_execution_ledger WHERE run_id=ANY($1::text[]) AND net_pnl IS NOT NULL ORDER BY id''',ids)
+ curve=await conn.fetch('''SELECT created_at,net_pnl,gross_pnl,friction_cost FROM colony_execution_ledger WHERE run_id=ANY($1::text[]) AND net_pnl IS NOT NULL ORDER BY id''',ids)
  out=[]
  for r in trades:
   d=dict(r);q=d.pop('quote') or {};q=json.loads(q) if isinstance(q,str) else q;d['attribution']=q.get('attribution');out.append(d)
