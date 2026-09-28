@@ -91,6 +91,22 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  accelerator:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "colony.acceleration_daemon"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   colony:
     build: .
     restart: unless-stopped

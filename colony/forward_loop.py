@@ -12,6 +12,7 @@ from colony.spep_mark import mark as mark_spep
 from colony.queen_scouts import process as process_queen_scouts, advance_lifecycle
 from colony.reversal_tournament import process as process_reversal_tournament, maybe_cull as maybe_cull_reversal
 from colony.family_tournament import process_all as process_family_tournaments, maybe_cull_all as maybe_cull_family_tournaments
+from colony.continuous_evolution import replenish as replenish_evolution, cull_obvious_failures
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 
@@ -32,6 +33,11 @@ async def main():
                 ftc=await maybe_cull_family_tournaments(_ftc)
             logging.info('family_tournaments %s',ftr)
             logging.info('family_tournament_culls %s',ftc)
+            async with connection() as _cec:
+                early=await cull_obvious_failures(_cec)
+                ce=await replenish_evolution(_cec)
+            if early: logging.info('continuous_culls %s',early)
+            if ce: logging.info('continuous_evolution %s',ce)
             spep=await process_spep(result.get('run')) if result.get('run') else {}
             logging.info('spep %s',spep)
             spep_marks=await mark_spep()
