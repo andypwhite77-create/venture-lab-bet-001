@@ -18,6 +18,10 @@ GRAVEYARD_BAD_ABSOLUTE_PCT=0.0
 GRAVEYARD_BAD_EDGE_PCT=-2.0
 NEAR_FAILURE_DISTANCE=0.08
 NEAR_FAILURE_NEIGHBORS=3
+BLOODLINE_QUALIFY_N=20
+ELITE_PARENT_FRACTION=0.10
+ELITE_PARITY_TOLERANCE_PCT=0.50
+BLOODLINE_IMPROVEMENT_MARGIN_PCT=0.0
 
 MUTATION_CLASSES=(
     ('local', MutationPolicy(numeric_sigma=0.08, mutation_rate=0.20, min_changes=1, max_changes=2)),
@@ -208,12 +212,55 @@ async def _metrics(c,scout_id,parent_id):
             'paired_wins':sum(x>y for x,y in paired),'paired_losses':sum(x<y for x,y in paired),'paired_ties':sum(x==y for x,y in paired),
             'parent_window_n':pwn,'parent_window_mean_return_pct':pwm,'window_edge_vs_parent_pct':window_edge}
 
+async def _bloodline_reference(c,family,parent_id):
+    # Mature baseline = median prospective mean return of evidence-qualified Gen-3 adults.
+    rows=await c.fetch('''SELECT g.genome_id,e.mint,o.net_return_pct
+      FROM colony_genomes g JOIN colony_forward_entries e ON e.genome_id=g.genome_id
+      JOIN LATERAL (SELECT net_return_pct FROM research_outcomes
+        WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at
+        ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+      WHERE g.generation=3 AND g.family=$1 AND e.run_id=$2 AND o.net_return_pct IS NOT NULL''',family,'fwd-g3-20260926T084022Z')
+    by={}
+    for r in rows:
+        by.setdefault(r['genome_id'],{}).setdefault(r['mint'],float(r['net_return_pct']))
+    adults=[]
+    for gid,mints in by.items():
+        vals=list(mints.values())
+        if len(vals)>=BLOODLINE_QUALIFY_N:
+            adults.append((gid,len(vals),sum(vals)/len(vals)))
+    if not adults:
+        return {'bloodline_baseline_pct':None,'qualified_adults':0,'parent_rank':None,'parent_percentile':None,'elite_parent':False,'parent_lifetime_mean_pct':None}
+    means=sorted(x[2] for x in adults)
+    n=len(means); mid=n//2
+    baseline=means[mid] if n%2 else (means[mid-1]+means[mid])/2
+    ranked=sorted(adults,key=lambda x:x[2],reverse=True)
+    parent=next((x for x in ranked if x[0]==parent_id),None)
+    rank=(ranked.index(parent)+1) if parent else None
+    elite_slots=max(1,__import__('math').ceil(len(ranked)*ELITE_PARENT_FRACTION))
+    return {'bloodline_baseline_pct':baseline,'qualified_adults':len(ranked),
+            'parent_rank':rank,'parent_percentile':((rank-1)/max(1,len(ranked)-1) if rank else None),
+            'elite_parent':bool(rank and rank<=elite_slots),
+            'parent_lifetime_mean_pct':(parent[2] if parent else None),'elite_slots':elite_slots}
+
+def _inheritance_decision(m,ref):
+    child=m.get('mean_return_pct'); baseline=ref.get('bloodline_baseline_pct'); parent_window=m.get('parent_window_mean_return_pct')
+    absolute_viable=child is not None and child>0
+    improvement=absolute_viable and baseline is not None and child >= baseline+BLOODLINE_IMPROVEMENT_MARGIN_PCT
+    elite_parity=(absolute_viable and ref.get('elite_parent') and baseline is not None and parent_window is not None
+                  and child>=baseline and child>=parent_window-ELITE_PARITY_TOLERANCE_PCT)
+    return {'absolute_viable':absolute_viable,'improvement_path':bool(improvement),'elite_inheritance_path':bool(elite_parity),
+            'passes_inheritance':bool(improvement or elite_parity),
+            'parity_tolerance_pct':ELITE_PARITY_TOLERANCE_PCT,'improvement_margin_pct':BLOODLINE_IMPROVEMENT_MARGIN_PCT}
+
 async def advance_lifecycle():
     await ensure_schema(); changes=[]
     async with connection() as c:
         scouts=await c.fetch("SELECT id,parent_genome_id,genome_id,genome,phenotype_id,state,created_at FROM colony_queen_scouts WHERE state IN ('nursery','paper') ORDER BY id")
         for s in scouts:
             m=await _metrics(c,s['id'],s['parent_genome_id']); age_h=(await c.fetchval("SELECT extract(epoch from (now()-$1))/3600",s['created_at'])) or 0
+            g=s['genome'] if isinstance(s['genome'],dict) else json.loads(s['genome'])
+            ref=await _bloodline_reference(c,g.get('family') or 'unknown',s['parent_genome_id'])
+            inheritance=_inheritance_decision(m,ref)
             to_state=reason=None
             # Conservative negative-knowledge gate: only archive after enough independent
             # evidence, negative absolute expectancy, and material underperformance vs parent window.
@@ -223,8 +270,10 @@ async def advance_lifecycle():
                 to_state,reason='graveyard','evidence_backed_failure'
             elif s['state']=='nursery' and age_h>=NURSERY_MIN_HOURS and m['evidence_n']>=NURSERY_MIN_EVIDENCE and m['parent_window_n']>=NURSERY_MIN_CONTROLS:
                 to_state,reason='paper','nursery_qc_pass'
-            elif s['state']=='paper' and age_h>=PAPER_MIN_HOURS and m['evidence_n']>=PAPER_MIN_EVIDENCE and m['parent_window_n']>=PAPER_MIN_CONTROLS and (m['window_edge_vs_parent_pct'] or 0)>0 and (m['mean_return_pct'] or 0)>0:
-                to_state,reason='live_ready','paper_validation_pass_live_still_disabled'
+            elif (s['state']=='paper' and age_h>=PAPER_MIN_HOURS and m['evidence_n']>=PAPER_MIN_EVIDENCE
+                  and m['parent_window_n']>=PAPER_MIN_CONTROLS and inheritance['passes_inheritance']):
+                path='elite_inheritance' if inheritance['elite_inheritance_path'] else 'bloodline_improvement'
+                to_state,reason='live_ready',f'paper_validation_pass:{path}:live_still_disabled'
             if to_state:
                 await c.execute("UPDATE colony_queen_scouts SET state=$2,stage_updated_at=now(),stage_reason=$3 WHERE id=$1",s['id'],to_state,reason)
                 if to_state=='graveyard':
@@ -245,8 +294,10 @@ async def summary():
         for s in scouts:
             m=await _metrics(c,s['id'],s['parent_genome_id'])
             g=s['genome'] if isinstance(s['genome'],dict) else json.loads(s['genome'])
+            ref=await _bloodline_reference(c,g.get('family') or 'unknown',s['parent_genome_id'])
+            inheritance=_inheritance_decision(m,ref)
             out.append({'id':s['id'],'genome_id':s['genome_id'],'parent_genome_id':s['parent_genome_id'],
-              'family':g.get('family'),'created_at':s['created_at'],'state':s['state'],'stage_reason':s['stage_reason'],**m})
+              'family':g.get('family'),'created_at':s['created_at'],'state':s['state'],'stage_reason':s['stage_reason'],**m,**ref,**inheritance})
     return out
 
 async def lifecycle_history(limit=100):
