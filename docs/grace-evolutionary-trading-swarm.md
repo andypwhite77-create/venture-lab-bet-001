@@ -1,7 +1,7 @@
 # Grace Evolutionary Trading Swarm
 
 Status: implemented prospective paper experiment
-Updated: 2026-09-27
+Updated: 2026-09-28
 
 ## Core idea
 
@@ -195,3 +195,17 @@ Reproduction now also maintains active negative memory. Functional descendants r
 
 This preserves abundant variation while keeping trust scarce: the colony can explore aggressively, remember what failed, and preserve already-elite structures without rewarding stagnation across the wider bloodline. Real-money authority remains disabled and separate from reproductive status.
 
+
+## Evolutionary acceleration and elite-only prospective training (2026-09-28)
+
+The colony now treats future market observations as the scarce training resource. Cheap historical compute is used aggressively before a genome is allowed to consume prospective evidence. Each bloodline can generate roughly 10,000 broad historical candidates plus a second elite-directed wave, scored on chronological train/validation splits with a later untouched holdout used only as an audit/veto. Historical success grants permission to audition prospectively; it never counts as forward proof.
+
+Reversal, momentum, order flow and wallet convergence each have an independent tournament with an immortal founder control and the elimination shape `100 → 60 → 30 → 15 → 5 → frozen holdout`. Active prospective training is now elite-only: aside from the immutable baseline/control, random or merely novel nursery organisms are archived but deactivated. Prospective slots are filled only from candidates that clear the historical walk-forward and holdout gates. Replacements begin their prospective record at zero and cannot inherit historical evidence.
+
+The evolutionary accelerator is event-throttled rather than continuously self-mining. It waits for at least 25 new independent mints before rerunning mass historical search, elite-directed breeding, regime-specialist search and generic pattern discovery. This reduces repeated optimisation against the same history and makes new external evidence, rather than CPU cycles alone, the limiting reagent.
+
+A generic pattern miner now searches observed feature combinations and multiple return horizons rather than assuming the hand-authored order-flow hypothesis must be correct. It may nominate a new rule only if it survives chronological evidence gates; returning no robust positive pattern is a valid result. The first strict sweep found no robust generic pattern and no qualified Order Flow elite, which is being treated as evidence that the current feature ecology is insufficient rather than as a reason to relax thresholds.
+
+The same audit exposed and repaired an impossible wallet-convergence threshold. `flow_ratio_15` is calculated as `buys/(buys+sells)` and therefore cannot exceed 1; the previous founder threshold of 1.2 could never fire. The intended 1.2 buy:sell ratio corresponds to a buy-share threshold of approximately 0.545455. Repaired experiments are separated from earlier contaminated evidence.
+
+This changes the optimisation objective from “keep many ants busy” to “spend prospective evidence only on organisms that have earned the right to learn from it.” Broad variation still exists in the historical nursery, but scarce live-paper observation bandwidth is concentrated on controls and elites.

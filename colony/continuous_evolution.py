@@ -36,6 +36,32 @@ async def _next_candidate(conn,family,exclude):
       WHERE family=$1 AND status='ready' AND NOT(genome_id=ANY($2::text[]))
       ORDER BY historical_score DESC, created_at ASC LIMIT 1''',family,list(exclude))
 
+
+async def enforce_elite_training_only(conn):
+    """Keep prospective compute/evidence focused on controls + historically qualified elites.
+
+    Random/broad nursery organisms remain preserved in history but do not consume future
+    candidate observations. The frozen baseline remains active as the control.
+    """
+    events=[]
+    rr=await conn.fetchrow("SELECT * FROM reversal_tournament_runs WHERE status='collecting' ORDER BY created_at DESC LIMIT 1")
+    if rr:
+        rows=await conn.fetch("SELECT genome_id,baseline,cohort FROM reversal_tournament_ants WHERE run_id=$1 AND active=true",rr['run_id'])
+        drop=[r['genome_id'] for r in rows if not r['baseline'] and r['cohort']!='historical_qualified']
+        if drop:
+            await conn.execute("""UPDATE reversal_tournament_ants SET active=false,eliminated_at=now(),
+              elimination_reason='elite_training_policy' WHERE run_id=$1 AND genome_id=ANY($2::text[])""",rr['run_id'],drop)
+            events.append({'family':'reversal','deactivated':len(drop)})
+    runs=await conn.fetch("SELECT * FROM family_tournament_runs WHERE status='collecting' ORDER BY created_at")
+    for run in runs:
+        rows=await conn.fetch("SELECT genome_id,baseline,cohort FROM family_tournament_ants WHERE run_id=$1 AND active=true",run['run_id'])
+        drop=[r['genome_id'] for r in rows if not r['baseline'] and r['cohort']!='historical_qualified']
+        if drop:
+            await conn.execute("""UPDATE family_tournament_ants SET active=false,eliminated_at=now(),
+              elimination_reason='elite_training_policy' WHERE run_id=$1 AND genome_id=ANY($2::text[])""",run['run_id'],drop)
+            events.append({'family':run['family'],'deactivated':len(drop)})
+    return events
+
 async def replenish(conn):
     events=[]
     # Reversal tournament is separate from the other family tournaments.

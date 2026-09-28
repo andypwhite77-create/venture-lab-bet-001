@@ -206,3 +206,15 @@ The platform is live in shadow mode on the VPS. RPC, PostgreSQL, Jupiter samplin
 ## Philosophy
 
 This repository is an experiment, not a promise of returns. A profitable strategy, a collection of weak effects that combine usefully, or a clear demonstration that a hypothesis fails after costs are all valid research outcomes.
+
+## Evolutionary acceleration and elite-only training (28 Sep 2026)
+
+The colony now separates cheap historical search from expensive prospective evidence. Each bloodline can breed and replay roughly 10,000 broad genomes against stored observations, then run a second elite-directed search around promising parameter regions. Historical data is split chronologically into train, validation and an untouched holdout audit. Historical performance can nominate a genome for prospective life, but never counts as prospective proof.
+
+Four independent 100-ant tournaments exist for reversal, momentum, order flow and wallet convergence. Their nominal elimination ladder is `100 -> 60 -> 30 -> 15 -> 5 -> frozen holdout`, with one immortal founder baseline per bloodline. However, active prospective slots are now reserved for the frozen control plus genomes that have already passed the historical walk-forward and holdout gates. Broad/random nursery organisms remain archived but do not consume new forward observations.
+
+Continuous evolution is asynchronous. Clearly failed prospective elites can be retired early; vacant slots are replenished from a queue of historically qualified candidates and every replacement starts prospective evidence from zero. This prevents weak/random ants from consuming scarce future information merely because they were born into the current population.
+
+The accelerator reruns only after at least 25 genuinely new independent mints have accumulated, rather than repeatedly mining an unchanged dataset. It also searches regime specialists and runs generic feature-pattern discovery across multiple horizons. Pattern discovery is allowed to return no robust strategy; failure to find an out-of-sample edge is treated as useful evidence rather than a reason to lower standards.
+
+A feature-definition fault was also corrected in wallet convergence: `flow_ratio_15` is a buy-share bounded to `[0,1]`, so the former `>=1.2` threshold was impossible. The corrected founder equivalent is approximately `0.545455` (the buy share corresponding to a 1.2 buy:sell ratio). Existing contaminated evidence is not silently rewritten; repaired experiments are versioned separately.
