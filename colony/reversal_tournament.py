@@ -11,6 +11,7 @@ from pathlib import Path
 from colony.forward import eligible
 from colony.genome import genome_id
 from colony.selection import ant_metrics
+from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured_roundtrip_network_fee_sol,sol_gbp_rate
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_SEED = 28092026
@@ -94,21 +95,28 @@ def outlier_dependence(vals: list[float]) -> float:
     return max(pos) / total if total else 1.0
 
 
-def score_record(returns: list[tuple[str,float]], baseline_map: dict[str,float]) -> dict:
-    first = {}
-    for mint, ret in returns: first.setdefault(mint, float(ret))
+def score_record(returns: list[tuple[str,float]], baseline_map: dict[str,float], stake_gbp=TARGET_STAKE_GBP, fixed_cost_gbp=0.0) -> dict:
+    raw_first = {}
+    for mint, ret in returns: raw_first.setdefault(mint, float(ret))
+    first={m:adjusted_return_pct(r,stake_gbp,fixed_cost_gbp) for m,r in raw_first.items()}
     vals = list(first.values())
     m = ant_metrics(list(first.items()))
-    shared = [(r, baseline_map[mint]) for mint, r in first.items() if mint in baseline_map]
+    base_adj={m:adjusted_return_pct(r,stake_gbp,fixed_cost_gbp) for m,r in baseline_map.items()}
+    shared = [(r, base_adj[mint]) for mint, r in first.items() if mint in base_adj]
     edge = statistics.fmean(r-b for r,b in shared) if shared else 0.0
     tail = abs(min(0.0, min(vals))) if vals else 100.0
     outlier = outlier_dependence(vals)
     # Fitness is already expectancy/robustness/consistency aware. Add explicit control edge,
     # and punish tails / single-moonshot dependence hard enough to stop lucky idiots breeding.
     tournament_score = float(m.get("fitness", -999.0)) + edge/100.0 - tail/200.0 - max(0.0, outlier-.45)
+    avg_net_gbp=(statistics.fmean(vals)*stake_gbp/100.0) if vals else None
+    positive_raw=[r for r in raw_first.values() if r>0]
+    mean_positive=statistics.fmean(positive_raw) if positive_raw else 0.0
+    break_even=(fixed_cost_gbp/(mean_positive/100.0)) if fixed_cost_gbp>0 and mean_positive>0 else (0.0 if mean_positive>0 else None)
     return {**m, "baseline_edge_pct": edge, "baseline_overlap_n": len(shared),
             "worst_return_pct": min(vals) if vals else None, "outlier_dependence": outlier,
-            "tournament_score": tournament_score, "mints": set(first)}
+            "tournament_score": tournament_score, "mints": set(first),"paper_stake_gbp":stake_gbp,
+            "fixed_cost_gbp":fixed_cost_gbp,"avg_net_gbp":avg_net_gbp,"break_even_stake_gbp":break_even}
 
 
 def rank_with_correlation(records: dict[str,dict]) -> list[tuple[str,dict]]:
@@ -173,7 +181,8 @@ async def metrics(conn, run_id: str, since=None) -> dict[str,dict]:
     baseline_gid=await conn.fetchval("SELECT genome_id FROM reversal_tournament_ants WHERE run_id=$1 AND baseline=true",run_id)
     base_first={}
     for mint,ret in grouped.get(baseline_gid,[]): base_first.setdefault(mint,ret)
-    return {gid:score_record(vals,base_first) for gid,vals in grouped.items()}
+    fee_sol=await measured_roundtrip_network_fee_sol(conn); rate,_=sol_gbp_rate(); fixed_gbp=fee_sol*rate
+    return {gid:score_record(vals,base_first,TARGET_STAKE_GBP,fixed_gbp) for gid,vals in grouped.items()}
 
 
 async def maybe_cull(conn) -> dict:

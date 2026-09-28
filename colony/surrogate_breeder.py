@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy,json,random,statistics
 from colony.genome import genome_id
 from colony.historical_nursery import load_rows,split_rows,evaluate,robust_score,select_finalists,founders,_set,SEED
+from colony.paper_economics import TARGET_STAKE_GBP,measured_roundtrip_network_fee_sol,sol_gbp_rate
 
 async def guided_family(conn,family,n=5000):
  row=await conn.fetchrow('SELECT id,finalists FROM historical_nursery_runs WHERE family=$1 ORDER BY created_at DESC LIMIT 1',family)
@@ -32,12 +33,13 @@ async def guided_family(conn,family,n=5000):
   if gid not in seen:pop.append(parent);seen.add(gid)
   i+=1
  rows=await load_rows(conn);splits=split_rows(rows);results=[]
+ fee_sol=await measured_roundtrip_network_fee_sol(conn);rate,_=sol_gbp_rate();fixed_gbp=fee_sol*rate
  for g in pop:
-  parts=[evaluate(g,s) for s in splits];rs=robust_score(parts)
+  parts=[evaluate(g,s,TARGET_STAKE_GBP,fixed_gbp) for s in splits];rs=robust_score(parts)
   results.append({'genome_id':genome_id(g),'genome':g,'train':parts[0],'validation':parts[1],'holdout':parts[2],'robust_score':rs})
  finals=select_finalists(results,100,rng_seed=f'guided:{SEED}:{family}')
  summary={'family':family,'status':'ok','tested':len(pop),'positive_elite':len(elite),'positive_finalists':sum(float(x.get('robust_score',-999))>0 for x in finals),
-          'best_score':max((float(x.get('robust_score',-999)) for x in finals),default=-999)}
+          'best_score':max((float(x.get('robust_score',-999)) for x in finals),default=-999),'stake_gbp':TARGET_STAKE_GBP,'fixed_cost_gbp':fixed_gbp}
  await conn.execute('''INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary)
    VALUES($1,$2,$3,$4::jsonb,$5::jsonb)''',family,len(pop),len(rows),json.dumps(finals),json.dumps({**summary,'mode':'surrogate_elite_directed'}))
  return summary

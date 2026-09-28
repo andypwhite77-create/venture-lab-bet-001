@@ -7,6 +7,7 @@ from pathlib import Path
 from colony.forward import eligible
 from colony.genome import genome_id
 from colony.selection import ant_metrics
+from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured_roundtrip_network_fee_sol,sol_gbp_rate
 
 ROOT=Path(__file__).resolve().parent
 DEFAULT_SEED=28092026
@@ -50,16 +51,23 @@ def _outlier(vals):
     pos=[x for x in vals if x>0]
     return 1.0 if not pos or sum(pos)==0 else max(pos)/sum(pos)
 
-def score_record(returns,baseline_map):
-    first={}
-    for mint,ret in returns:first.setdefault(mint,float(ret))
+def score_record(returns,baseline_map,stake_gbp=TARGET_STAKE_GBP,fixed_cost_gbp=0.0):
+    raw_first={}
+    for mint,ret in returns:raw_first.setdefault(mint,float(ret))
+    first={m:adjusted_return_pct(r,stake_gbp,fixed_cost_gbp) for m,r in raw_first.items()}
     vals=list(first.values()); m=ant_metrics(list(first.items()))
-    shared=[(r,baseline_map[mint]) for mint,r in first.items() if mint in baseline_map]
+    base_adj={m:adjusted_return_pct(r,stake_gbp,fixed_cost_gbp) for m,r in baseline_map.items()}
+    shared=[(r,base_adj[mint]) for mint,r in first.items() if mint in base_adj]
     edge=statistics.fmean(r-b for r,b in shared) if shared else 0.0
     tail=abs(min(0.0,min(vals))) if vals else 100.0; outlier=_outlier(vals)
     score=float(m.get('fitness',-999))+edge/100-tail/200-max(0.0,outlier-.45)
+    avg_net_gbp=(statistics.fmean(vals)*stake_gbp/100.0) if vals else None
+    positive_raw=[r for r in raw_first.values() if r>0]
+    mean_positive=statistics.fmean(positive_raw) if positive_raw else 0.0
+    break_even=(fixed_cost_gbp/(mean_positive/100.0)) if fixed_cost_gbp>0 and mean_positive>0 else (0.0 if mean_positive>0 else None)
     return {**m,'baseline_edge_pct':edge,'baseline_overlap_n':len(shared),'worst_return_pct':min(vals) if vals else None,
-            'outlier_dependence':outlier,'tournament_score':score,'mints':set(first)}
+            'outlier_dependence':outlier,'tournament_score':score,'mints':set(first),'paper_stake_gbp':stake_gbp,
+            'fixed_cost_gbp':fixed_cost_gbp,'avg_net_gbp':avg_net_gbp,'break_even_stake_gbp':break_even}
 
 def catastrophic(r):return r.get('n',0)>=8 and r.get('catastrophe_rate',0)>=.20
 
@@ -89,7 +97,8 @@ async def metrics(conn,run_id,since=None):
     base=await conn.fetchval('SELECT genome_id FROM family_tournament_ants WHERE run_id=$1 AND baseline=true',run_id)
     bm={}
     for mint,ret in grouped.get(base,[]):bm.setdefault(mint,ret)
-    return {gid:score_record(vals,bm) for gid,vals in grouped.items()}
+    fee_sol=await measured_roundtrip_network_fee_sol(conn); rate,_=sol_gbp_rate(); fixed_gbp=fee_sol*rate
+    return {gid:score_record(vals,bm,TARGET_STAKE_GBP,fixed_gbp) for gid,vals in grouped.items()}
 
 async def process_all(conn):
     runs=await conn.fetch("SELECT * FROM family_tournament_runs WHERE status='collecting' ORDER BY created_at")

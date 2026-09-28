@@ -226,3 +226,9 @@ Prospective training capacity is now treated as scarce. Each bloodline keeps its
 Qualified genomes that cannot immediately enter an active roster remain in a ranked challenger queue ordered by historical screening score. A challenger cannot displace an incumbent on backtest strength alone. Turnover requires the incumbent to have at least 12 independent prospective mints, a non-positive prospective tournament score, and the challenger to have a materially stronger historical admission score (at least +0.01 or +15%, whichever is larger). The founder/control is never replaceable.
 
 A displaced incumbent retains its full prospective evidence and elimination reason. An incoming challenger begins with zero prospective credit. This creates persistent competitive pressure without letting retrospective optimisation rewrite forward evidence.
+
+## £25 stake economics (2026-09-28)
+
+Paper economics now use a £25 per-ant reference stake, matching the intended tiny live-canary scale. Fixed execution costs are modelled separately from percentage edge so a strong signal is not rejected merely because an unrealistically tiny paper stake makes fixed fees dominate. Recent observed successful Jupiter transaction fees provide the fixed network-cost estimate; proportional friction remains separate. The engine records net £ economics and an implied break-even stake while preserving the underlying percentage-return signal.
+
+The £25 execution-reality probe is prospective-only and begins after candidate 1395. It uses read-only Jupiter quotes and never signs or broadcasts. Historical evidence still cannot substitute for prospective proof, and live authority remains disabled.

@@ -217,3 +217,9 @@ The prospective layer is now an elite roster rather than a random population. Th
 Qualified genomes beyond current capacity wait in a ranked challenger queue. A queued genome does not replace an active elite simply because its historical result is better. An incumbent becomes replaceable only after at least 12 independent prospective mints and a non-positive prospective tournament score; the challenger must also have a materially stronger historical admission score (minimum +0.01 or +15%).
 
 This makes training slots continuously competitive without contaminating the prospective experiment. The outgoing ant's evidence is preserved permanently, while the incoming challenger receives no inherited prospective credit and must prove itself from zero.
+
+## Stake-aware economics (28 September 2026)
+
+Strategy quality and capital size are now explicitly separated. Each elite is evaluated against a £25 reference paper stake, while fixed round-trip network costs are estimated from the median fee of recently observed successful Jupiter transactions. A trade may therefore retain a strong directional signal while still being labelled uneconomic below its break-even stake. Conversely, increasing stake does not rescue a genuinely negative edge; it only dilutes fixed costs.
+
+Prospective £25 execution-reality probes use actual read-only Jupiter quotes and record stake, measured fixed cost, fixed-cost drag, net £ result and break-even stake. This is a paper/shadow model only; no signing or broadcast capability is introduced.

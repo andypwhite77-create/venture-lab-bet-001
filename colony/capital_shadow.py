@@ -2,7 +2,7 @@
 import math
 from collections import Counter
 
-STARTER_GBP=1.0
+STARTER_GBP=25.0
 INITIAL_SLOTS=25
 GROWTH_SHARE=0.50
 MAX_FAMILY_FRACTION=0.40

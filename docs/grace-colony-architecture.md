@@ -186,3 +186,9 @@ The architecture now distinguishes unlimited cheap candidate generation from sca
 When a bloodline is full, newly qualified elites enter a ranked challenger queue rather than being discarded. Historical score alone is never sufficient to evict an incumbent: the incumbent must first accumulate at least 12 independent prospective mints and have a non-positive prospective tournament score. The challenger must also exceed the incumbent's historical admission score by at least 0.01 or 15%, whichever is larger. Baselines are never displaced.
 
 If turnover occurs, the incumbent is archived with its prospective evidence and a `challenger_displacement` reason; the challenger starts prospective evidence from zero. Empty slots are still filled immediately from the strongest qualified queue. This preserves forward-test integrity while ensuring active training capacity remains contestable by newly discovered high performers.
+
+## Stake-aware execution economics (28 September 2026)
+
+The colony now treats £25 as the per-ant reference stake for eventual canary-scale economics. Fitness distinguishes signal return from stake-dependent execution viability. Fixed costs are estimated from observed on-chain Jupiter fees, while proportional friction and quote-derived price impact remain separate. The model can therefore identify a minimum break-even stake for a good signal instead of misclassifying it as a bad strategy solely because a toy stake cannot absorb fixed fees.
+
+A new prospective execution epoch probes elite-family opportunities at approximately £25 equivalent SOL using read-only Jupiter quotes. The epoch begins after candidate 1395 so earlier observations are not retrospectively backfilled. All execution remains simulated and broadcast authority remains off.

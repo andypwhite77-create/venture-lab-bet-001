@@ -68,6 +68,9 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
+      PAPER_STAKE_GBP: "25"
+      PAPER_V2_START_AFTER_CANDIDATE_ID: "1395"
+      PAPER_SOL_GBP_FALLBACK: "90.36"
     logging:
       options:
         max-size: "10m"
