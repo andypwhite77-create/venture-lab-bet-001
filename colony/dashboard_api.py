@@ -35,13 +35,39 @@ async def snapshot():
   fam=await c.fetch('''SELECT quote->'attribution'->>'family' family,count(*) trades,
    count(*) FILTER(WHERE net_pnl>0) wins,coalesce(sum(net_pnl),0) net
    FROM colony_execution_ledger WHERE run_id='colony-native-v1' GROUP BY 1 ORDER BY net DESC''')
+  # Current elite-training roster is separate from the frozen forward-run provenance above.
+  elite=[]
+  rr=await c.fetchrow("SELECT run_id,stage_size,stage_index,status FROM reversal_tournament_runs ORDER BY created_at DESC LIMIT 1")
+  if rr:
+   rc=await c.fetchrow('''SELECT count(*) FILTER(WHERE active) active,
+      count(*) FILTER(WHERE active AND baseline) controls,
+      count(*) FILTER(WHERE active AND NOT baseline AND cohort='historical_qualified') elites
+      FROM reversal_tournament_ants WHERE run_id=$1''',rr['run_id'])
+   elite.append({'family':'reversal',**dict(rc),'stage_size':rr['stage_size'],'stage_index':rr['stage_index'],'status':rr['status']})
+  fruns=await c.fetch("SELECT DISTINCT ON(family) run_id,family,stage_size,stage_index,status FROM family_tournament_runs ORDER BY family,created_at DESC")
+  for r in fruns:
+   fc=await c.fetchrow('''SELECT count(*) FILTER(WHERE active) active,
+      count(*) FILTER(WHERE active AND baseline) controls,
+      count(*) FILTER(WHERE active AND NOT baseline AND cohort='historical_qualified') elites
+      FROM family_tournament_ants WHERE run_id=$1''',r['run_id'])
+   elite.append({'family':r['family'],**dict(fc),'stage_size':r['stage_size'],'stage_index':r['stage_index'],'status':r['status']})
+  qrows=await c.fetch("SELECT family,count(*) waiting,max(historical_score) best_score FROM evolution_candidate_queue WHERE status='ready' GROUP BY family")
+  qmap={r['family']:dict(r) for r in qrows}
+  for e in elite:
+   q=qmap.get(e['family'],{});e['challengers']=q.get('waiting',0);e['best_challenger_score']=q.get('best_score')
+  accel=await c.fetchval("SELECT value FROM acceleration_state WHERE key='historical_nursery'")
+  accel=json.loads(accel) if isinstance(accel,str) else (accel or {})
+  current_mints=await c.fetchval('''SELECT count(DISTINCT c.mint) FROM research_candidates c
+    WHERE EXISTS(SELECT 1 FROM research_outcomes o WHERE o.candidate_id=c.id AND o.net_return_pct IS NOT NULL)''')
+  accel={'last_mints':int(accel.get('unique_mints',0)),'current_mints':int(current_mints or 0),
+         'new_mints':max(0,int(current_mints or 0)-int(accel.get('unique_mints',0))),'trigger_at':25}
   rate=await asyncio.to_thread(_sol_gbp)
   families=[dict(x) for x in fam]
   for x in families:x['net_gbp']=float(x['net'])*rate if rate is not None else None
   payload={'external':external,'native':native,'sol_gbp':rate,'signals':[dict(x) for x in signals],
    'genomes':[dict(x) for x in genomes],'events':[dict(x) for x in events],
    'mind':[dict(x) for x in mind],'experiments':[dict(x) for x in exps],
-   'lineage':[dict(x) for x in lineage],'family_performance':families}
+   'lineage':[dict(x) for x in lineage],'family_performance':families,'elite_roster':elite,'accelerator':accel}
  # IMPORTANT: release the dashboard DB connection before selection telemetry, which
  # acquires its own connection. Otherwise concurrent dashboard requests can exhaust
  # the small asyncpg pool and deadlock each other.
