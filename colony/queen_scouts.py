@@ -12,6 +12,12 @@ PAPER_MIN_EVIDENCE=50
 PAPER_MIN_CONTROLS=30
 MAX_NURSERY_PER_BLOODLINE=40
 GLOBAL_NURSERY_CAP=50
+GRAVEYARD_MIN_EVIDENCE=20
+GRAVEYARD_MIN_PARENT_WINDOW=10
+GRAVEYARD_BAD_ABSOLUTE_PCT=0.0
+GRAVEYARD_BAD_EDGE_PCT=-2.0
+NEAR_FAILURE_DISTANCE=0.08
+NEAR_FAILURE_NEIGHBORS=3
 
 MUTATION_CLASSES=(
     ('local', MutationPolicy(numeric_sigma=0.08, mutation_rate=0.20, min_changes=1, max_changes=2)),
@@ -20,24 +26,62 @@ MUTATION_CLASSES=(
     ('exploratory', MutationPolicy(numeric_sigma=0.40, mutation_rate=0.80, min_changes=2, max_changes=6)),
 )
 
+def _phenotype_payload(genome):
+    # Functional identity excludes ancestry/provenance metadata.
+    return {k:v for k,v in genome.items() if k not in ('mutation','parents')}
+
+def phenotype_id(genome):
+    raw=json.dumps(_phenotype_payload(genome),sort_keys=True,separators=(',',':'))
+    return 'p_'+hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+def _parameter_distance(a,b):
+    """Scale-free mean distance across shared numeric parameters."""
+    ap=a.get('parameters',{}); bp=b.get('parameters',{})
+    keys=[k for k in set(ap)&set(bp) if isinstance(ap[k],(int,float)) and not isinstance(ap[k],bool) and isinstance(bp[k],(int,float)) and not isinstance(bp[k],bool)]
+    if not keys: return 1.0
+    ds=[]
+    for k in keys:
+        av=float(ap[k]); bv=float(bp[k]); scale=max(abs(av),abs(bv),1.0)
+        ds.append(abs(av-bv)/scale)
+    return sum(ds)/len(ds)
+
 async def ensure_schema():
     async with connection() as c:
         await c.execute('''CREATE TABLE IF NOT EXISTS colony_queen_scouts(
           id BIGSERIAL PRIMARY KEY,mind_experiment_id BIGINT NOT NULL,run_id TEXT NOT NULL,
           parent_genome_id TEXT NOT NULL,genome_id TEXT NOT NULL,genome JSONB NOT NULL,
           birth_cutoff BIGINT NOT NULL,created_at TIMESTAMPTZ DEFAULT now(),state TEXT NOT NULL DEFAULT 'nursery',
-          stage_updated_at TIMESTAMPTZ DEFAULT now(),stage_reason TEXT,
+          stage_updated_at TIMESTAMPTZ DEFAULT now(),stage_reason TEXT,phenotype_id TEXT,
           UNIQUE(mind_experiment_id,genome_id))''')
         await c.execute("ALTER TABLE colony_queen_scouts ADD COLUMN IF NOT EXISTS stage_updated_at TIMESTAMPTZ DEFAULT now()")
         await c.execute("ALTER TABLE colony_queen_scouts ADD COLUMN IF NOT EXISTS stage_reason TEXT")
+        await c.execute("ALTER TABLE colony_queen_scouts ADD COLUMN IF NOT EXISTS phenotype_id TEXT")
         await c.execute("UPDATE colony_queen_scouts SET state='nursery' WHERE state='shadow'")
         await c.execute('''CREATE TABLE IF NOT EXISTS colony_queen_scout_entries(
           id BIGSERIAL PRIMARY KEY,scout_id BIGINT NOT NULL REFERENCES colony_queen_scouts(id),
           mint TEXT NOT NULL,candidate_id BIGINT NOT NULL,observed_at TIMESTAMPTZ NOT NULL,
           hold_minutes INTEGER NOT NULL,UNIQUE(scout_id,candidate_id))''')
+        await c.execute('''CREATE TABLE IF NOT EXISTS colony_genome_graveyard(
+          phenotype_id TEXT PRIMARY KEY,genome_id TEXT NOT NULL,parent_genome_id TEXT,family TEXT NOT NULL,
+          genome JSONB NOT NULL,reason TEXT NOT NULL,evidence_n INTEGER,parent_window_n INTEGER,
+          mean_return_pct DOUBLE PRECISION,edge_vs_parent_pct DOUBLE PRECISION,created_at TIMESTAMPTZ DEFAULT now())''')
+        rows=await c.fetch("SELECT id,genome FROM colony_queen_scouts WHERE phenotype_id IS NULL")
+        for r in rows:
+            g=r['genome'] if isinstance(r['genome'],dict) else json.loads(r['genome'])
+            await c.execute("UPDATE colony_queen_scouts SET phenotype_id=$2 WHERE id=$1",r['id'],phenotype_id(g))
         await c.execute('''CREATE TABLE IF NOT EXISTS colony_queen_scout_lifecycle(
           id BIGSERIAL PRIMARY KEY,scout_id BIGINT NOT NULL REFERENCES colony_queen_scouts(id),
           from_state TEXT,to_state TEXT NOT NULL,reason TEXT NOT NULL,created_at TIMESTAMPTZ DEFAULT now())''')
+        # Preserve historical duplicates as research memory but stop spending new evidence on them.
+        dupes=await c.fetch('''SELECT phenotype_id,array_agg(id ORDER BY id) ids FROM colony_queen_scouts
+          WHERE phenotype_id IS NOT NULL AND state IN ('nursery','paper') GROUP BY phenotype_id HAVING count(*)>1''')
+        for d in dupes:
+            for sid in list(d['ids'])[1:]:
+                old=await c.fetchval("SELECT state FROM colony_queen_scouts WHERE id=$1",sid)
+                await c.execute("UPDATE colony_queen_scouts SET state='research_archive',stage_updated_at=now(),stage_reason='exact_duplicate_existing' WHERE id=$1",sid)
+                exists=await c.fetchval("SELECT EXISTS(SELECT 1 FROM colony_queen_scout_lifecycle WHERE scout_id=$1 AND to_state='research_archive' AND reason='exact_duplicate_existing')",sid)
+                if not exists:
+                    await c.execute("INSERT INTO colony_queen_scout_lifecycle(scout_id,from_state,to_state,reason) VALUES($1,$2,'research_archive','exact_duplicate_existing')",sid,old)
 
 async def active_count(family=None):
     await ensure_schema()
@@ -79,11 +123,23 @@ async def create(experiment_id,run_id,cutoff,parent_ids,max_scouts=2):
             class_name,policy=MUTATION_CLASSES[attempts % len(MUTATION_CLASSES)]
             child=mutate(parent,seed=_seed(experiment_id,pid,attempts),policy=policy)
             child.setdefault('mutation',{})['class']=class_name
-            gid=genome_id(child)
+            gid=genome_id(child); phid=phenotype_id(child)
+            # Exact functional duplicates never return, regardless of mutation seed/provenance.
+            seen=await c.fetchval("SELECT EXISTS(SELECT 1 FROM colony_queen_scouts WHERE phenotype_id=$1) OR EXISTS(SELECT 1 FROM colony_genome_graveyard WHERE phenotype_id=$1)",phid)
+            if seen:
+                attempts+=1; continue
+            # Repeated nearby failures make a region hostile; one isolated failure does not.
+            graves=await c.fetch("SELECT genome FROM colony_genome_graveyard WHERE family=$1",family)
+            near=0
+            for gr in graves:
+                gg=gr['genome'] if isinstance(gr['genome'],dict) else json.loads(gr['genome'])
+                if _parameter_distance(child,gg)<=NEAR_FAILURE_DISTANCE: near+=1
+            if near>=NEAR_FAILURE_NEIGHBORS:
+                attempts+=1; continue
             sid=await c.fetchval('''INSERT INTO colony_queen_scouts
-              (mind_experiment_id,run_id,parent_genome_id,genome_id,genome,birth_cutoff,state,stage_reason)
-              VALUES($1,$2,$3,$4,$5::jsonb,$6,'nursery',$7) ON CONFLICT DO NOTHING RETURNING id''',
-              experiment_id,run_id,pid,gid,json.dumps(child),int(cutoff or 0),f'newborn_qc:{class_name}')
+              (mind_experiment_id,run_id,parent_genome_id,genome_id,genome,birth_cutoff,state,stage_reason,phenotype_id)
+              VALUES($1,$2,$3,$4,$5::jsonb,$6,'nursery',$7,$8) ON CONFLICT DO NOTHING RETURNING id''',
+              experiment_id,run_id,pid,gid,json.dumps(child),int(cutoff or 0),f'newborn_qc:{class_name}',phid)
             if sid:
                 await c.execute("INSERT INTO colony_queen_scout_lifecycle(scout_id,from_state,to_state,reason) VALUES($1,NULL,'nursery',$2)",sid,f'newborn_qc:{class_name}')
                 made.append({'scout_id':sid,'genome_id':gid,'parent':pid,'mutation_class':class_name})
@@ -155,16 +211,30 @@ async def _metrics(c,scout_id,parent_id):
 async def advance_lifecycle():
     await ensure_schema(); changes=[]
     async with connection() as c:
-        scouts=await c.fetch("SELECT id,parent_genome_id,state,created_at FROM colony_queen_scouts WHERE state IN ('nursery','paper') ORDER BY id")
+        scouts=await c.fetch("SELECT id,parent_genome_id,genome_id,genome,phenotype_id,state,created_at FROM colony_queen_scouts WHERE state IN ('nursery','paper') ORDER BY id")
         for s in scouts:
             m=await _metrics(c,s['id'],s['parent_genome_id']); age_h=(await c.fetchval("SELECT extract(epoch from (now()-$1))/3600",s['created_at'])) or 0
             to_state=reason=None
-            if s['state']=='nursery' and age_h>=NURSERY_MIN_HOURS and m['evidence_n']>=NURSERY_MIN_EVIDENCE and m['parent_window_n']>=NURSERY_MIN_CONTROLS:
+            # Conservative negative-knowledge gate: only archive after enough independent
+            # evidence, negative absolute expectancy, and material underperformance vs parent window.
+            if (m['evidence_n']>=GRAVEYARD_MIN_EVIDENCE and m['parent_window_n']>=GRAVEYARD_MIN_PARENT_WINDOW
+                and m['mean_return_pct'] is not None and m['mean_return_pct']<GRAVEYARD_BAD_ABSOLUTE_PCT
+                and m['window_edge_vs_parent_pct'] is not None and m['window_edge_vs_parent_pct']<=GRAVEYARD_BAD_EDGE_PCT):
+                to_state,reason='graveyard','evidence_backed_failure'
+            elif s['state']=='nursery' and age_h>=NURSERY_MIN_HOURS and m['evidence_n']>=NURSERY_MIN_EVIDENCE and m['parent_window_n']>=NURSERY_MIN_CONTROLS:
                 to_state,reason='paper','nursery_qc_pass'
             elif s['state']=='paper' and age_h>=PAPER_MIN_HOURS and m['evidence_n']>=PAPER_MIN_EVIDENCE and m['parent_window_n']>=PAPER_MIN_CONTROLS and (m['window_edge_vs_parent_pct'] or 0)>0 and (m['mean_return_pct'] or 0)>0:
                 to_state,reason='live_ready','paper_validation_pass_live_still_disabled'
             if to_state:
                 await c.execute("UPDATE colony_queen_scouts SET state=$2,stage_updated_at=now(),stage_reason=$3 WHERE id=$1",s['id'],to_state,reason)
+                if to_state=='graveyard':
+                    g=s['genome'] if isinstance(s['genome'],dict) else json.loads(s['genome'])
+                    phid=s['phenotype_id'] or phenotype_id(g)
+                    await c.execute('''INSERT INTO colony_genome_graveyard
+                      (phenotype_id,genome_id,parent_genome_id,family,genome,reason,evidence_n,parent_window_n,mean_return_pct,edge_vs_parent_pct)
+                      VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10) ON CONFLICT(phenotype_id) DO NOTHING''',
+                      phid,s['genome_id'],s['parent_genome_id'],g.get('family') or 'unknown',json.dumps(g),reason,
+                      m['evidence_n'],m['parent_window_n'],m['mean_return_pct'],m['window_edge_vs_parent_pct'])
                 await c.execute("INSERT INTO colony_queen_scout_lifecycle(scout_id,from_state,to_state,reason) VALUES($1,$2,$3,$4)",s['id'],s['state'],to_state,reason)
                 changes.append({'scout_id':s['id'],'from':s['state'],'to':to_state,'reason':reason})
     return {'changes':changes,'live_execution_authority':False}
