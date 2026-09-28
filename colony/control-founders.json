@@ -84,7 +84,7 @@
     "family": "wallet_convergence",
     "parameters": {
       "buy_wallets_30_min": 2,
-      "flow_ratio_15_min": 1.2,
+      "flow_ratio_15_min": 0.545455,
       "hold_minutes": 15,
       "cooldown_minutes": 0
     },
@@ -95,7 +95,7 @@
       ],
       "flow_ratio_15_min": [
         0.5,
-        8
+        0.95
       ],
       "hold_minutes": [
         1,
