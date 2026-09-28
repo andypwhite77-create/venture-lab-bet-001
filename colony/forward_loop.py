@@ -10,6 +10,7 @@ from colony.shadow_orchestrator import cycle as shadow_cycle
 from colony.spep_worker import process as process_spep
 from colony.spep_mark import mark as mark_spep
 from colony.queen_scouts import process as process_queen_scouts, advance_lifecycle
+from colony.reversal_tournament import process as process_reversal_tournament, maybe_cull as maybe_cull_reversal
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 
@@ -19,6 +20,12 @@ async def main():
         try:
             result=await process()
             logging.info('forward_colony %s',result)
+            from db import connection
+            async with connection() as _rtc:
+                rt=await process_reversal_tournament(_rtc)
+                rtc=await maybe_cull_reversal(_rtc)
+            logging.info('reversal_tournament %s',rt)
+            logging.info('reversal_tournament_cull %s',rtc)
             spep=await process_spep(result.get('run')) if result.get('run') else {}
             logging.info('spep %s',spep)
             spep_marks=await mark_spep()
