@@ -232,3 +232,21 @@ A displaced incumbent retains its full prospective evidence and elimination reas
 Paper economics now use a £25 per-ant reference stake, matching the intended tiny live-canary scale. Fixed execution costs are modelled separately from percentage edge so a strong signal is not rejected merely because an unrealistically tiny paper stake makes fixed fees dominate. Recent observed successful Jupiter transaction fees provide the fixed network-cost estimate; proportional friction remains separate. The engine records net £ economics and an implied break-even stake while preserving the underlying percentage-return signal.
 
 The £25 execution-reality probe is prospective-only and begins after candidate 1395. It uses read-only Jupiter quotes and never signs or broadcasts. Historical evidence still cannot substitute for prospective proof, and live authority remains disabled.
+
+## Breed, test, take the best
+
+The governing evolutionary rule is simple: breed descendants, test them prospectively on independent opportunities, and retain only the strongest evidence-backed performers. Paper evidence is cheap, so selection must favour proof over speed.
+
+Reversal uses increasingly demanding cumulative gates: 20 independent mints before 100→60, 40 before 60→30, 60 before 30→15, and 80 before 15→5. The final five are then frozen and must survive 50 entirely new independent mints. Historical/backtest strength cannot substitute for prospective evidence.
+
+Children are judged primarily against the bloodline and also against their parent window. Weak parents must produce genuine improvement. Elite parents may produce descendants that preserve strong expectancy while improving robustness, tail behaviour, drawdown, execution quality, or regime coverage. No descendant advances merely because it is less bad than a weak parent.
+
+Selection rewards net expectancy after costs, control/baseline edge, consistency and robustness, while penalising tail loss, drawdown, outlier/moonshot dependence and excessive correlation with stronger relatives. Failed descendants are archived/demoted; they do not receive live capital. Live-ready remains eligibility only and cannot grant itself execution authority.
+
+### Deep historical breeding and fast prospective admission
+
+Reversal now uses a compute-heavy historical funnel: each acceleration cycle breeds 50,000 candidate genomes, scores them chronologically on train/validation data, and uses an untouched historical holdout only as a veto. Only the top 10 robust/diverse survivors are admitted to prospective live-market paper observation. Historical performance never counts as prospective proof.
+
+The prospective admission rule is deliberately short but strict: after at least 20 independent future mints, candidates must have positive mean and median net return, positive matched edge versus the immortal Reversal control, and no catastrophic-tail trigger. Correlation-adjusted ranking then admits at most the top five to `colony_genomes` with `status=production`. Existing parents remain in the population; promotion adds children rather than replacing parental genetic memory. Production status is live-ready/main-pool membership only and does not grant real-money transaction authority.
+
+A separate `historical-bank` service continuously archives hourly GeckoTerminal OHLCV for every observed Solana pair, backfilling up to roughly six months where the public endpoint provides it. Existing candidate features, outcomes, minute price paths and market snapshots continue to accumulate prospectively, so the local research bank becomes deeper with time.

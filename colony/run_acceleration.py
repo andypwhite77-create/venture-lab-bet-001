@@ -9,7 +9,7 @@ async def main():
   outputs=[]
   for fam in FAMILIES:
    print('NURSERY_START',fam,flush=True)
-   r=await run_family(c,fam,10000)
+   r=await run_family(c,fam,50000 if fam=='reversal' else 10000,10)
    finalists=r.pop('finalists')
    await c.execute('''INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary)
       VALUES($1,$2,$3,$4::jsonb,$5::jsonb)''',fam,r['tested'],r['rows'],json.dumps(finalists),json.dumps(r,default=str))

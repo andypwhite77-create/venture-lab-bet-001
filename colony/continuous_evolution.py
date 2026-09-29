@@ -189,3 +189,34 @@ async def cull_obvious_failures(conn):
             await conn.execute("UPDATE family_tournament_ants SET active=false,eliminated_at=now(),elimination_reason='continuous_failure_cull' WHERE run_id=$1 AND genome_id=ANY($2::text[])",run['run_id'],losers)
             events += [{'family':run['family'],'genome_id':g,'reason':'continuous_failure_cull'} for g in losers]
     return events
+
+
+async def promote_reversal_elite_to_production_pool(conn, minimum_mints=20, keep=5):
+    """Promote only the best historically screened Reversal children after fresh prospective proof.
+
+    Production-pool status means eligible for the main paper/live-ready population; it grants no
+    real-money broadcast authority and never removes the existing parent generation.
+    """
+    from colony.reversal_tournament import metrics as reversal_metrics, rank_with_correlation, catastrophic
+    run=await conn.fetchrow("SELECT * FROM reversal_tournament_runs WHERE status='collecting' ORDER BY created_at DESC LIMIT 1")
+    if not run:return []
+    ants=await conn.fetch("SELECT genome_id,genome,baseline,cohort FROM reversal_tournament_ants WHERE run_id=$1 AND active=true",run['run_id'])
+    recs=await reversal_metrics(conn,run['run_id'])
+    eligible={}
+    genomes={}
+    for a in ants:
+        if a['baseline'] or a['cohort']!='historical_qualified':continue
+        r=recs.get(a['genome_id'],{})
+        if r.get('n',0)<minimum_mints or catastrophic(r):continue
+        if r.get('avg_return_pct',-999)<=0 or r.get('median_return_pct',-999)<=0 or r.get('baseline_edge_pct',-999)<=0:continue
+        eligible[a['genome_id']]=r; genomes[a['genome_id']]=a['genome']
+    ranked=rank_with_correlation(eligible)[:keep]
+    promoted=[]
+    for gid,r in ranked:
+        g=genomes[gid]; g=json.loads(g) if isinstance(g,str) else g
+        parents=list(g.get('parents') or [])
+        await conn.execute("""INSERT INTO colony_genomes(genome_id,parent_ids,generation,family,genome,status)
+          VALUES($1,$2,4,'reversal',$3::jsonb,'production')
+          ON CONFLICT(genome_id) DO UPDATE SET status='production'""",gid,parents,json.dumps(g))
+        promoted.append({'genome_id':gid,'n':r.get('n'),'score':r.get('adjusted_score',r.get('tournament_score'))})
+    return promoted

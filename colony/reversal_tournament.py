@@ -18,11 +18,13 @@ DEFAULT_SEED = 28092026
 STAGES = [
     # population, minimum cumulative independent mints before cull, survivors
     (100, 20, 60),
-    (60, 35, 30),
-    (30, 40, 15),
-    (15, 50, 5),
-    # finalists are frozen: require 25 NEW independent mints after stage start
-    (5, 25, 5),
+    (60, 40, 30),
+    (30, 60, 15),
+    (15, 80, 5),
+    # Finalists are frozen only after substantial prospective evidence, then must
+    # survive 50 NEW independent mints. Cheap paper evidence is preferred to
+    # prematurely declaring a winner.
+    (5, 50, 5),
 ]
 COHORTS = ("drop_threshold", "buy_ratio", "hold", "cooldown", "mixed")
 

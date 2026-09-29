@@ -71,7 +71,7 @@ def robust_score(parts):
  # Holdout is deliberately excluded from selection fitness. It remains an untouched diagnostic.
  return .40*train['nursery_score']+.60*val['nursery_score'] + min(train['nursery_score'],val['nursery_score'])*.35
 
-def select_finalists(results,n=100,rng_seed=SEED):
+def select_finalists(results,n=10,rng_seed=SEED):
  valid=[r for r in results if r['robust_score']>-900]
  valid.sort(key=lambda r:r['robust_score'],reverse=True)
  elite=valid[:60]
@@ -80,16 +80,16 @@ def select_finalists(results,n=100,rng_seed=SEED):
  for r in valid[60:]:
   p=r['genome']['parameters']; fp=tuple((k,round(float(v),2)) for k,v in sorted(p.items()))
   if fp not in seen:diverse.append(r);seen.add(fp)
-  if len(diverse)>=20:break
+  if len(diverse)>=max(1,n//5):break
  # regime specialists: good in any one chronological regime but still non-disastrous elsewhere
  spec=sorted(valid,key=lambda r:max(r['train']['nursery_score'],r['validation']['nursery_score']),reverse=True)
  specialists=[]
  used={r['genome_id'] for r in elite+diverse}
  for r in spec:
   if r['genome_id'] not in used:specialists.append(r);used.add(r['genome_id'])
-  if len(specialists)>=10:break
+  if len(specialists)>=max(1,n//5):break
  remaining=[r for r in valid if r['genome_id'] not in used]
- rng=random.Random(rng_seed); rng.shuffle(remaining); explorers=remaining[:10]
+ rng=random.Random(rng_seed); rng.shuffle(remaining); explorers=remaining[:max(0,n-len(elite)-len(diverse)-len(specialists))]
  out=elite+diverse+specialists+explorers
  return out[:n]
 
@@ -129,14 +129,14 @@ async def load_rows(conn):
  for d in grouped.values():d['flat']=flatten(d)
  return list(grouped.values())
 
-async def run_family(conn,family,n_genomes=10000):
+async def run_family(conn,family,n_genomes=10000,finalist_n=10):
  base=founders()[family]; rows=await load_rows(conn); splits=split_rows(rows); pop=breed_population(base,n_genomes,f'{SEED}:{family}')
  fee_sol=await measured_roundtrip_network_fee_sol(conn); rate,_=sol_gbp_rate(); fixed_gbp=fee_sol*rate
  results=[]
  for g in pop:
   parts=[evaluate(g,s,TARGET_STAKE_GBP,fixed_gbp) for s in splits]; rs=robust_score(parts)
   results.append({'genome_id':genome_id(g),'genome':g,'train':parts[0],'validation':parts[1],'holdout':parts[2],'robust_score':rs})
- finalists=select_finalists(results,100)
+ finalists=select_finalists(results,finalist_n)
  specialists=regime_specialists(results,splits[0]+splits[1],10,TARGET_STAKE_GBP,fixed_gbp)
  if specialists:
   existing={r['genome_id'] for r in finalists}

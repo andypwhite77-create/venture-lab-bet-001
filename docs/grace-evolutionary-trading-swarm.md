@@ -223,3 +223,21 @@ This makes training slots continuously competitive without contaminating the pro
 Strategy quality and capital size are now explicitly separated. Each elite is evaluated against a £25 reference paper stake, while fixed round-trip network costs are estimated from the median fee of recently observed successful Jupiter transactions. A trade may therefore retain a strong directional signal while still being labelled uneconomic below its break-even stake. Conversely, increasing stake does not rescue a genuinely negative edge; it only dilutes fixed costs.
 
 Prospective £25 execution-reality probes use actual read-only Jupiter quotes and record stake, measured fixed cost, fixed-cost drag, net £ result and break-even stake. This is a paper/shadow model only; no signing or broadcast capability is introduced.
+
+## Breed, test, take the best
+
+The governing evolutionary rule is simple: breed descendants, test them prospectively on independent opportunities, and retain only the strongest evidence-backed performers. Paper evidence is cheap, so selection must favour proof over speed.
+
+Reversal uses increasingly demanding cumulative gates: 20 independent mints before 100→60, 40 before 60→30, 60 before 30→15, and 80 before 15→5. The final five are then frozen and must survive 50 entirely new independent mints. Historical/backtest strength cannot substitute for prospective evidence.
+
+Children are judged primarily against the bloodline and also against their parent window. Weak parents must produce genuine improvement. Elite parents may produce descendants that preserve strong expectancy while improving robustness, tail behaviour, drawdown, execution quality, or regime coverage. No descendant advances merely because it is less bad than a weak parent.
+
+Selection rewards net expectancy after costs, control/baseline edge, consistency and robustness, while penalising tail loss, drawdown, outlier/moonshot dependence and excessive correlation with stronger relatives. Failed descendants are archived/demoted; they do not receive live capital. Live-ready remains eligibility only and cannot grant itself execution authority.
+
+## Deep-history breeding / short prospective gate
+
+Reversal's current evolutionary funnel breeds 50,000 variants against chronological historical evidence and retains only ten robust/diverse survivors after an untouched holdout veto. The historical stage exists to kill weak genetics cheaply; it cannot promote an organism by itself.
+
+A historically selected survivor must then accumulate at least 20 independent future mints in live-market paper observation. Positive mean and median net return, positive matched control edge, acceptable tail behaviour and correlation-adjusted rank are mandatory. No more than five can join the production pool, and their parents remain. This is population admission, not real-money authority.
+
+The colony also maintains a growing historical bank of candidate features, outcomes, price paths and market snapshots, supplemented by a rate-limited GeckoTerminal OHLCV backfill for observed Solana pools. Historical data is explicitly separated from prospective proof to prevent leakage.

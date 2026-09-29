@@ -192,3 +192,21 @@ If turnover occurs, the incumbent is archived with its prospective evidence and 
 The colony now treats £25 as the per-ant reference stake for eventual canary-scale economics. Fitness distinguishes signal return from stake-dependent execution viability. Fixed costs are estimated from observed on-chain Jupiter fees, while proportional friction and quote-derived price impact remain separate. The model can therefore identify a minimum break-even stake for a good signal instead of misclassifying it as a bad strategy solely because a toy stake cannot absorb fixed fees.
 
 A new prospective execution epoch probes elite-family opportunities at approximately £25 equivalent SOL using read-only Jupiter quotes. The epoch begins after candidate 1395 so earlier observations are not retrospectively backfilled. All execution remains simulated and broadcast authority remains off.
+
+## Breed, test, take the best
+
+The governing evolutionary rule is simple: breed descendants, test them prospectively on independent opportunities, and retain only the strongest evidence-backed performers. Paper evidence is cheap, so selection must favour proof over speed.
+
+Reversal uses increasingly demanding cumulative gates: 20 independent mints before 100→60, 40 before 60→30, 60 before 30→15, and 80 before 15→5. The final five are then frozen and must survive 50 entirely new independent mints. Historical/backtest strength cannot substitute for prospective evidence.
+
+Children are judged primarily against the bloodline and also against their parent window. Weak parents must produce genuine improvement. Elite parents may produce descendants that preserve strong expectancy while improving robustness, tail behaviour, drawdown, execution quality, or regime coverage. No descendant advances merely because it is less bad than a weak parent.
+
+Selection rewards net expectancy after costs, control/baseline edge, consistency and robustness, while penalising tail loss, drawdown, outlier/moonshot dependence and excessive correlation with stronger relatives. Failed descendants are archived/demoted; they do not receive live capital. Live-ready remains eligibility only and cannot grant itself execution authority.
+
+## Historical slaughterhouse -> production pool
+
+For Reversal, broad breeding is intentionally cheap and massive: 50,000 historical variants per acceleration cycle. Chronological training and validation select; an untouched historical holdout can veto but is never optimised against. Only ten historically robust/diverse survivors consume prospective evidence.
+
+Those ten then face real future market data in paper mode. At 20 independent mints, only candidates with positive mean and median net return, positive matched edge to the immortal control, acceptable tails and the strongest correlation-adjusted scores may enter the production pool; at most five are admitted. Parents are retained. Production-pool membership means eligible for the main/live-ready ecology, never autonomous permission to broadcast real-money trades.
+
+The research bank grows continuously: raw prospective candidates/outcomes/price paths/snapshots remain retained, while a dedicated archival worker backfills hourly Solana pool OHLCV from GeckoTerminal for observed pairs. External historical sources are discovery data, not promotion evidence.
