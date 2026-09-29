@@ -125,6 +125,10 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@127.0.0.1:5432/venturelab
+      REVERSAL_CURRENT_CODE_START_ID: "1730"
+      REVERSAL_CANARY_MIN_OPPS: "30"
+      REVERSAL_CANARY_MIN_EXEC_COVERAGE: "0.90"
+      REVERSAL_CANARY_MAX_DRAWDOWN_PCT: "30"
     logging:
       options:
         max-size: "10m"
