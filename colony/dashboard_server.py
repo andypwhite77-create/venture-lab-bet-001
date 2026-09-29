@@ -135,6 +135,15 @@ def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
         rr=next((x for x in roster if x.get('family')==selected_family),{})
         mind=f"<div class='gate compact'><b>{escape(_label(selected_family))} Queen</b><div class='authority'><span>Active <b>{rr.get('active',0)}</b></span><span>Elite <b>{rr.get('elites',0)}</b></span><span>Queued <b>{rr.get('challengers',0)}</b></span></div><small>Isolated evolutionary governor. Shares market evidence with the swarm but does not write into Reversal Queen memory or reasoning.</small></div>"
 
+    if selected_family=='all':
+        sq=j.get('swarm_queen') or {}; sb=sq.get('briefing') or {}
+        if isinstance(sb,str):
+            try: sb=__import__('json').loads(sb)
+            except Exception: sb={}
+        sq_summary=escape(str(sb.get('summary') or 'Executive monitor warming up.'))
+        sq_status=escape(str(sb.get('status') or 'starting').upper())
+        mind=f"<div class='gate compact'><b>Swarm Queen / Grace Interface</b><span class='state good'>{sq_status}</span><div class='gate-copy'>{sq_summary}</div><small>Executive monitor only: cross-colony synthesis, faults, regime and allocation recommendations. No trading or genetic authority.</small></div>"+mind
+
     signals=''.join(f"<div class='feed-item'><b>#{x.get('id')}</b> {escape(str(x.get('direction')))} <code>{escape(str(x.get('mint','')))[:8]}…</code></div>" for x in j.get('signals',[])) or '<div class=empty>None</div>'
     experiments=''.join(f"<div class='feed-item'><span class=pill>{escape(str(x.get('experiment_type')))}</span> {escape(str(x.get('status')))}</div>" for x in j.get('experiments',[])) or '<div class=empty>None</div>'
     scouts=j.get('queen_scouts') or []

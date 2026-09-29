@@ -94,6 +94,25 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  swarm-queen:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    command: ["python", "-m", "colony.swarm_queen_daemon"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@127.0.0.1:5432/venturelab
+      OLLAMA_URL: http://127.0.0.1:11434/api/generate
+      SWARM_QUEEN_MODEL: qwen3:4b
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   accelerator:
     build: .
     restart: unless-stopped

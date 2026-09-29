@@ -7,6 +7,7 @@ from colony.queen_scouts import summary as queen_scout_summary
 from colony.biology_ecology import snapshot as biology_snapshot
 from colony.drives import snapshot as drives_snapshot
 from colony.paper_economics import TARGET_STAKE_GBP,measured_roundtrip_network_fee_sol,sol_gbp_rate
+from colony.swarm_queen import latest as swarm_queen_latest
 _fx={'rate':None,'at':0}
 def _sol_gbp():
  now=time.time()
@@ -89,4 +90,5 @@ async def snapshot():
  payload['queen_scouts']=await queen_scout_summary()
  payload['biology']=await biology_snapshot()
  payload['drives']=await drives_snapshot()
+ payload['swarm_queen']=await swarm_queen_latest()
  return payload
