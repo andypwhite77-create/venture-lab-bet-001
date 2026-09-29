@@ -4,7 +4,7 @@ She monitors, synthesises and recommends; she never trades or rewrites colony ge
 import json, os, time, httpx
 from db import connection
 
-MODEL=os.getenv('SWARM_QUEEN_MODEL','qwen3:1.7b')
+MODEL=os.getenv('SWARM_QUEEN_MODEL','qwen3:0.6b')
 OLLAMA=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
 FAMILIES=('reversal','momentum','order_flow','wallet_convergence')
 
@@ -40,8 +40,8 @@ async def wake():
     schema={'type':'object','properties':{'status':{'type':'string','enum':['healthy','warning','critical']},'summary':{'type':'string'},'material_changes':{'type':'array','items':{'type':'string'}},'colony_notes':{'type':'object'},'recommendations':{'type':'array','items':{'type':'string'}}},'required':['status','summary','material_changes','colony_notes','recommendations'],'additionalProperties':False}
     started=time.time()
     try:
-        async with httpx.AsyncClient(timeout=90) as h:
-            r=await h.post(OLLAMA,json={'model':MODEL,'prompt':prompt(e),'stream':False,'format':schema,'think':False,'options':{'num_ctx':3072,'num_predict':480,'temperature':0.1}}); r.raise_for_status(); b=json.loads(r.json()['response'])
+        async with httpx.AsyncClient(timeout=45) as h:
+            r=await h.post(OLLAMA,json={'model':MODEL,'prompt':prompt(e),'stream':False,'format':schema,'think':False,'options':{'num_ctx':2048,'num_predict':320,'temperature':0.1}}); r.raise_for_status(); b=json.loads(r.json()['response'])
         state='ok'
     except Exception as ex:
         b={'status':'warning','summary':'Swarm Queen inference unavailable','material_changes':[str(ex)[:180]],'colony_notes':{},'recommendations':['Continue deterministic monitoring; no authority changes.']}; state='inference_error'
