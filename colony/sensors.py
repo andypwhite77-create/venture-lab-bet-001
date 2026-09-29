@@ -1,5 +1,9 @@
 """Shared market senses. One fetch per asset; all ants consume the same snapshot."""
 import asyncio, json, os, time, urllib.parse, urllib.request, urllib.error
+_CACHE={}
+_LAST_CALL={}
+_BIRDEYE_MIN_INTERVAL=1.1
+_CACHE_TTL=30
 
 def _get_json(url, headers=None, timeout=10):
     req=urllib.request.Request(url,headers=headers or {})
@@ -7,12 +11,17 @@ def _get_json(url, headers=None, timeout=10):
         return json.loads(r.read().decode())
 
 async def birdeye_price(mint):
+    now=time.monotonic(); cached=_CACHE.get(('birdeye',mint))
+    if cached and now-cached[0] < _CACHE_TTL:return dict(cached[1],cached=True)
+    wait=_BIRDEYE_MIN_INTERVAL-(now-_LAST_CALL.get('birdeye',0))
+    if wait>0: await asyncio.sleep(wait)
+    _LAST_CALL['birdeye']=time.monotonic()
     key=os.getenv('BIRDEYE_API_KEY');
     if not key:return {'provider':'birdeye','ok':False,'error':'no_key'}
     url='https://public-api.birdeye.so/defi/price?address='+urllib.parse.quote(mint)
     try:
         x=await asyncio.to_thread(_get_json,url,{'X-API-KEY':key,'x-chain':'solana'})
-        d=x.get('data') or {}; return {'provider':'birdeye','ok':bool(x.get('success')),'price_usd':d.get('value'),'raw':d}
+        d=x.get('data') or {}; result={'provider':'birdeye','ok':bool(x.get('success')),'price_usd':d.get('value'),'raw':d}; _CACHE[('birdeye',mint)]=(time.monotonic(),result); return result
     except urllib.error.HTTPError as e:
         body=e.read(300).decode(errors='replace')
         return {'provider':'birdeye','ok':False,'error':f'HTTP_{e.code}','detail':body}
