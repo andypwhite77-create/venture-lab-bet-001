@@ -19,13 +19,16 @@ def _sol_gbp():
 async def _run(conn,run_id):
  ids=list(run_id) if isinstance(run_id,(list,tuple)) else [run_id]
  trades=await conn.fetch('''SELECT intent_id,created_at,mint,side,notional,status,reason,quote,entry_price,mark_price,gross_pnl,friction_cost,net_pnl,broadcast,execution_reality,friction_ratio,executable_edge_sol FROM colony_execution_ledger WHERE run_id=ANY($1::text[]) ORDER BY id DESC LIMIT 60''',ids)
- curve=await conn.fetch('''SELECT created_at,net_pnl,gross_pnl,friction_cost FROM colony_execution_ledger WHERE run_id=ANY($1::text[]) AND net_pnl IS NOT NULL ORDER BY id''',ids)
+ curve=await conn.fetch('''SELECT created_at,net_pnl,gross_pnl,friction_cost,quote FROM colony_execution_ledger WHERE run_id=ANY($1::text[]) AND net_pnl IS NOT NULL ORDER BY id''',ids)
  out=[]
  for r in trades:
   d=dict(r);q=d.pop('quote') or {};q=json.loads(q) if isinstance(q,str) else q;d['attribution']=q.get('attribution');out.append(d)
 
  summ=await conn.fetchrow("""SELECT count(*) n,count(*) FILTER(WHERE status='accepted') accepted,count(*) FILTER(WHERE status='rejected') rejected,coalesce(sum(net_pnl),0) net_pnl,avg(net_pnl) FILTER(WHERE net_pnl IS NOT NULL) avg_net FROM colony_execution_ledger WHERE run_id=ANY($1::text[])""",ids)
- return {'run_id':run_id,'summary':dict(summ),'trades':out,'curve':[dict(x) for x in curve]}
+ curve_out=[]
+ for x in curve:
+  d=dict(x); q=d.pop('quote') or {}; q=json.loads(q) if isinstance(q,str) else q; d['family']=(q.get('attribution') or {}).get('family'); curve_out.append(d)
+ return {'run_id':run_id,'summary':dict(summ),'trades':out,'curve':curve_out}
 async def snapshot():
  async with connection() as c:
   external=await _run(c,'paper-livequote-v1');native=await _run(c,['colony-native-v3-holdaware'])

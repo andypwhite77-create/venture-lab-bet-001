@@ -80,7 +80,20 @@ def _chart(curve, rate, period='7d', metric='net_gbp'):
     summary=f"<div class='chart-summary'><b>{escape(metrics[metric])}</b><span>{escape(periods[period][0])} • {len(vals)} marked bets • latest <b>{escape(fmt(vals[-1]))}</b></span></div>"
     return controls+summary+f"<div class='chartbox'>{svg}</div>"
 
-def render(j, chart_period="7d", chart_metric="net_gbp"):
+def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
+    valid={"all","reversal","momentum","order_flow","wallet_convergence"}
+    selected_family=selected_family if selected_family in valid else "all"
+    if selected_family != "all":
+        j=dict(j)
+        j["elite_roster"]=[x for x in j.get("elite_roster",[]) if x.get("family")==selected_family]
+        j["family_performance"]=[x for x in j.get("family_performance",[]) if x.get("family")==selected_family]
+        sel=dict(j.get("selection") or {})
+        sel["ants"]=[x for x in sel.get("ants",[]) if x.get("family")==selected_family]
+        j["selection"]=sel
+        native=dict(j.get("native") or {})
+        native["trades"]=[x for x in native.get("trades",[]) if (x.get("attribution") or {}).get("family")==selected_family]
+        native["curve"]=[x for x in native.get("curve",[]) if x.get("family")==selected_family]
+        j["native"]=native
     n=j['native'];s=n['summary'];curve=n['curve'];marked=len(curve);wins=sum(1 for x in curve if float(x.get('net_pnl') or 0)>0)
     rate=j.get('sol_gbp');net=float(s.get('net_pnl') or 0);gbp='' if rate is None else f'£{net*float(rate):.2f}'
     roster=j.get('elite_roster',[]);active=sum(int(x.get('active') or 0) for x in roster);elites=sum(int(x.get('elites') or 0) for x in roster);chall=sum(int(x.get('challengers') or 0) for x in roster)
@@ -89,7 +102,15 @@ def render(j, chart_period="7d", chart_metric="net_gbp"):
     rw=j.get('reversal_wallet') or {}; rwbal=rw.get('balance_gbp'); rwret=rw.get('return_pct'); rwtr=rw.get('trades',0)
     cards=[('ACTIVE ANTS',active,'prospective roster'),('QUALIFIED ELITES',elites,'earned training seats'),('CHALLENGERS',chall,'waiting for a seat'),('REVERSAL £25 WALLET',('£'+_f(rwbal,2)) if rwbal is not None else '—',f"{rwtr} independent matured mints • {_f(rwret,1)}% • research, not live fills"),('EXECUTION TESTS',marked,'independent £25-scale observations; not a wallet'),('NEXT EVOLUTION',f'{left} mints','until accelerator sweep')]
     cards_html=''.join(f"<div class='metric'><div class='metric-label'>{escape(k)}</div><div class='metric-value'>{escape(str(v))}</div><div class='metric-note'>{escape(str(note))}</div></div>" for k,v,note in cards)
+    tabs=''.join(f"<a class='colony-tab {'active' if selected_family==f else ''}' href='/dashboard?family={f}&period={chart_period}&metric={chart_metric}'>{_label(f) if f!='all' else 'Swarm'}</a>" for f in ['all','reversal','momentum','order_flow','wallet_convergence'])
+    cards_html=f"<div class='colony-tabs'>{tabs}</div>"+cards_html
     fam=_bloodline_cards(j)
+    if selected_family != 'all':
+        # _bloodline_cards sees a family-filtered snapshot; suppress zero cards from other colonies.
+        import re
+        # Re-render only the selected colony by temporarily filtering the card function's family list output.
+        all_cards=fam.split("</article>")
+        fam=''.join(x+"</article>" for x in all_cards if x and f"family-dot {selected_family}" in x)
     pop=''.join(f"<div class='roster-row'><span><span class='family-dot {x.get('family')}'></span>{escape(_label(x.get('family')))}</span><span><b>{x.get('active',0)}</b> active &nbsp; <b>{x.get('elites',0)}</b> elite &nbsp; <b>{x.get('challengers',0)}</b> queued</span></div>" for x in roster)
     es=j.get('selection') or {};newm=int(acc.get('new_mints',0));trigger=int(acc.get('trigger_at',25));pct=min(100,(newm/trigger*100) if trigger else 0)
     evo=f"""<div class='gate'><div class='gate-head'><b>Evolution engine</b><span class='state good'>RUNNING</span></div>
@@ -107,7 +128,13 @@ def render(j, chart_period="7d", chart_metric="net_gbp"):
     sm=j.get('stake_model') or {}; evo+=f"<div class='gate compact'><b>Reversal canary wallet</b><div class='authority'><span>Start <b>£{_f(rw.get('start_gbp'),2)}</b></span><span>Current <b class={'pos' if float(rw.get('profit_gbp') or 0)>=0 else 'neg'}>£{_f(rw.get('balance_gbp'),2)}</b></span><span>Profit <b>£{_f(rw.get('profit_gbp'),2)}</b></span><span>Trades <b>{rw.get('trades',0)}</b></span><span>Win rate <b>{_f(rw.get('win_rate_pct'),1)}%</b></span><span>Worst drawdown <b>{_f(rw.get('worst_drawdown_pct'),1)}%</b></span></div><small>Sequential single-wallet counterfactual using unique prospective Reversal mints and each signal's hold horizon. Research economics only; LIVE-FILL VERIFIED: NO.</small></div>"
     evo+=f"<div class='gate compact'><b>Stake economics</b><div class='authority'><span>Per-ant paper stake <b>£{_f(sm.get('stake_gbp'),2)}</b></span><span>Measured round-trip network cost <b>£{_f(sm.get('roundtrip_network_fee_gbp'),4)}</b></span><span>Fixed-cost drag <b>{_f(sm.get('fixed_fee_pct_at_stake'),4)}%</b></span></div><small>Fitness now evaluates fixed execution costs at the intended canary stake. Percentage edge and £ profitability are tracked separately so a good signal is not killed merely because a toy stake cannot absorb fixed fees.</small></div>"
     rows=''.join(_trade_row(x,True) for x in n.get('trades',[]));ext=''.join(_trade_row(x,False) for x in j['external'].get('trades',[]))
-    mind=''.join(f"<div class='feed-item'><div><b>{escape(str(x.get('status')))}</b><span class=feed-time>{escape(str(x.get('observed_at','')))[:19]}</span></div><small>{escape(str(x.get('core')))[:260]}</small></div>" for x in j.get('mind',[])) or "<div class=empty>Queen is quiet</div>"
+
+    if selected_family in {'all','reversal'}:
+        mind=''.join(f"<div class='feed-item'><div><b>{escape(str(x.get('status')))}</b><span class=feed-time>{escape(str(x.get('observed_at','')))[:19]}</span></div><small>{escape(str(x.get('core')))[:260]}</small></div>" for x in j.get('mind',[])) or "<div class=empty>Reversal Queen is quiet</div>"
+    else:
+        rr=next((x for x in roster if x.get('family')==selected_family),{})
+        mind=f"<div class='gate compact'><b>{escape(_label(selected_family))} Queen</b><div class='authority'><span>Active <b>{rr.get('active',0)}</b></span><span>Elite <b>{rr.get('elites',0)}</b></span><span>Queued <b>{rr.get('challengers',0)}</b></span></div><small>Isolated evolutionary governor. Shares market evidence with the swarm but does not write into Reversal Queen memory or reasoning.</small></div>"
+
     signals=''.join(f"<div class='feed-item'><b>#{x.get('id')}</b> {escape(str(x.get('direction')))} <code>{escape(str(x.get('mint','')))[:8]}…</code></div>" for x in j.get('signals',[])) or '<div class=empty>None</div>'
     experiments=''.join(f"<div class='feed-item'><span class=pill>{escape(str(x.get('experiment_type')))}</span> {escape(str(x.get('status')))}</div>" for x in j.get('experiments',[])) or '<div class=empty>None</div>'
     scouts=j.get('queen_scouts') or []

@@ -258,11 +258,11 @@ async def colony_live():
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(period: str = "7d", metric: str = "net_gbp"):
+async def dashboard(period: str = "7d", metric: str = "net_gbp", family: str = "all"):
     from pathlib import Path
     from colony.dashboard_api import snapshot
     from colony.dashboard_server import render
-    parts=render(await snapshot(), chart_period=period, chart_metric=metric)
+    parts=render(await snapshot(), chart_period=period, chart_metric=metric, selected_family=family)
     html=Path("colony/dashboard.html").read_text()
     html=html.replace("<head>","<head><meta http-equiv=refresh content=\"15\">")
     repl={"<div class=metric-grid id=cards></div>":f"<div class=metric-grid id=cards>{parts[0]}</div>","<canvas id=curve></canvas>":parts[1],"<div class=bloodline-grid id=families></div>":f"<div class=bloodline-grid id=families>{parts[2]}</div>","<div id=pop></div>":f"<div id=pop>{parts[3]}</div>","<div id=evolution></div>":f"<div id=evolution>{parts[4]}</div>","<tbody id=native></tbody>":f"<tbody id=native>{parts[5]}</tbody>","<div id=mind class=scroll></div>":f"<div id=mind class=scroll>{parts[6]}</div>","<div id=signals class=scroll></div>":f"<div id=signals class=scroll>{parts[7]}</div>","<div id=experiments></div>":f"<div id=experiments>{parts[8]}</div>","<div id=events class=scroll></div>":f"<div id=events class=scroll>{parts[9]}</div>","<tbody id=external></tbody>":f"<tbody id=external>{parts[10]}</tbody>","<div id=capital></div>":f"<div id=capital>{parts[11]}</div>"}
