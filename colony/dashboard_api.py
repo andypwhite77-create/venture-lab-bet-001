@@ -81,7 +81,8 @@ async def snapshot():
  # A ledger sum is cumulative test exposure, not a wallet balance.  Show a
  # conservative single-wallet counterfactual from the Reversal control: £25
  # compounded through independent prospective mints at each ant's hold horizon.
- wallet=await c.fetchrow("""WITH x AS (
+ async with connection() as wc:
+  wallet=await wc.fetchrow("""WITH x AS (
           SELECT e.mint,e.observed_at,o.net_return_pct,
             row_number() over(partition by e.mint order by e.observed_at) rn
           FROM reversal_tournament_entries e
