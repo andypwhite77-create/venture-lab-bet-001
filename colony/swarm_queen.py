@@ -6,7 +6,7 @@ from db import connection
 
 MODEL=os.getenv('SWARM_QUEEN_MODEL','qwen3:1.7b')
 OLLAMA=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
-FAMILIES=('reversal','momentum','order_flow','wallet_convergence')
+FAMILIES=('reversal','momentum','order_flow','exhaustion')
 
 async def ensure_schema(c):
     await c.execute('''CREATE TABLE IF NOT EXISTS swarm_queen_journal(

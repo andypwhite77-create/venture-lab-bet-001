@@ -12,7 +12,7 @@ from colony.selection import ant_metrics
 from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured_roundtrip_network_fee_sol,sol_gbp_rate
 
 ROOT=Path(__file__).resolve().parent
-FAMILIES=('reversal','momentum','order_flow','wallet_convergence')
+FAMILIES=('reversal','momentum','order_flow','exhaustion')
 SEED=28092026
 
 def founders(): return {g['family']:g for g in json.load(open(ROOT/'control-founders.json'))}

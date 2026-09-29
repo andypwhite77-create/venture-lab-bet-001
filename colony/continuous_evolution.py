@@ -7,7 +7,7 @@ from colony.genome import genome_id
 
 async def seed_queue_from_latest_nursery(conn):
     out=[]
-    families=('reversal','momentum','order_flow','wallet_convergence')
+    families=('reversal','momentum','order_flow','exhaustion')
     for fam in families:
         row=await conn.fetchrow('SELECT id,finalists FROM historical_nursery_runs WHERE family=$1 ORDER BY created_at DESC LIMIT 1',fam)
         if not row: continue

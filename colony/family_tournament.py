@@ -12,7 +12,7 @@ from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured
 ROOT=Path(__file__).resolve().parent
 DEFAULT_SEED=28092026
 STAGES=[(100,20,60),(60,35,30),(30,40,15),(15,50,5),(5,25,5)]
-FAMILIES=("momentum","order_flow","wallet_convergence")
+FAMILIES=("momentum","order_flow","exhaustion")
 
 def founder(family):
     founders=json.load(open(ROOT/'control-founders.json'))
