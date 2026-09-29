@@ -113,6 +113,23 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  auditor:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    command: ["python", "-m", "colony.audit_daemon"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@127.0.0.1:5432/venturelab
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   accelerator:
     build: .
     restart: unless-stopped
