@@ -8,8 +8,11 @@ from colony.forward import eligible
 from colony.genome import genome_id
 
 async def active_run(conn):
+    # Forward collection is continuous. frozen_until was the original experiment
+    # review horizon, not an expiry switch; treating it as expiry silently starved
+    # prospective evidence after 48h.
     return await conn.fetchrow("""SELECT * FROM colony_forward_runs
-      WHERE status='collecting' AND frozen_until > now() ORDER BY started_at DESC LIMIT 1""")
+      WHERE status='collecting' ORDER BY started_at DESC LIMIT 1""")
 
 async def process():
     async with connection() as conn:

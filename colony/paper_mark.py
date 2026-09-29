@@ -22,9 +22,20 @@ async def mark_pending(run_id='paper-livequote-v1',slippage_bps=100):
   entry=float(q.get('signal_reference_price') or 0)
   if entry<=0:continue
   price,sources=await _price(r['mint'])
-  if not price:continue
   reality=roundtrip(r['mint'],q,float(r['notional']))
-  pnl=await reconcile(r['intent_id'],entry,price,slippage_bps,network_floor)
+  # Accounting authority is executable SOL round-trip economics, not provider token
+  # spot prices. Tiny-token provider prices can differ by units/decimals/pools and
+  # previously created impossible multi-SOL P&L on a ~0.28 SOL stake.
+  if reality.get('ok'):
+   gross=float(reality['gross_edge_sol'])
+   friction_cost=float(r['notional'])*slippage_bps/10000.0+network_floor
+   mark_price=entry*(1.0+gross/float(r['notional']))
+   pnl=await reconcile(r['intent_id'],entry,mark_price,slippage_bps,network_floor)
+  elif price:
+   # Provider mark is retained only as a degraded fallback when executable quotes fail.
+   pnl=await reconcile(r['intent_id'],entry,price,slippage_bps,network_floor)
+  else:
+   continue
   gross_pct=(float(pnl.get('gross_pnl') or 0)/float(r['notional'])*100.0) if pnl and float(r['notional']) else 0.0
   stake_gbp=float(r['notional'])*rate
   econ=economics(gross_pct,stake_gbp=stake_gbp,fixed_cost_gbp=network_floor*rate,proportional_cost_pct=slippage_bps/100.0)
