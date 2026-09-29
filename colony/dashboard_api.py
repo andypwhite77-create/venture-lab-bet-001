@@ -78,7 +78,23 @@ async def snapshot():
  # the small asyncpg pool and deadlock each other.
  selection=await selection_snapshot()
  payload['selection']=selection
- payload['capital_shadow']=capital_shadow_snapshot(selection, native['summary'].get('net_pnl',0), rate)
+ # A ledger sum is cumulative test exposure, not a wallet balance.  Show a
+ # conservative single-wallet counterfactual from the Reversal control: £25
+ # compounded through independent prospective mints at each ant's hold horizon.
+ wallet=await c.fetchrow("""WITH x AS (
+          SELECT e.mint,e.observed_at,o.net_return_pct,
+            row_number() over(partition by e.mint order by e.observed_at) rn
+          FROM reversal_tournament_entries e
+          JOIN reversal_tournament_ants a ON a.run_id=e.run_id AND a.genome_id=e.genome_id AND a.baseline=true
+          JOIN LATERAL (SELECT net_return_pct FROM research_outcomes o WHERE o.candidate_id=e.candidate_id
+            ORDER BY abs(o.horizon_minutes-e.hold_minutes),o.horizon_minutes LIMIT 1) o ON true
+          WHERE a.active=true)
+          SELECT count(*) FILTER(WHERE rn=1) trades,
+            25.0*exp(coalesce(sum(ln(greatest(.000001,1+net_return_pct/100.0))) FILTER(WHERE rn=1),0)) balance_gbp
+          FROM x""")
+ payload['reversal_wallet']={'start_gbp':25.0,'balance_gbp':float(wallet['balance_gbp'] or 25.0),'trades':int(wallet['trades'] or 0),
+   'basis':'baseline_reversal_unique_mints_hold_horizon','warning':'research outcome economics; not live fills'}
+ payload['capital_shadow']=capital_shadow_snapshot(selection, 0, rate)
  payload['queen_scouts']=await queen_scout_summary()
  payload['biology']=await biology_snapshot()
  payload['drives']=await drives_snapshot()
