@@ -23,12 +23,12 @@ async def groups(limit=20):
    FROM elite_entries e JOIN research_candidates c ON c.id=e.candidate_id
    GROUP BY e.candidate_id,e.mint,e.family,c.entry_price ORDER BY e.candidate_id DESC LIMIT $1""",limit,cutoff)
  return [dict(r) for r in rows]
-async def process_group(g,run_id='colony-native-v2-25gbp',notional=None):
+async def process_group(g,run_id='colony-native-v3-holdaware',notional=None):
  if notional is None:
   notional,rate,rate_source=notional_sol(TARGET_STAKE_GBP)
  else:
   rate,rate_source=None,'explicit_notional'
- iid=f"native-{g['candidate_id']}-{g['family']}-v2-25gbp";st=await state(run_id)
+ iid=f"native-{g['candidate_id']}-{g['family']}-v3-holdaware";st=await state(run_id)
  intent={'intent_id':iid,'mint':g['mint'],'side':'buy','notional':notional,'max_slippage_bps':100,'created_at':time.time()}
  attribution={'candidate_id':g['candidate_id'],'family':g['family'],'genomes':g['genomes'],'ants':g['ants'],'reference_price':g['entry_price'],
               'target_stake_gbp':TARGET_STAKE_GBP,'sol_gbp_rate':rate,'rate_source':rate_source,'hold_minutes':g['hold_minutes'],'max_hold_minutes':g['max_hold_minutes']}

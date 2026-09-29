@@ -28,7 +28,7 @@ async def _run(conn,run_id):
  return {'run_id':run_id,'summary':dict(summ),'trades':out,'curve':[dict(x) for x in curve]}
 async def snapshot():
  async with connection() as c:
-  external=await _run(c,'paper-livequote-v1');native=await _run(c,['colony-native-v1','colony-native-v2-25gbp'])
+  external=await _run(c,'paper-livequote-v1');native=await _run(c,['colony-native-v3-holdaware'])
   signals=await c.fetch('''SELECT id,created_at,mint,direction,confidence,reference_price FROM signal_events ORDER BY id DESC LIMIT 30''')
   genomes=await c.fetch("""SELECT family,count(DISTINCT genome_id) n FROM colony_forward_entries GROUP BY family ORDER BY family""")
   events=await c.fetch('''SELECT event_type,payload,created_at FROM colony_events ORDER BY id DESC LIMIT 25''')
@@ -37,7 +37,7 @@ async def snapshot():
   lineage=await c.fetch("""SELECT s.id signal_id,f.family,count(DISTINCT f.genome_id) ants FROM signal_events s JOIN colony_forward_entries f ON f.mint=s.mint AND f.observed_at BETWEEN s.created_at-interval '30 minutes' AND s.created_at+interval '5 minutes' WHERE s.id IN (SELECT id FROM signal_events ORDER BY id DESC LIMIT 30) GROUP BY s.id,f.family ORDER BY s.id DESC,ants DESC""")
   fam=await c.fetch('''SELECT quote->'attribution'->>'family' family,count(*) trades,
    count(*) FILTER(WHERE net_pnl>0) wins,coalesce(sum(net_pnl),0) net
-   FROM colony_execution_ledger WHERE run_id=ANY($1::text[]) GROUP BY 1 ORDER BY net DESC''',['colony-native-v1','colony-native-v2-25gbp'])
+   FROM colony_execution_ledger WHERE run_id=ANY($1::text[]) GROUP BY 1 ORDER BY net DESC''',['colony-native-v3-holdaware'])
   # Current elite-training roster is separate from the frozen forward-run provenance above.
   elite=[]
   rr=await c.fetchrow("SELECT run_id,stage_size,stage_index,status FROM reversal_tournament_runs ORDER BY created_at DESC LIMIT 1")

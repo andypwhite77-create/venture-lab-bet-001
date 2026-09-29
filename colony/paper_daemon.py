@@ -12,7 +12,7 @@ async def loop(interval=300):
    trades=await run_once(10)
    native=await native_run_once(20)
    marks_external=await mark_pending('paper-livequote-v1')
-   marks_native=await mark_pending('colony-native-v2-25gbp')
+   marks_native=await mark_pending('colony-native-v3-holdaware')
    log.info('paper cycle external=%s native=%s marks_external=%s marks_native=%s',
             len(trades),len(native),len(marks_external),len(marks_native))
   except Exception:log.exception('paper cycle failed')
