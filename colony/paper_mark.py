@@ -21,6 +21,14 @@ async def mark_pending(run_id='paper-livequote-v1',slippage_bps=100):
    import json;q=json.loads(q)
   entry=float(q.get('signal_reference_price') or 0)
   if entry<=0:continue
+  # Respect the strategy hold before marking; never score an ant at daemon-cycle time.
+  attr=q.get('attribution') or {}
+  hold_minutes=int(attr.get('hold_minutes') or 15)
+  created=r.get('created_at')
+  if created:
+   from datetime import datetime,timezone,timedelta
+   now=datetime.now(timezone.utc)
+   if created + timedelta(minutes=hold_minutes) > now: continue
   price,sources=await _price(r['mint'])
   reality=roundtrip(r['mint'],q,float(r['notional']))
   # Accounting authority is executable SOL round-trip economics, not provider token
