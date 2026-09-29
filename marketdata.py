@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 import httpx
 
@@ -7,6 +8,9 @@ log = logging.getLogger("signal-engine.marketdata")
 GECKO_MULTI_URL = "https://api.geckoterminal.com/api/v2/networks/solana/tokens/multi/{addresses}"
 GECKO_TRENDING_URL = "https://api.geckoterminal.com/api/v2/networks/solana/trending_pools?page=1"
 MAX_MULTI = 30
+_GECKO_BLOCKED_UNTIL = 0.0
+_GECKO_CACHE = {}
+_GECKO_TTL = 120.0
 
 
 def _f(value, default=None):
@@ -87,7 +91,7 @@ def normalize_trending_pool(pool: dict) -> dict:
     }
 
 
-async def _get_json(url: str, attempts: int = 3):
+async def _get_json(url: str, attempts: int = 1):
     headers = {"User-Agent": "Mozilla/5.0 venture-lab-research", "Accept": "application/json"}
     last_exc = None
     for attempt in range(attempts):
@@ -104,29 +108,39 @@ async def _get_json(url: str, attempts: int = 3):
 
 
 async def fetch_market_snapshots(mints) -> dict[str, dict]:
+    global _GECKO_BLOCKED_UNTIL
     ids = sorted({m for m in mints if m})
+    now=time.time()
+    cached={m:v[1] for m,v in _GECKO_CACHE.items() if m in ids and now-v[0] < _GECKO_TTL}
+    ids=[m for m in ids if m not in cached]
+    if now < _GECKO_BLOCKED_UNTIL: return cached
     if not ids:
-        return {}
-    result = {}
+        return cached
+    result = dict(cached)
     for offset in range(0, len(ids), MAX_MULTI):
         chunk = ids[offset:offset + MAX_MULTI]
         try:
             body = await _get_json(GECKO_MULTI_URL.format(addresses=",".join(chunk)))
             rows = [normalize_token(item) for item in (body.get("data") or [])]
-            result.update({row["mint"]: row for row in rows if row.get("mint") and row.get("price_usd")})
+            fresh={row["mint"]: row for row in rows if row.get("mint") and row.get("price_usd")}
+            result.update(fresh); _GECKO_CACHE.update({m:(time.time(),v) for m,v in fresh.items()})
         except Exception as exc:
-            log.warning("Token multi-market snapshot failed after retries: %r", exc)
+            if "429" in str(exc): _GECKO_BLOCKED_UNTIL=time.time()+300
+            log.warning("GeckoTerminal snapshot degraded; circuit open if rate-limited: %r", exc)
     return result
 
 
 async def fetch_trending_market_snapshots(limit: int = 20) -> dict[str, dict]:
+    global _GECKO_BLOCKED_UNTIL
+    if time.time() < _GECKO_BLOCKED_UNTIL: return {}
     try:
         body = await _get_json(GECKO_TRENDING_URL)
         pools = body.get("data") or []
         rows = [normalize_trending_pool(pool) for pool in pools[:limit]]
         return {row["mint"]: row for row in rows if row.get("mint") and row.get("price_usd")}
     except Exception as exc:
-        log.warning("Trending market snapshot failed after retries: %r", exc)
+        if "429" in str(exc): _GECKO_BLOCKED_UNTIL=time.time()+300
+        log.warning("GeckoTerminal trending degraded; circuit opened if rate-limited: %r", exc)
         return {}
 
 
