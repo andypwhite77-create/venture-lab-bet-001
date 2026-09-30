@@ -19,6 +19,17 @@ def flatten(row: dict) -> dict:
     out.setdefault("volume_liquidity_m5", vol/max(1.0,liq))
     buys=float(out.get("buys_m5") or 0); sells=float(out.get("sells_m5") or 0)
     out.setdefault("dex_buy_ratio_m5", buys/max(1.0,buys+sells))
+    # Derived context sensors available from the observation itself. These add vocabulary
+    # without peeking at future returns or sealed partitions.
+    pc5=float(out.get("price_change_m5") or 0); pch=float(out.get("price_change_h1") or 0)
+    b15=float(out.get("buys_15") or 0); s15=float(out.get("sells_15") or 0)
+    b30=float(out.get("buys_30") or 0); s30=float(out.get("sells_30") or 0)
+    out.setdefault("trend_alignment", pc5*pch)
+    out.setdefault("short_vs_hour", pc5-(pch/12.0))
+    out.setdefault("flow_imbalance_15", (b15-s15)/max(1.0,b15+s15))
+    out.setdefault("flow_imbalance_30", (b30-s30)/max(1.0,b30+s30))
+    out.setdefault("flow_shift", out["flow_imbalance_15"]-out["flow_imbalance_30"])
+    out.setdefault("activity_30", b30+s30)
     return out
 
 def evaluate(population: list[dict], observations: list[dict]) -> dict:

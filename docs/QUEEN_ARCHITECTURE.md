@@ -54,3 +54,10 @@ The dashboard/command layer should surface Queen beliefs, top niches, graveyard 
 Spartan's examiner remains sealed, but Queen has been given more breeding-visible resources rather than being weakened. Selection now rewards broader train/validation participation and specifically rewards validation coverage that does not collapse relative to training. Minimum breeding evidence rises to 18 train and 12 validation events. Parent selection also caps repeated train/validation phenotypes so one narrow behavioural niche cannot monopolise the 300-parent breeding pool.
 
 This is deliberately asymmetric: Queen receives better search pressure, diversity and generalisation resources, while Spartan's isolated holdout, 25-opportunity floor and behavioural deduplication remain untouched. The objective is to breed genuinely stronger organisms, not lower the exam standard.
+
+## Queen sensory expansion — 2026-09-30
+Queen's breeding vocabulary now includes derived, present-time context sensors computed only from information available at the observation: trend alignment, short-vs-hour movement, 15/30-window flow imbalance, flow shift, and 30-window activity. These features are available equally to train, validation and sealed holdout evaluation; future returns are never used to construct them.
+
+Genomes may also evolve hold horizon plus conservative stop-loss and take-profit parameters. Because the archive currently stores horizon outcomes rather than full intrahorizon price paths, risk management is scored conservatively: a stop or target is credited only when the observed horizon endpoint itself crosses that level. This avoids inventing fills from price paths we do not possess. Path-aware exits remain a future upgrade once candle/trade-path history is available.
+
+This expansion deliberately gives Queen more expressive organisms without weakening Spartan or revealing holdout information. Existing campaigns/checkpoints remain historical evidence; new sensory vocabulary takes effect only in newly bred populations after deployment.

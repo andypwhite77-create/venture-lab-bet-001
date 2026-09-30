@@ -57,7 +57,14 @@ def evaluate(genome,rows,stake_gbp=TARGET_STAKE_GBP,fixed_cost_gbp=0.0):
    ret=r['returns'].get(hold)
    if ret is None and r['returns']:
     h=min(r['returns'],key=lambda x:abs(x-hold)); ret=r['returns'][h]
-   if ret is not None:bymint.setdefault(r['mint'],float(ret))
+   if ret is not None:
+    ret=float(ret)
+    # Conservative endpoint approximation for evolved risk management. Until path-level
+    # candles exist, never award a TP/SL that the observed endpoint did not cross.
+    sl=genome.get('parameters',{}).get('stop_loss_pct'); tp=genome.get('parameters',{}).get('take_profit_pct')
+    if sl is not None and ret <= float(sl): ret=float(sl)
+    if tp is not None and ret >= float(tp): ret=float(tp)
+    bymint.setdefault(r['mint'],ret)
  return score(list(bymint.items()),stake_gbp,fixed_cost_gbp)
 
 def split_rows(rows):

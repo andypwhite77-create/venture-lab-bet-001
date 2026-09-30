@@ -7,8 +7,11 @@ from colony.genome import genome_id
 from colony.historical_nursery import load_rows,split_rows,evaluate
 from colony.queen_memory import load_memory
 from colony.paper_economics import TARGET_STAKE_GBP,measured_roundtrip_network_fee_sol,sol_gbp_rate
-SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000)}
+SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000),'trend_alignment':(-1200,1800),'short_vs_hour':(-30,30),'flow_imbalance_15':(-1,1),'flow_imbalance_30':(-1,1),'flow_shift':(-2,2),'activity_30':(0,1600)}
 HOLDS=(5,10,15,30,45,60,240)
+# Queen may evolve simple risk management; all decisions are fixed before sealed holdout.
+STOP_LOSSES=(None,-5,-8,-12,-18,-25)
+TAKE_PROFITS=(None,5,8,12,20,35,60)
 
 def random_genome(rng,memory=None):
  memory=memory or {}; preferred=[k for k in memory.get('preferred_features',[]) if k in SENSORS]
@@ -18,7 +21,7 @@ def random_genome(rng,memory=None):
  keys += rng.sample([k for k in pool if k not in keys],n-len(keys));p={}
  for k in keys:
   lo,hi=SENSORS[k];p[k]={rng.choice(('min','max')):rng.uniform(lo,hi)}
- return {'family':'queen_pattern','species':'general_pattern','parameters':{'hold_minutes':rng.choice(HOLDS)},'predicates':p,'bounds':{}}
+ return {'family':'queen_pattern','species':'general_pattern','parameters':{'hold_minutes':rng.choice(HOLDS),'stop_loss_pct':rng.choice(STOP_LOSSES),'take_profit_pct':rng.choice(TAKE_PROFITS)},'predicates':p,'bounds':{}}
 
 def mutate(g,rng):
  x=copy.deepcopy(g);p=x['predicates']
@@ -31,6 +34,8 @@ def mutate(g,rng):
   if rng.random()<.6:
    lo,hi=SENSORS[k];op=next(iter(r));r[op]=max(lo,min(hi,r[op]+rng.gauss(0,(hi-lo)*.05)))
  if rng.random()<.2:x['parameters']['hold_minutes']=rng.choice(HOLDS)
+ if rng.random()<.12:x['parameters']['stop_loss_pct']=rng.choice(STOP_LOSSES)
+ if rng.random()<.12:x['parameters']['take_profit_pct']=rng.choice(TAKE_PROFITS)
  return x
 
 def selection_fitness(parts):
