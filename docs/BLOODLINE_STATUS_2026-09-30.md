@@ -8,3 +8,8 @@
 - Breakout Failure / Order Flow: no finalists in its 50,000-genome search; dead pending redesign.
 
 No historical result grants real-capital authority. Promotion still requires adversarial qualification, behavioural diversity and prospective paper evidence.
+
+## Queen-directed consolidation
+Momentum, Order Flow / Breakout Failure, Wallet Convergence, Liquidity Impulse and Overshoot Recovery are mothballed as active reproductive bloodlines. Their code and historical evidence are retained as negative knowledge; they do not consume active evolutionary budget. Mean Reversion remains research-only rather than promoted. Exhaustion remains a benchmark hypothesis but must re-earn qualification on the enlarged bank. Reversal remains isolated from these experiments.
+
+The Queen's general pattern-recognition programme is now the primary discovery budget. She is given the rules of the economic game—positive after-cost expectancy, breadth, survival, distributed contribution and chronological persistence—but not Spartan's hidden pass thresholds. Search capacity is increased to six waves of 50,000 genomes with 300-parent retention and 10% fresh random blood. Holdout remains sealed during breeding; Spartan remains an unseen examiner.
