@@ -35,14 +35,17 @@ def mutate(g,rng):
 
 def selection_fitness(parts):
  t,v=parts[:2]
- if t.get('n',0)<15 or v.get('n',0)<10:return -999.0
+ if t.get('n',0)<18 or v.get('n',0)<12:return -999.0
  # Queen knows the game, not Spartan's hidden cutoffs: reward breadth, survival and distributed contribution.
- breadth=(min(1.0,t['n']/40.0)*min(1.0,v['n']/25.0))**0.5
+ breadth=(min(1.0,t['n']/55.0)*min(1.0,v['n']/30.0))**0.5
+ # Generalization reserve: reward strategies whose validation participation does not collapse
+ # relative to training. This uses breeding-visible evidence only, never Spartan/holdout.
+ coverage=min(1.0,(v['n']/max(1,t['n']))/.45)
  concentration=max(float(t.get('outlier',1)),float(v.get('outlier',1)))
  if concentration>.50:return -999.0
  consistency=min(float(t.get('win_rate',0)),float(v.get('win_rate',0)))
  base=.35*t['nursery_score']+.65*v['nursery_score']+.45*min(t['nursery_score'],v['nursery_score'])
- return base*breadth + .10*consistency - max(0,concentration-.30)*1.15
+ return base*breadth*(.65+.35*coverage) + .10*consistency - max(0,concentration-.30)*1.15
 
 async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_pattern_checkpoint.pkl'):
  rng=random.Random(seed);memory=load_memory();rows=await load_rows(conn);splits=split_rows(rows)
@@ -59,13 +62,23 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
   for g in pop:
    parts=[evaluate(g,s,TARGET_STAKE_GBP,cost) for s in splits];tested+=1
    ranked.append({'genome_id':genome_id(g),'genome':g,'train':parts[0],'validation':parts[1],'holdout':parts[2],'selection_score':selection_fitness(parts),'wave':wave})
-  ranked.sort(key=lambda x:x['selection_score'],reverse=True);parents=[x['genome'] for x in ranked[:300]];last=ranked
+  ranked.sort(key=lambda x:x['selection_score'],reverse=True)
+  # Preserve behavioural diversity among parents: cap identical train+validation event-count
+  # phenotypes so one narrow niche cannot consume the whole breeding pool.
+  parents=[]; phenos={}
+  for x in ranked:
+   if x['selection_score']<=-900: continue
+   sig=(x['train'].get('n',0),x['validation'].get('n',0),round(x['train'].get('win_rate',0),2),round(x['validation'].get('win_rate',0),2))
+   if phenos.get(sig,0)>=12: continue
+   phenos[sig]=phenos.get(sig,0)+1;parents.append(x['genome'])
+   if len(parents)>=300: break
+  last=ranked
   eligible=sum(x['selection_score']>-900 for x in ranked)
   print(json.dumps({'wave':wave,'tested':tested,'eligible':eligible,'best':ranked[0]['selection_score'],'urgency':'EXTREME','directive':'breed faster; kill fragility; earn expansion'}),flush=True)
   if checkpoint:
    os.makedirs(os.path.dirname(checkpoint),exist_ok=True);pickle.dump({'wave':wave,'tested':tested,'parents':parents,'rng_state':rng.getstate(),'best':ranked[0]['selection_score'],'eligible':eligible,'saved_at':time.time()},open(checkpoint,'wb'))
  finalists=[x for x in last if x['selection_score']>-900][:40]
- summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'min_train_events':15,'min_validation_events':10,'selection_concentration_ceiling':.50,'fresh_blood_rate':.20,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[])}
+ summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'min_train_events':18,'min_validation_events':12,'breeding_diversity_cap_per_phenotype':12,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':.20,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[])}
  if checkpoint and os.path.exists(checkpoint): os.remove(checkpoint)
  await conn.execute("INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary) VALUES('queen_pattern',$1,$2,$3::jsonb,$4::jsonb)",tested,len(rows),json.dumps(finalists),json.dumps(summary))
  return summary,finalists

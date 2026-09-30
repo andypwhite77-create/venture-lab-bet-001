@@ -49,3 +49,8 @@ Queen also maintains an opportunity map of underexplored sensors and a meta-allo
 A newborn/shadow-Queen control is defined but intentionally not allowed to reuse the current sealed evidence. It will be run periodically only when a retired-evidence split can be isolated cleanly; this prevents the control itself from leaking the examiner into breeding. The purpose is to test whether accumulated Queen expertise beats a memoryless researcher, rather than assuming that memory is useful.
 
 The dashboard/command layer should surface Queen beliefs, top niches, graveyard size, underexplored territory and changing confidence. These are auditable research beliefs, not claims of consciousness or guaranteed market edge.
+
+## Queen resource uplift after Spartan hardening
+Spartan's examiner remains sealed, but Queen has been given more breeding-visible resources rather than being weakened. Selection now rewards broader train/validation participation and specifically rewards validation coverage that does not collapse relative to training. Minimum breeding evidence rises to 18 train and 12 validation events. Parent selection also caps repeated train/validation phenotypes so one narrow behavioural niche cannot monopolise the 300-parent breeding pool.
+
+This is deliberately asymmetric: Queen receives better search pressure, diversity and generalisation resources, while Spartan's isolated holdout, 25-opportunity floor and behavioural deduplication remain untouched. The objective is to breed genuinely stronger organisms, not lower the exam standard.
