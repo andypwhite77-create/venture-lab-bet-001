@@ -8,6 +8,7 @@ from pathlib import Path
 from colony.evaluator import matches
 from colony.genome import genome_id
 from colony.replay import flatten
+from colony.queen_council import archetype_signals,live_specialist_votes,enrich_historical_context
 from colony.selection import ant_metrics
 from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured_roundtrip_network_fee_sol,sol_gbp_rate
 
@@ -140,10 +141,16 @@ async def load_rows(conn):
   WHERE o.net_return_pct IS NOT NULL ORDER BY c.created_at,c.id,o.horizon_minutes''')
  grouped={}
  for x in rows:
-  d=grouped.setdefault(x['id'],{'created_at':x['created_at'],'mint':x['mint'],'features':(json.loads(x['features']) if isinstance(x['features'],str) else dict(x['features'] or {})),'market':(json.loads(x['market']) if isinstance(x['market'],str) else dict(x['market'] or {})),'returns':{}})
+  d=grouped.setdefault(x['id'],{'id':x['id'],'created_at':x['created_at'],'mint':x['mint'],'features':(json.loads(x['features']) if isinstance(x['features'],str) else dict(x['features'] or {})),'market':(json.loads(x['market']) if isinstance(x['market'],str) else dict(x['market'] or {})),'returns':{}})
   d['returns'][int(x['horizon_minutes'])]=float(x['net_return_pct'])
- for d in grouped.values():d['flat']=flatten(d)
- return list(grouped.values())
+ live=await live_specialist_votes(conn)
+ for d in grouped.values():
+  d['flat']=flatten(d)
+  d['flat'].update(archetype_signals(d['flat']))
+  d['flat'].update(live.get(int(d.get('id',0)),{}))
+ out=list(grouped.values())
+ await enrich_historical_context(conn,out)
+ return out
 
 async def run_family(conn,family,n_genomes=10000,finalist_n=10):
  base=founders()[family]; rows=await load_rows(conn); splits=split_rows(rows); pop=breed_population(base,n_genomes,f'{SEED}:{family}')

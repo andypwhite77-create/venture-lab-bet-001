@@ -66,3 +66,10 @@ This expansion deliberately gives Queen more expressive organisms without weaken
 Queen can now evolve against the remaining useful context already present in the archive: pair age, hourly activity, hourly buy/sell imbalance, recent buy-activity change, hourly volume relative to liquidity, FDV/liquidity and market-cap/liquidity. These are derived only from information available at the observation timestamp and are exposed consistently across train, validation and sealed holdout.
 
 This package does not add new market data; it exposes more of the data we already collect. The main remaining bottleneck is now dataset breadth and age rather than unused archived fields.
+
+## Specialist council + historical context — 2026-09-30
+Queen now receives a council layer without merging specialist genetics. Reversal, Momentum, Order Flow, Exhaustion and Mean Reversion expose fixed archetype signals derived only from observation-time market features. Actual prospective tournament firings are also attached by candidate ID, so Queen may learn when independent specialist ants agreed or disagreed without back-projecting today's evolved winners into earlier history.
+
+The local GeckoTerminal historical bank is now used as past-only context. For candidate observations whose pool has archived hourly bars, Queen receives trailing 24h/7d return, 24h volatility, recent/prior volume ratio, seven-day drawdown and seven-day price position. Every historical feature is computed using bars timestamped at or before the candidate observation; future bars, candidate outcomes and Spartan evidence are excluded.
+
+This is a hierarchical design: specialist ants remain free to trade/paper-trade their own niches, while the general Queen may evolve rules using raw sensors, specialist opinions, actual prospective specialist firings and historical regime context. Queen's persistent cross-campaign memory remains the single breeding memory. Spartan remains external and sealed.
