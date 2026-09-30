@@ -5,12 +5,17 @@ Train+validation drive evolution; holdout is sealed until finalists are fixed.
 import copy,json,random,statistics,os,pickle,time
 from colony.genome import genome_id
 from colony.historical_nursery import load_rows,split_rows,evaluate
+from colony.queen_memory import load_memory
 from colony.paper_economics import TARGET_STAKE_GBP,measured_roundtrip_network_fee_sol,sol_gbp_rate
 SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000)}
 HOLDS=(5,10,15,30,45,60,240)
 
-def random_genome(rng):
- keys=rng.sample(list(SENSORS),rng.randint(2,6));p={}
+def random_genome(rng,memory=None):
+ memory=memory or {}; preferred=[k for k in memory.get('preferred_features',[]) if k in SENSORS]
+ pool=list(SENSORS); n=rng.randint(2,6); keys=[]
+ if preferred and rng.random()<.75:
+  keys=rng.sample(preferred,min(len(preferred),rng.randint(1,min(n,len(preferred)))))
+ keys += rng.sample([k for k in pool if k not in keys],n-len(keys));p={}
  for k in keys:
   lo,hi=SENSORS[k];p[k]={rng.choice(('min','max')):rng.uniform(lo,hi)}
  return {'family':'queen_pattern','species':'general_pattern','parameters':{'hold_minutes':rng.choice(HOLDS)},'predicates':p,'bounds':{}}
@@ -40,7 +45,7 @@ def selection_fitness(parts):
  return base*breadth + .10*consistency - max(0,concentration-.30)*1.15
 
 async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_pattern_checkpoint.pkl'):
- rng=random.Random(seed);rows=await load_rows(conn);splits=split_rows(rows)
+ rng=random.Random(seed);memory=load_memory();rows=await load_rows(conn);splits=split_rows(rows)
  fee=await measured_roundtrip_network_fee_sol(conn);rate,_=sol_gbp_rate();cost=fee*rate
  parents=[];last=[];tested=0;start_wave=1
  if checkpoint and os.path.exists(checkpoint):
@@ -49,7 +54,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
    print(json.dumps({'event':'queen_resumed','from_wave':start_wave,'tested':tested,'urgency':'EXTREME'}),flush=True)
   except Exception as e: print(json.dumps({'event':'checkpoint_rejected','error':str(e)}),flush=True)
  for wave in range(start_wave,waves+1):
-  pop=[random_genome(rng) for _ in range(wave_size)] if not parents else [mutate(rng.choice(parents),rng) if rng.random()<.90 else random_genome(rng) for _ in range(wave_size)]
+  pop=[random_genome(rng,memory) for _ in range(wave_size)] if not parents else [mutate(rng.choice(parents),rng) if rng.random()<.80 else random_genome(rng,memory) for _ in range(wave_size)]
   ranked=[]
   for g in pop:
    parts=[evaluate(g,s,TARGET_STAKE_GBP,cost) for s in splits];tested+=1
@@ -60,7 +65,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
   if checkpoint:
    os.makedirs(os.path.dirname(checkpoint),exist_ok=True);pickle.dump({'wave':wave,'tested':tested,'parents':parents,'rng_state':rng.getstate(),'best':ranked[0]['selection_score'],'eligible':eligible,'saved_at':time.time()},open(checkpoint,'wb'))
  finalists=[x for x in last if x['selection_score']>-900][:40]
- summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'min_train_events':15,'min_validation_events':10,'selection_concentration_ceiling':.50,'fresh_blood_rate':.10}
+ summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'min_train_events':15,'min_validation_events':10,'selection_concentration_ceiling':.50,'fresh_blood_rate':.20,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[])}
  if checkpoint and os.path.exists(checkpoint): os.remove(checkpoint)
  await conn.execute("INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary) VALUES('queen_pattern',$1,$2,$3::jsonb,$4::jsonb)",tested,len(rows),json.dumps(finalists),json.dumps(summary))
  return summary,finalists

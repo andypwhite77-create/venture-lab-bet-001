@@ -6,6 +6,7 @@ import asyncio,json,os,time
 from db import init_db,connection
 from colony.queen_pattern_recognition import run as queen_run
 from colony.spartan_v2_runner import audit_family
+from colony.queen_memory import learn_campaign
 
 STATE='/data/queen_survival_state.json'
 
@@ -19,7 +20,9 @@ async def main():
         campaign+=1
         async with connection() as c:
             print(json.dumps({'event':'campaign_start','campaign':campaign,'directive':'PERSIST ADAPT BREED KILL FRAGILITY'}),flush=True)
-            summary,_=await queen_run(c,seed=300933+campaign,checkpoint='/data/queen_pattern_checkpoint.pkl')
+            summary,finalists=await queen_run(c,seed=300933+campaign,checkpoint='/data/queen_pattern_checkpoint.pkl')
+            memory=learn_campaign(finalists,summary)
+            print(json.dumps({'event':'queen_learned','memory_campaigns':memory.get('campaigns'),'preferred_features':memory.get('preferred_features',[])}),flush=True)
             audit=await audit_family(c,'queen_pattern')
             passed=[x for x in audit['results'] if x['stress_pass']]
             distinct={tuple(x['events']) for x in passed}
