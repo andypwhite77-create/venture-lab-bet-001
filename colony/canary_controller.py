@@ -45,14 +45,16 @@ async def ensure_schema():
           requested_sol DOUBLE PRECISION NOT NULL,wallet_sol DOUBLE PRECISION NOT NULL,
           wallet_gbp DOUBLE PRECISION NOT NULL,status TEXT NOT NULL,reason TEXT,
           live_enabled BOOLEAN NOT NULL DEFAULT false,broadcast BOOLEAN NOT NULL DEFAULT false,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT now())''')
+          hold_minutes INT,created_at TIMESTAMPTZ NOT NULL DEFAULT now())''')
+        await c.execute('ALTER TABLE canary_trade_intents ADD COLUMN IF NOT EXISTS hold_minutes INT')
 async def latest_reversal_groups(limit=50):
     async with connection() as c:
         rows=await c.fetch('''WITH latest_run AS (
           SELECT run_id,last_candidate_id FROM reversal_tournament_runs ORDER BY created_at DESC LIMIT 1),
         aa AS (SELECT count(*)::int n FROM reversal_tournament_ants a JOIN latest_run r USING(run_id) WHERE a.active=true),
         x AS (SELECT e.candidate_id,e.mint,min(e.observed_at) observed_at,
-          count(DISTINCT e.genome_id)::int votes
+          count(DISTINCT e.genome_id)::int votes,
+          percentile_cont(0.5) within group(order by e.hold_minutes)::int hold_minutes
           FROM reversal_tournament_entries e JOIN latest_run r USING(run_id)
           JOIN reversal_tournament_ants a ON a.run_id=e.run_id AND a.genome_id=e.genome_id AND a.active=true
           WHERE e.candidate_id>$1 AND e.candidate_id <= r.last_candidate_id GROUP BY e.candidate_id,e.mint)
@@ -70,10 +72,10 @@ async def record_intent(g,rate,balance_sol,status,reason):
     frac=(g['votes']/g['active_ants']) if g['active_ants'] else 0.0
     async with connection() as c:
         await c.execute('''INSERT INTO canary_trade_intents(candidate_id,mint,observed_at,votes,active_ants,
-          vote_fraction,requested_gbp,requested_sol,wallet_sol,wallet_gbp,status,reason,live_enabled,broadcast)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false) ON CONFLICT(candidate_id) DO NOTHING''',
+          vote_fraction,requested_gbp,requested_sol,wallet_sol,wallet_gbp,status,reason,live_enabled,broadcast,hold_minutes)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false,$14) ON CONFLICT(candidate_id) DO NOTHING''',
           g['candidate_id'],g['mint'],g['observed_at'],g['votes'],g['active_ants'],frac,
-          requested_gbp,requested_sol,balance_sol,balance_sol*rate,status,reason,LIVE_ENABLED)
+          requested_gbp,requested_sol,balance_sol,balance_sol*rate,status,reason,LIVE_ENABLED,g.get('hold_minutes'))
 async def process_once():
     await ensure_schema()
     rate,_=sol_gbp_rate()

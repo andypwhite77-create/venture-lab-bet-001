@@ -228,6 +228,24 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  hummingbot-gateway:
+    image: hummingbot/gateway:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:15888:15888"
+    volumes:
+      - ./gateway-files/conf:/home/gateway/conf
+      - ./gateway-files/logs:/home/gateway/logs
+      - ./gateway-certs:/home/gateway/certs
+    environment:
+      GATEWAY_PASSPHRASE: ${HUMMINGBOT_GATEWAY_PASSPHRASE}
+      GATEWAY_API_KEY: ${HUMMINGBOT_GATEWAY_API_KEY}
+      DEV: "true"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   caddy_data:
   caddy_config:
