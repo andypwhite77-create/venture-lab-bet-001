@@ -17,10 +17,10 @@ ROOT = Path(__file__).resolve().parent
 DEFAULT_SEED = 28092026
 STAGES = [
     # population, minimum cumulative independent mints before cull, survivors
-    (100, 20, 60),
-    (60, 40, 30),
-    (30, 60, 15),
-    (15, 80, 5),
+    (100, 12, 60),
+    (60, 20, 30),
+    (30, 30, 15),
+    (15, 40, 5),
     # Finalists are frozen only after substantial prospective evidence, then must
     # survive 50 NEW independent mints. Cheap paper evidence is preferred to
     # prematurely declaring a winner.
@@ -197,7 +197,9 @@ async def maybe_cull(conn) -> dict:
     recs=await metrics(conn,run["run_id"],since=since)
     baseline_gid=next((a["genome_id"] for a in active if a["baseline"]),None)
     qualified=[a for a in active if recs.get(a["genome_id"],{}).get("n",0)>=min_n]
-    required_qualified = len(active) if stage_size==5 else max(2,math.ceil(len(active)*.80))
+    # Do not let sparse/dead descendants block the tournament forever. Baseline plus a
+    # substantial evidence-bearing cohort is enough to advance; weak ants are culled, not replenished mid-stage.
+    required_qualified = len(active) if stage_size==5 else max(10, math.ceil(min(stage_size,len(active))*.50))
     if len(qualified)<required_qualified:
         return {"run":run["run_id"],"stage":stage_size,"active":len(active),"qualified":len(qualified),"minimum_n":min_n,"culled":0}
     if stage_size==5:

@@ -68,7 +68,9 @@ async def replenish(conn):
     rr=await conn.fetchrow("SELECT * FROM reversal_tournament_runs WHERE status='collecting' ORDER BY created_at DESC LIMIT 1")
     if rr:
         active=await conn.fetch('SELECT genome_id FROM reversal_tournament_ants WHERE run_id=$1 AND active=true',rr['run_id'])
-        need=max(0,int(rr['stage_size'])-len(active)); ids={x['genome_id'] for x in active}
+        # Reversal is a protected parent/control experiment. Never backfill a stage with new
+        # descendants: replacements reset evidence comparability and were causing stage-0 churn.
+        need=0; ids={x['genome_id'] for x in active}
         for _ in range(need):
             q=await _next_candidate(conn,'reversal',ids)
             if not q: break
@@ -146,7 +148,8 @@ async def challenger_turnover(conn):
 
     rr=await conn.fetchrow("SELECT * FROM reversal_tournament_runs WHERE status='collecting' ORDER BY created_at DESC LIMIT 1")
     if rr:
-        await maybe_rotate('reversal',rr,'reversal_tournament_ants',reversal_metrics)
+        # Protect Reversal baseline and frozen cohort; no asynchronous challenger displacement.
+        pass
     runs=await conn.fetch("SELECT * FROM family_tournament_runs WHERE status='collecting' ORDER BY created_at")
     for run in runs:
         await maybe_rotate(run['family'],run,'family_tournament_ants',family_metrics)
