@@ -12,7 +12,7 @@ def _bloodline_cards(j):
     perf={x.get('family') or 'unknown':x for x in j.get('family_performance',[])}
     roster={x.get('family'):x for x in j.get('elite_roster',[])}
     ants=(j.get('selection') or {}).get('ants',[])
-    names=['reversal','momentum','order_flow','wallet_convergence']
+    names=['reversal','exhaustion','queen_pattern','mean_reversion']
     cards=[]
     for fam in names:
         aa=[a for a in ants if a.get('family')==fam]
@@ -24,13 +24,17 @@ def _bloodline_cards(j):
         wr=(wins/trades*100) if trades else None
         rate=j.get('sol_gbp'); net_gbp=(net*float(rate)) if rate is not None else None
         active=int(r.get('active') or 0);elites=int(r.get('elites') or 0);controls=int(r.get('controls') or 0);chall=int(r.get('challengers') or 0)
-        state='ELITE FIELD' if elites else 'SEARCHING'
+        research=next((x for x in j.get('research_bloodlines',[]) if x.get('family')==fam),{})
+        rs=research.get('summary') or {}; rs=__import__('json').loads(rs) if isinstance(rs,str) else rs
+        tested=int(research.get('tested_genomes') or 0); finalists=int(rs.get('finalists') or 0); hp=int(rs.get('holdout_positive') or 0)
+        state='ELITE FIELD' if elites else ('QUEEN HUNT' if fam=='queen_pattern' else ('RESEARCH' if tested else 'SEARCHING'))
         statecls='good' if elites else 'searching'
         cards.append(f"""<article class='bloodline'>
           <div class='bloodline-head'><div><span class='family-dot {fam}'></span><b>{escape(_label(fam))}</b></div><span class='state {statecls}'>{state}</span></div>
           <div class='bloodline-number'>{active}</div><div class='bloodline-caption'>active prospective ants</div>
           <div class='mini-grid'><div><strong>{elites}</strong><span>elite</span></div><div><strong>{controls}</strong><span>control</span></div><div><strong>{chall}</strong><span>waiting</span></div></div>
           <div class='bloodline-meta'>Stage <b>{r.get('stage_size','—')}</b> • evidence-ready <b>{len(mature)}</b> • mature median <b>{_f(statistics.median(returns) if returns else None,2)}%</b></div>
+          <div class='bloodline-meta'>Research <b>{tested:,}</b> genomes • finalists <b>{finalists}</b> • holdout+ <b>{hp}</b></div>
           <div class='bloodline-meta'>Paper bets <b>{trades}</b> • win rate <b>{_f(wr,1)}%</b> • net <b class={'pos' if net>=0 else 'neg'}>{'£'+_f(net_gbp,2) if net_gbp is not None else '—'}</b> <span class='muted'>• {_f(net,6)} SOL</span></div>
         </article>""")
     return ''.join(cards)
@@ -81,7 +85,7 @@ def _chart(curve, rate, period='7d', metric='net_gbp'):
     return controls+summary+f"<div class='chartbox'>{svg}</div>"
 
 def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
-    valid={"all","reversal","momentum","order_flow","wallet_convergence"}
+    valid={"all","reversal","exhaustion","queen_pattern","mean_reversion"}
     selected_family=selected_family if selected_family in valid else "all"
     if selected_family != "all":
         j=dict(j)
@@ -109,7 +113,7 @@ def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
         money_card=('COLONY TOTAL',('£'+_f(family_gbp,2)) if family_gbp is not None else '—',f"{_label(selected_family)} only • no other colony P&L")
     cards=[('ACTIVE ANTS',active,'prospective roster'),('QUALIFIED ELITES',elites,'earned training seats'),('CHALLENGERS',chall,'waiting for a seat'),money_card,('EXECUTION TESTS',marked,'independent £25-scale observations; not a wallet'),('NEXT EVOLUTION',f'{left} mints','until accelerator sweep')]
     cards_html=''.join(f"<div class='metric'><div class='metric-label'>{escape(k)}</div><div class='metric-value'>{escape(str(v))}</div><div class='metric-note'>{escape(str(note))}</div></div>" for k,v,note in cards)
-    tabs=''.join(f"<a class='colony-tab {'active' if selected_family==f else ''}' href='/dashboard?family={f}&period={chart_period}&metric={chart_metric}'>{_label(f) if f!='all' else 'Swarm'}</a>" for f in ['all','reversal','momentum','order_flow','wallet_convergence'])
+    tabs=''.join(f"<a class='colony-tab {'active' if selected_family==f else ''}' href='/dashboard?family={f}&period={chart_period}&metric={chart_metric}'>{_label(f) if f!='all' else 'Swarm'}</a>" for f in ['all','reversal','exhaustion','queen_pattern','mean_reversion'])
     cards_html=f"<div class='colony-tabs'>{tabs}</div>"+cards_html
     fam=_bloodline_cards(j)
     if selected_family != 'all':
@@ -156,8 +160,9 @@ def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
             try: sb=__import__('json').loads(sb)
             except Exception: sb={}
         sq_summary=escape(str(sb.get('summary') or 'Executive monitor warming up.'))
+        doctrine='PERSIST • ADAPT • DOMINATE REPEATABLE STRUCTURE • PROTECT CAPITAL • BREED SPECIALISTS • KILL FRAGILITY'
         sq_status=escape(str(sb.get('status') or 'starting').upper())
-        mind=f"<div class='gate compact'><b>Swarm Queen / Grace Interface</b><span class='state good'>{sq_status}</span><div class='gate-copy'>{sq_summary}</div><small>Executive monitor only: cross-colony synthesis, faults, regime and allocation recommendations. No trading or genetic authority.</small></div>"+mind
+        mind=f"<div class='gate compact'><b>Swarm Queen / Grace Interface</b><span class='state good'>{sq_status}</span><div class='gate-copy'>{sq_summary}</div><div class='gate-copy' style='margin-top:8px'><b>{doctrine}</b></div><small>Executive monitor only: cross-colony synthesis, faults, regime and allocation recommendations. No trading or genetic authority.</small></div>"+mind
 
     signals=''.join(f"<div class='feed-item'><b>#{x.get('id')}</b> {escape(str(x.get('direction')))} <code>{escape(str(x.get('mint','')))[:8]}…</code></div>" for x in j.get('signals',[])) or '<div class=empty>None</div>'
     experiments=''.join(f"<div class='feed-item'><span class=pill>{escape(str(x.get('experiment_type')))}</span> {escape(str(x.get('status')))}</div>" for x in j.get('experiments',[])) or '<div class=empty>None</div>'

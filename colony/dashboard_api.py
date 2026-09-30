@@ -77,10 +77,12 @@ async def snapshot():
   stake_model={'stake_gbp':TARGET_STAKE_GBP,'roundtrip_network_fee_sol':fee_sol,'roundtrip_network_fee_gbp':fee_gbp,'fixed_fee_pct_at_stake':(fee_gbp/TARGET_STAKE_GBP*100.0 if TARGET_STAKE_GBP else None),'rate_source':_econ_source}
   health=await c.fetch("""SELECT DISTINCT ON(provider) provider,ok,observed_at,error,latency_ms FROM colony_provider_health ORDER BY provider,observed_at DESC""")
   health=[dict(x) for x in health]
+  research=await c.fetch('''SELECT DISTINCT ON(family) family,created_at,tested_genomes,historical_rows,summary FROM historical_nursery_runs ORDER BY family,created_at DESC''')
+  research=[dict(x) for x in research]
   payload={'external':external,'native':native,'sol_gbp':rate,'signals':[dict(x) for x in signals],
    'genomes':[dict(x) for x in genomes],'events':[dict(x) for x in events],
    'mind':[dict(x) for x in mind],'experiments':[dict(x) for x in exps],
-   'lineage':[dict(x) for x in lineage],'provider_health':health,'family_performance':families,'elite_roster':elite,'accelerator':accel,'stake_model':stake_model}
+   'lineage':[dict(x) for x in lineage],'provider_health':health,'research_bloodlines':research,'family_performance':families,'elite_roster':elite,'accelerator':accel,'stake_model':stake_model}
  # IMPORTANT: release the dashboard DB connection before selection telemetry, which
  # acquires its own connection. Otherwise concurrent dashboard requests can exhaust
  # the small asyncpg pool and deadlock each other.
