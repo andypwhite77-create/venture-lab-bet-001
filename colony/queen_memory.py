@@ -18,8 +18,11 @@ def learn_campaign(finalists,summary):
         score=float(x.get('selection_score',0)); g=x.get('genome',{})
         for k in g.get('predicates',{}):
             z=fs.setdefault(k,{'seen':0,'score_sum':0.0,'positive':0})
-            z['seen']+=1;z['score_sum']+=score;z['positive']+=int(score>0)
+            z['seen']+=1;z['score_sum']+=score;z['positive']+=int(score>0);z['last_campaign']=m['campaigns']
     ranked=sorted(fs.items(),key=lambda kv:(kv[1]['score_sum']/max(1,kv[1]['seen']),kv[1]['seen']),reverse=True)
+    # Age stale expertise and expose underexplored territory.
+    for z in fs.values(): z['score_sum']*=.96
     m['preferred_features']=[k for k,_ in ranked[:6]]
+    m['underexplored_features']=[k for k,z in sorted(fs.items(),key=lambda kv:kv[1]['seen'])[:5]]
     m['lessons']=(m.get('lessons',[])+[{'campaign':m['campaigns'],'tested':summary.get('tested'),'finalists':summary.get('finalists'),'holdout_withheld':True,'preferred_features':m['preferred_features']}])[-30:]
     save_memory(m);return m
