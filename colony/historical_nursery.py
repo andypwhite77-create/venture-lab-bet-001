@@ -61,8 +61,17 @@ def evaluate(genome,rows,stake_gbp=TARGET_STAKE_GBP,fixed_cost_gbp=0.0):
  return score(list(bymint.items()),stake_gbp,fixed_cost_gbp)
 
 def split_rows(rows):
- rows=sorted(rows,key=lambda r:r['created_at']); n=len(rows); a=int(n*.60); b=int(n*.80)
- return rows[:a],rows[a:b],rows[b:]
+ # Entity-isolated chronological split: a mint belongs to exactly one partition.
+ # Assignment is based on its first observation, so later observations cannot leak
+ # the same asset into validation/holdout after breeding has seen it earlier.
+ rows=sorted(rows,key=lambda r:r['created_at'])
+ first={}
+ for r in rows:first.setdefault(r['mint'],r['created_at'])
+ mints=sorted(first,key=lambda m:first[m]); n=len(mints); a=int(n*.60); b=int(n*.80)
+ train=set(mints[:a]); val=set(mints[a:b]); hold=set(mints[b:])
+ return ([r for r in rows if r['mint'] in train],
+         [r for r in rows if r['mint'] in val],
+         [r for r in rows if r['mint'] in hold])
 
 def robust_score(parts):
  # reward survival across all time segments; weakest segment dominates
