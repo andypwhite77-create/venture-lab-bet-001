@@ -3,13 +3,14 @@
 GeckoTerminal is the zero-credential backfill source. Data is research-only and
 never grants promotion/live authority. Existing forward candidate/path logging remains primary.
 """
-import asyncio, json, logging, time, urllib.parse, urllib.request
+import asyncio, json, logging, time, urllib.parse, urllib.request, urllib.error, random
 from datetime import datetime, timezone, timedelta
 from db import init_db, connection
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 BASE='https://api.geckoterminal.com/api/v2/networks/solana/pools'
 RATE_SLEEP=7.0
+MAX_RETRIES=5
 SIX_MONTHS=int((datetime.now(timezone.utc)-timedelta(days=183)).timestamp())
 
 async def schema(c):
@@ -31,9 +32,21 @@ async def backfill_pair(c,pair):
     oldest=await c.fetchval("SELECT extract(epoch from min(ts))::bigint FROM historical_ohlcv WHERE pair_address=$1 AND timeframe='1h'",pair)
     before=int(oldest)-1 if oldest else None; added=0
     while before is None or before>SIX_MONTHS:
-        try:data=await asyncio.to_thread(fetch,pair,before)
-        except Exception as e:
-            logging.warning('backfill_fetch_failed pair=%s err=%s',pair,e); break
+        data=None
+        for attempt in range(MAX_RETRIES):
+            try:
+                data=await asyncio.to_thread(fetch,pair,before); break
+            except urllib.error.HTTPError as e:
+                if e.code != 429:
+                    logging.warning('backfill_fetch_failed pair=%s err=%s',pair,e); break
+                retry_after=e.headers.get('Retry-After') if e.headers else None
+                delay=float(retry_after) if retry_after and retry_after.isdigit() else min(120.0, 8.0*(2**attempt))
+                delay+=random.uniform(0,2.0)
+                logging.warning('backfill_rate_limited pair=%s attempt=%s sleep=%.1fs',pair,attempt+1,delay)
+                await asyncio.sleep(delay)
+            except Exception as e:
+                logging.warning('backfill_fetch_failed pair=%s err=%s',pair,e); break
+        if data is None: break
         bars=((data.get('data') or {}).get('attributes') or {}).get('ohlcv_list') or []
         if not bars:break
         rows=[]
