@@ -61,3 +61,8 @@ Queen's breeding vocabulary now includes derived, present-time context sensors c
 Genomes may also evolve hold horizon plus conservative stop-loss and take-profit parameters. Because the archive currently stores horizon outcomes rather than full intrahorizon price paths, risk management is scored conservatively: a stop or target is credited only when the observed horizon endpoint itself crosses that level. This avoids inventing fills from price paths we do not possess. Path-aware exits remain a future upgrade once candle/trade-path history is available.
 
 This expansion deliberately gives Queen more expressive organisms without weakening Spartan or revealing holdout information. Existing campaigns/checkpoints remain historical evidence; new sensory vocabulary takes effect only in newly bred populations after deployment.
+
+## Queen lifecycle/context sensor package — 2026-09-30
+Queen can now evolve against the remaining useful context already present in the archive: pair age, hourly activity, hourly buy/sell imbalance, recent buy-activity change, hourly volume relative to liquidity, FDV/liquidity and market-cap/liquidity. These are derived only from information available at the observation timestamp and are exposed consistently across train, validation and sealed holdout.
+
+This package does not add new market data; it exposes more of the data we already collect. The main remaining bottleneck is now dataset breadth and age rather than unused archived fields.

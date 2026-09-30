@@ -7,7 +7,7 @@ from colony.genome import genome_id
 from colony.historical_nursery import load_rows,split_rows,evaluate
 from colony.queen_memory import load_memory
 from colony.paper_economics import TARGET_STAKE_GBP,measured_roundtrip_network_fee_sol,sol_gbp_rate
-SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000),'trend_alignment':(-1200,1800),'short_vs_hour':(-30,30),'flow_imbalance_15':(-1,1),'flow_imbalance_30':(-1,1),'flow_shift':(-2,2),'activity_30':(0,1600)}
+SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000),'trend_alignment':(-1200,1800),'short_vs_hour':(-30,30),'flow_imbalance_15':(-1,1),'flow_imbalance_30':(-1,1),'flow_shift':(-2,2),'activity_30':(0,1600),'activity_h1':(0,5000),'flow_imbalance_h1':(-1,1),'buy_activity_change':(-1,12),'volume_liquidity_h1':(0,10),'fdv_liquidity_ratio':(0,1000),'marketcap_liquidity_ratio':(0,1000),'pair_age_hours':(0,10000)}
 HOLDS=(5,10,15,30,45,60,240)
 # Queen may evolve simple risk management; all decisions are fixed before sealed holdout.
 STOP_LOSSES=(None,-5,-8,-12,-18,-25)

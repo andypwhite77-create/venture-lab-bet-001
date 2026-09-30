@@ -30,6 +30,24 @@ def flatten(row: dict) -> dict:
     out.setdefault("flow_imbalance_30", (b30-s30)/max(1.0,b30+s30))
     out.setdefault("flow_shift", out["flow_imbalance_15"]-out["flow_imbalance_30"])
     out.setdefault("activity_30", b30+s30)
+    bh=float(out.get("buys_h1") or 0); sh=float(out.get("sells_h1") or 0)
+    vh=float(out.get("volume_h1") or 0); mc=float(out.get("market_cap") or 0); fdv=float(out.get("fdv") or 0)
+    prev=float(out.get("prev_buys_15") or 0)
+    out.setdefault("activity_h1", bh+sh)
+    out.setdefault("flow_imbalance_h1", (bh-sh)/max(1.0,bh+sh))
+    out.setdefault("buy_activity_change", (b15-prev)/max(1.0,prev))
+    out.setdefault("volume_liquidity_h1", vh/max(1.0,liq))
+    out.setdefault("fdv_liquidity_ratio", fdv/max(1.0,liq))
+    out.setdefault("marketcap_liquidity_ratio", mc/max(1.0,liq))
+    try:
+        from datetime import datetime
+        ca=out.get("created_at"); pa=out.get("pair_created_at")
+        if ca and pa:
+            def _dt(v):
+                return v if hasattr(v,"timestamp") else datetime.fromisoformat(str(v).replace("Z","+00:00"))
+            out.setdefault("pair_age_hours", max(0.0,(_dt(ca)-_dt(pa)).total_seconds()/3600.0))
+    except Exception:
+        pass
     return out
 
 def evaluate(population: list[dict], observations: list[dict]) -> dict:
