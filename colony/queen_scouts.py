@@ -172,8 +172,7 @@ async def _metrics(c,scout_id,parent_id):
     # prospective window, because eligibility mutations can intentionally add/remove trades.
     child_rows=await c.fetch('''SELECT DISTINCT ON (e.mint) e.mint,e.candidate_id,e.observed_at,e.hold_minutes,o.net_return_pct
       FROM colony_queen_scout_entries e JOIN LATERAL
-      (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at
-       ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+      (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at AND horizon_minutes=e.hold_minutes LIMIT 1) o ON true
       WHERE e.scout_id=$1 AND o.net_return_pct IS NOT NULL ORDER BY e.mint,e.observed_at''',scout_id)
     child_vals=[float(r['net_return_pct']) for r in child_rows]
     evidence_n=len(child_vals)
@@ -186,7 +185,7 @@ async def _metrics(c,scout_id,parent_id):
           WHERE genome_id=$1 AND candidate_id=$2 ORDER BY observed_at LIMIT 1''',parent_id,ce['candidate_id'])
         if not pe: continue
         po=await c.fetchval('''SELECT net_return_pct FROM research_outcomes
-          WHERE candidate_id=$1 AND measured_at>=$2 ORDER BY abs(horizon_minutes-$3) LIMIT 1''',
+          WHERE candidate_id=$1 AND measured_at>=$2 AND horizon_minutes=$3 LIMIT 1''',
           ce['candidate_id'],pe['observed_at'],pe['hold_minutes'])
         if po is not None: paired.append((float(ce['net_return_pct']),float(po)))
     pn=len(paired)
@@ -197,8 +196,7 @@ async def _metrics(c,scout_id,parent_id):
     parent_rows=await c.fetch('''SELECT DISTINCT ON (pe.mint) pe.mint,po.net_return_pct
       FROM colony_forward_entries pe JOIN colony_queen_scouts s ON s.id=$2
       JOIN LATERAL (SELECT net_return_pct FROM research_outcomes
-        WHERE candidate_id=pe.candidate_id AND measured_at>=pe.observed_at
-        ORDER BY abs(horizon_minutes-pe.hold_minutes) LIMIT 1) po ON true
+        WHERE candidate_id=pe.candidate_id AND measured_at>=pe.observed_at AND horizon_minutes=pe.hold_minutes LIMIT 1) po ON true
       WHERE pe.genome_id=$1 AND pe.candidate_id>s.birth_cutoff AND po.net_return_pct IS NOT NULL
       ORDER BY pe.mint,pe.observed_at''',parent_id,scout_id)
     parent_vals=[float(r['net_return_pct']) for r in parent_rows]
@@ -217,8 +215,7 @@ async def _bloodline_reference(c,family,parent_id):
     rows=await c.fetch('''SELECT g.genome_id,e.mint,o.net_return_pct
       FROM colony_genomes g JOIN colony_forward_entries e ON e.genome_id=g.genome_id
       JOIN LATERAL (SELECT net_return_pct FROM research_outcomes
-        WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at
-        ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+        WHERE candidate_id=e.candidate_id AND measured_at>=e.observed_at AND horizon_minutes=e.hold_minutes LIMIT 1) o ON true
       WHERE g.generation=3 AND g.family=$1 AND e.run_id=$2 AND o.net_return_pct IS NOT NULL''',family,'fwd-g3-20260926T084022Z')
     by={}
     for r in rows:

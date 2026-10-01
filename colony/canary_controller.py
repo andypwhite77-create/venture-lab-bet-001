@@ -110,7 +110,7 @@ async def main():
         try:
             print(json.dumps(await process_once(),default=str),flush=True)
         except Exception as e:
-            print(json.dumps({'ok':False,'error':type(e).__name__,'detail':str(e)[:200]}),flush=True)
+            print(json.dumps({'ok':False,'error':type(e).__name__,'detail':'redacted'}),flush=True)
         await asyncio.sleep(POLL_SECONDS)
 
 if __name__=='__main__':

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd /home/deploy/venture-lab
+[ -f secrets/admin.env ] || { echo 'Run: python3 scripts/admin_bootstrap.py'; exit 1; }
+chmod 600 secrets/admin.env
+docker compose up -d --build admin gateway
+echo 'Open: https://colony.cobaltindustrial.tech/admin'

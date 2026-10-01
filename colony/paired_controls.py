@@ -18,7 +18,7 @@ async def collect():
  async with connection() as c:
   await ensure(c)
   rows=await c.fetch('''SELECT c.id candidate_id,c.mint,c.created_at observed_at,c.features,
-    (SELECT o.net_return_pct FROM research_outcomes o WHERE o.candidate_id=c.id ORDER BY abs(o.horizon_minutes-60),o.horizon_minutes LIMIT 1) ret
+    (SELECT o.net_return_pct FROM research_outcomes o WHERE o.candidate_id=c.id AND o.horizon_minutes=60 LIMIT 1) ret
     FROM research_candidates c WHERE c.id>$1 ORDER BY c.id''',START)
   touched=0
   for r in rows:

@@ -27,9 +27,15 @@ def learn(finalists,summary,campaign):
         b=e["beliefs"].setdefault(sig,{"confidence":0.0,"evidence":0});b["confidence"]=min(1,.92*b["confidence"]+.12);b["evidence"]+=len(xs)
     e["journal"].append({"campaign":campaign,"at":now,"tested":summary.get("tested"),"finalists":len(finalists),"niches":len(groups)})
     e["journal"]=e["journal"][-100:]
-    # Graveyard means repeatedly explored but weak breeding-visible niches; reversible, never deleted.
-    for sig,n in e["niches"].items():
-        if n["campaigns"]>=3 and n["score_ema"]<=0: e["graveyard"][sig]={"reason":"repeated weak train/validation fitness","at":now,"revisitable":True}
+    # Graveyard is fed by explicitly failed breeding-visible niches, not just finalists.
+    failures=e.setdefault('failures',{})
+    for item in summary.get('weak_niches',[]):
+        sig=item.get('signature'); cnt=int(item.get('count',0) or 0)
+        if not sig: continue
+        z=failures.setdefault(sig,{'campaigns':0,'count':0,'last_seen':0})
+        z['campaigns']+=1; z['count']+=cnt; z['last_seen']=now
+        if z['campaigns']>=2 and z['count']>=20:
+            e['graveyard'][sig]={"reason":"repeated breeding-visible failure","at":now,"revisitable":True,"campaigns":z['campaigns'],"count":z['count']}
     e["opportunity_map"]={"underexplored_sensors":summary.get("underexplored_sensors",[]),"updated":now}
     save(e);return e
 

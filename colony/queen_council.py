@@ -4,6 +4,7 @@ Only information available at observation time is exposed. Spartan/holdout outco
 """
 from __future__ import annotations
 import bisect, math, statistics
+from datetime import timedelta
 from collections import defaultdict
 
 
@@ -61,7 +62,10 @@ async def enrich_historical_context(conn, rows: list[dict]) -> int:
     for r in rows:
         f=r.get('flat',{}); arr=bank.get(str(f.get('pair_address')))
         if not arr: continue
-        ts=r.get('created_at'); times=[x[0] for x in arr]; i=bisect.bisect_right(times,ts)-1
+        ts=r.get('created_at'); times=[x[0] for x in arr]
+        # Hourly bars are timestamped at candle start; only use bars fully closed before observation.
+        cutoff=ts-timedelta(hours=1)
+        i=bisect.bisect_right(times,cutoff)-1
         if i<0: continue
         recent=arr[max(0,i-167):i+1]; c=arr[i][1]
         f['hist_context_available']=1.0; enriched+=1

@@ -30,7 +30,7 @@ async def snapshot():
           count(DISTINCT e.mint) evidence_n,avg(o.net_return_pct) mean_return_pct
           FROM colony_queen_scouts s LEFT JOIN colony_queen_scout_entries e ON e.scout_id=s.id
           LEFT JOIN LATERAL (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id
-            AND measured_at>=e.observed_at ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+            AND measured_at>=e.observed_at AND horizon_minutes=e.hold_minutes LIMIT 1) o ON true
           GROUP BY s.id ORDER BY s.id''') if await c.fetchval("SELECT to_regclass('public.colony_queen_scouts') IS NOT NULL") else []
     nursery=defaultdict(list)
     for s in scouts:
@@ -70,6 +70,8 @@ async def snapshot():
     justified=sum(x['justified_worker_capacity'] for x in families)
     return {'mode':'shadow_only','organism_model':'eusocial_v1','population_fixed':False,
             'worker_rule':'workers gather evidence; bloodlines earn reproduction; Queen proposes brood',
+            'survival_doctrine':'survival_through_variation',
+            'variation_rule':'avoid monoculture; preserve independently evidenced bloodlines and niches without subsidising weak workers',
             'min_worker_evidence':MIN_WORKER_EVIDENCE,'max_workers_per_bloodline':MAX_WORKERS_PER_BLOODLINE,
             'max_nursery_per_bloodline':MAX_NURSERY_PER_BLOODLINE,
             'global_soft_carrying_capacity':GLOBAL_SOFT_CARRYING_CAPACITY,

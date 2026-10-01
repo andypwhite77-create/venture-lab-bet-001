@@ -2,6 +2,7 @@
 import asyncio,json,logging
 from db import init_db,connection
 from colony.historical_nursery import FAMILIES,run_family
+from colony.exhaustion_evolve import run as run_exhaustion
 from colony.surrogate_breeder import run_all as guided_all
 from colony.pattern_discovery import discover
 from colony.continuous_evolution import seed_queue_from_latest_nursery
@@ -25,6 +26,8 @@ async def cycle():
    await c.execute('''INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary)
     VALUES($1,$2,$3,$4::jsonb,$5::jsonb)''',fam,r['tested'],r['rows'],json.dumps(finalists),json.dumps(r,default=str))
    summaries.append({k:v for k,v in r.items() if k!='best'})
+  exhaustion_summary,_=await run_exhaustion(c,50000)
+  summaries.append(exhaustion_summary)
   guided=await guided_all(c)
   patterns=await discover(c,30)
   for x in patterns['top']:

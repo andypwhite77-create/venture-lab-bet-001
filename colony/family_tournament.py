@@ -12,7 +12,7 @@ from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured
 ROOT=Path(__file__).resolve().parent
 DEFAULT_SEED=28092026
 STAGES=[(100,20,60),(60,35,30),(30,40,15),(15,50,5),(5,25,5)]
-FAMILIES=("momentum","order_flow","exhaustion")
+FAMILIES=("momentum","order_flow")
 
 def founder(family):
     founders=json.load(open(ROOT/'control-founders.json'))
@@ -89,8 +89,7 @@ async def metrics(conn,run_id,since=None):
     clause=' AND e.observed_at >= $2' if since else ''; args=[run_id]+([since] if since else [])
     rows=await conn.fetch(f'''SELECT e.genome_id,e.mint,o.net_return_pct FROM family_tournament_entries e
       JOIN research_outcomes o ON o.candidate_id=e.candidate_id WHERE e.run_id=$1 {clause}
-      AND o.horizon_minutes=(SELECT horizon_minutes FROM research_outcomes WHERE candidate_id=e.candidate_id
-        ORDER BY abs(horizon_minutes-e.hold_minutes),horizon_minutes LIMIT 1)
+      AND o.horizon_minutes=e.hold_minutes
       ORDER BY e.genome_id,e.observed_at''',*args)
     grouped={}
     for r in rows:grouped.setdefault(r['genome_id'],[]).append((r['mint'],float(r['net_return_pct'])))

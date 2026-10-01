@@ -149,10 +149,10 @@ def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
     rows=''.join(_trade_row(x,True) for x in n.get('trades',[]));ext=''.join(_trade_row(x,False) for x in j['external'].get('trades',[]))
 
     if selected_family in {'all','reversal'}:
-        mind=''.join(f"<div class='feed-item'><div><b>{escape(str(x.get('status')))}</b><span class=feed-time>{escape(str(x.get('observed_at','')))[:19]}</span></div><small>{escape(str(x.get('core')))[:260]}</small></div>" for x in j.get('mind',[])) or "<div class=empty>Reversal Queen is quiet</div>"
+        mind=''.join(f"<div class='feed-item'><div><b>{escape(str(x.get('status')))}</b><span class=feed-time>{escape(str(x.get('observed_at','')))[:19]}</span></div><small>{escape(str(x.get('core')))[:260]}</small></div>" for x in j.get('mind',[])) or "<div class=empty>Reversal colony telemetry is quiet</div>"
     else:
         rr=next((x for x in roster if x.get('family')==selected_family),{})
-        mind=f"<div class='gate compact'><b>{escape(_label(selected_family))} Queen</b><div class='authority'><span>Active <b>{rr.get('active',0)}</b></span><span>Elite <b>{rr.get('elites',0)}</b></span><span>Queued <b>{rr.get('challengers',0)}</b></span></div><small>Isolated evolutionary governor. Shares market evidence with the swarm but does not write into Reversal Queen memory or reasoning.</small></div>"
+        mind=f"<div class='gate compact'><b>{escape(_label(selected_family))} colony</b><div class='authority'><span>Active <b>{rr.get('active',0)}</b></span><span>Elite <b>{rr.get('elites',0)}</b></span><span>Queued <b>{rr.get('challengers',0)}</b></span></div><small>Specialist ant colony. Its frozen ants gather prospective evidence; successful careers can now seed descendants through the Breeding Queen without rewriting deployed genomes.</small></div>"
 
     if selected_family=='all':
         sq=j.get('swarm_queen') or {}; sb=sq.get('briefing') or {}
@@ -171,7 +171,9 @@ def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
     events=''.join(f"<div class='feed-item'><b>{escape(str(x.get('event_type')))}</b></div>" for x in j.get('events',[])) or '<div class=empty>None</div>'
     cs=j.get('capital_shadow') or {};fc=cs.get('family_counts') or {};famcounts=' • '.join(f"{escape(_label(k))}: {v}" for k,v in sorted(fc.items())) or '—'
     rost=''.join(f"<tr><td>{r.get('rank')}</td><td>{escape(_label(r.get('family')))}</td><td><code>{escape(str(r.get('genome_id')))[:12]}…</code></td><td>{_f(r.get('fitness'),3)}</td><td>{r.get('evidence_n')}</td><td>{escape(str(r.get('slot_source')))}</td></tr>" for r in cs.get('roster',[]))
-    capital=f"<div class='submetrics'><div><span>Shadow slots</span><b>{cs.get('active_slots',0)}</b></div><div><span>Earned slots</span><b>{cs.get('earned_slots',0)}</b></div><div><span>Growth reserve</span><b>£{_f(cs.get('growth_reserve_gbp'),2)}</b></div><div><span>Locked profit</span><b>£{_f(cs.get('locked_profit_gbp'),2)}</b></div></div><p class=muted>{famcounts}</p><div class=scroll><table><thead><tr><th>#</th><th>Family</th><th>Genome</th><th>Fitness</th><th>Evidence</th><th>Slot</th></tr></thead><tbody>{rost}</tbody></table></div>"
+    risk=escape(str(cs.get('monoculture_risk','—')).upper())
+    variation=f"<div class='gate compact'><b>Survival through variation</b><div class='authority'><span>Distinct families <b>{cs.get('distinct_families',0)}</b></span><span>Largest family <b>{_f(float(cs.get('largest_family_fraction') or 0)*100,1)}%</b></span><span>Concentration HHI <b>{_f(cs.get('concentration_hhi'),3)}</b></span><span>Monoculture risk <b>{risk}</b></span></div><small>Resource production should survive regime change. Diversity is earned: weak bloodlines are not subsidised merely to make the portfolio look balanced.</small></div>"
+    capital=f"<div class='submetrics'><div><span>Shadow slots</span><b>{cs.get('active_slots',0)}</b></div><div><span>Earned slots</span><b>{cs.get('earned_slots',0)}</b></div><div><span>Growth reserve</span><b>£{_f(cs.get('growth_reserve_gbp'),2)}</b></div><div><span>Locked profit</span><b>£{_f(cs.get('locked_profit_gbp'),2)}</b></div></div>{variation}<p class=muted>{famcounts}</p><div class=scroll><table><thead><tr><th>#</th><th>Family</th><th>Genome</th><th>Fitness</th><th>Evidence</th><th>Slot</th></tr></thead><tbody>{rost}</tbody></table></div>"
     return cards_html,_chart(curve,rate,chart_period,chart_metric),fam,pop,evo,rows,mind,signals,experiments,events,ext,capital
 
 def _trade_row(x,native):

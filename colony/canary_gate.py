@@ -11,7 +11,7 @@ async def status():
   rows=await c.fetch('''WITH x AS (SELECT e.candidate_id,e.mint,e.observed_at,e.hold_minutes,o.net_return_pct,
     row_number() over(partition by e.mint order by e.observed_at,e.id) rn
     FROM reversal_tournament_entries e JOIN reversal_tournament_ants a ON a.run_id=e.run_id AND a.genome_id=e.genome_id
-    JOIN LATERAL(SELECT net_return_pct FROM research_outcomes o WHERE o.candidate_id=e.candidate_id ORDER BY abs(o.horizon_minutes-e.hold_minutes),o.horizon_minutes LIMIT 1)o ON true
+    JOIN LATERAL(SELECT net_return_pct FROM research_outcomes o WHERE o.candidate_id=e.candidate_id AND o.horizon_minutes=e.hold_minutes LIMIT 1)o ON true
     WHERE a.baseline=true AND a.active=true AND e.candidate_id>$1) SELECT * FROM x WHERE rn=1 ORDER BY observed_at''',CURRENT_CODE_START_ID)
   er=await c.fetchrow("SELECT count(*) total,count(*) FILTER(WHERE execution_reality->>'ok'='true') executable FROM colony_execution_ledger WHERE run_id='colony-native-v3-holdaware' AND coalesce((quote->'attribution'->>'candidate_id')::bigint,0)>$1",CURRENT_CODE_START_ID)
   faults=await c.fetchval("SELECT coalesce((SELECT (auditor->>'fault_count')::int FROM colony_audit_snapshots ORDER BY id DESC LIMIT 1),0)")

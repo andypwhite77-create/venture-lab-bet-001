@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+import json, os, sys, urllib.request, urllib.error, getpass
+
+ROOT='/home/deploy/venture-lab'
+KEYFILE=f'{ROOT}/secrets/reversal_canary_keypair.json'
+EXPECTED='j4nCnM29iyZx9n8oKHXBk8HNJESZb5yaBsA1VkvtkGZ'
+URL='http://127.0.0.1:15888/wallet/add'
+ALPH='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+def b58encode(raw: bytes) -> str:
+    n=int.from_bytes(raw,'big')
+    out=''
+    while n:
+        n,r=divmod(n,58); out=ALPH[r]+out
+    pad=len(raw)-len(raw.lstrip(b'\0'))
+    return ALPH[0]*pad + (out or '')
+
+def die(msg):
+    print(f'\nSTOP: {msg}', file=sys.stderr); sys.exit(1)
+
+print('Reversal £6 canary — wallet authorisation')
+print('This imports the dedicated canary signer into LOCAL Hummingbot Gateway.')
+print('It does NOT enable live trading.\n')
+
+try:
+    st=os.stat(KEYFILE)
+except FileNotFoundError:
+    die(f'protected key file is missing: {KEYFILE}')
+if st.st_mode & 0o077:
+    die(f'key permissions are too open ({oct(st.st_mode & 0o777)}); expected 0o600')
+
+try:
+    vals=json.load(open(KEYFILE))
+    if not isinstance(vals,list) or len(vals)!=64 or any((not isinstance(x,int) or x<0 or x>255) for x in vals):
+        raise ValueError('not a 64-byte Solana secret key')
+    private=b58encode(bytes(vals))
+except Exception as e:
+    die(f'could not read the protected Solana key: {e}')
+
+phrase=input('Type AUTHORIZE CANARY to continue: ').strip()
+if phrase != 'AUTHORIZE CANARY':
+    die('authorisation cancelled')
+
+payload=json.dumps({'chain':'solana','privateKey':private,'setDefault':True}).encode()
+# Best effort to remove our reference promptly; Python cannot guarantee memory zeroisation.
+private=None; vals=None
+api_key = None
+for line in open(f'{ROOT}/.env'):
+    if line.startswith('HUMMINGBOT_GATEWAY_API_KEY='):
+        api_key = line.split('=',1)[1].strip().strip('"').strip("'")
+        break
+
+if not api_key:
+    die('Gateway API key is missing from .env')
+
+req=urllib.request.Request(
+    URL,
+    data=payload,
+    headers={
+        'Content-Type':'application/json',
+        'Authorization':f'Bearer {api_key}'
+    },
+    method='POST'
+)
+try:
+    with urllib.request.urlopen(req,timeout=30) as r:
+        body=json.loads(r.read().decode())
+except urllib.error.HTTPError as e:
+    detail='redacted'
+    die(f'Gateway rejected the import (HTTP {e.code}): {detail}')
+except Exception as e:
+    die(f'could not reach local Gateway: {type(e).__name__}')
+
+addr=body.get('address')
+if addr != EXPECTED:
+    die(f'Gateway returned unexpected address {addr!r}; expected {EXPECTED}. Live remains OFF.')
+
+print('\nAUTHORISED OK')
+print('Public wallet:', addr)
+print('Gateway signer: imported and set as Solana default')
+print('Live trading:   STILL OFF')
+print('\nNext: run ./scripts/canary-status')

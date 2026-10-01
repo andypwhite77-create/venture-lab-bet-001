@@ -28,22 +28,35 @@ def cvar(values,q=.10):
     if not values:return -1.0
     s=sorted(values); n=max(1,math.ceil(len(s)*q))
     return sum(s[:n])/n
-def stress_returns(raw_returns, base_friction, trials=500, seed='spartan-v2'):
-    """Monte Carlo execution torture. raw_returns are pre-friction decimal returns."""
+def stress_returns(raw_returns, base_friction, trials=500, seed='spartan-v2', baseline_proportional=.008):
+    """Monte Carlo execution torture.
+
+    raw_returns are already net of the normal proportional research friction
+    (currently 80 bps). We therefore add only the *incremental* proportional
+    cost above 1x, plus fixed network cost and stochastic latency/slippage.
+    """
     rng=random.Random(seed); paths=[]; dds=[]
     multipliers=(1.0,1.0,1.0,1.5,1.5,2.0,2.0,3.0)
     for _ in range(trials):
         path=[]
         for r in raw_returns:
             mult=rng.choice(multipliers)
-            latency_drag=max(0.0,rng.gauss(base_friction*.25,base_friction*.20))
-            slippage=max(0.0,rng.gauss(base_friction*.20,base_friction*.20))
-            path.append(r-(base_friction*mult)-latency_drag-slippage)
-        paths.append(sum(path)); dds.append(max_drawdown(path))
+            incremental_prop=baseline_proportional*max(0.0,mult-1.0)
+            stress_scale=base_friction+baseline_proportional
+            latency_drag=max(0.0,rng.gauss(stress_scale*.08,stress_scale*.06))
+            slippage=max(0.0,rng.gauss(stress_scale*.08,stress_scale*.06))
+            path.append(r-(base_friction*mult)-incremental_prop-latency_drag-slippage)
+        equity=1.0
+        for r in path: equity*=max(0.0,1.0+r)
+        paths.append(equity-1.0); dds.append(max_drawdown(path))
     ordered=sorted(paths)
+    def compounded(mult):
+        eq=1.0
+        for r in raw_returns:eq*=max(0.0,1.0+r-base_friction*mult-baseline_proportional*max(0.0,mult-1.0))
+        return eq-1.0
     return StressResult(statistics.mean(paths),ordered[max(0,int(.05*len(ordered))-1)],
         cvar(paths,.10),sum(d<=.15 for d in dds)/len(dds),max(dds),
-        min((m for m in (1,1.5,2,2.5,3) if sum(r-base_friction*m for r in raw_returns)<=0),default=3.5))
+        min((m for m in (1,1.5,2,2.5,3) if compounded(m)<=0),default=3.5))
 
 
 def opportunity_efficiency(taken_returns,rejected_returns):

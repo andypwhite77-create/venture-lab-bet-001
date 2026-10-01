@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd /home/deploy/venture-lab
+docker compose run --rm --no-deps canary-executor python -m colony.canary_executor status
+docker compose ps --all canary-executor hummingbot-gateway canary-controller

@@ -176,7 +176,7 @@ async def metrics(conn, run_id: str, since=None) -> dict[str,dict]:
       FROM reversal_tournament_entries e
       JOIN research_outcomes o ON o.candidate_id=e.candidate_id
       WHERE e.run_id=$1 {clause} AND o.horizon_minutes=(SELECT horizon_minutes FROM research_outcomes
-        WHERE candidate_id=e.candidate_id ORDER BY abs(horizon_minutes-e.hold_minutes),horizon_minutes LIMIT 1)
+        WHERE candidate_id=e.candidate_id AND horizon_minutes=e.hold_minutes LIMIT 1)
       ORDER BY e.genome_id,e.observed_at""",*args)
     grouped={}
     for r in rows: grouped.setdefault(r["genome_id"],[]).append((r["mint"],float(r["net_return_pct"])))

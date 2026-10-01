@@ -1,11 +1,19 @@
 """Persistent Queen research memory. Contains only breeding-visible evidence."""
 import json,os,collections,math
+from colony.queen_experience import load_experience
 PATH='/data/queen_memory.json'
 
 def load_memory():
-    if not os.path.exists(PATH): return {'campaigns':0,'feature_stats':{},'species':{},'lessons':[]}
-    try: return json.load(open(PATH))
-    except Exception: return {'campaigns':0,'feature_stats':{},'species':{},'lessons':[]}
+    base={'campaigns':0,'feature_stats':{},'species':{},'lessons':[]}
+    if os.path.exists(PATH):
+        try: base.update(json.load(open(PATH)))
+        except Exception: pass
+    exp=load_experience()
+    base['prospective_preferred_features']=exp.get('preferred_features',[])
+    base['prospective_parent_templates']=exp.get('parent_templates',[])
+    base['prospective_experience_mints']=exp.get('experienced_mints',[])
+    base['prospective_experience_summary']={k:exp.get(k) for k in ('updated_at','observations','career_count','eligible_careers')}
+    return base
 
 def save_memory(m):
     os.makedirs(os.path.dirname(PATH),exist_ok=True)

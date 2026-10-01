@@ -46,5 +46,5 @@ async def guided_family(conn,family,n=5000):
 
 async def run_all(conn):
  out=[]
- for fam in ('reversal','momentum','order_flow','wallet_convergence'):out.append(await guided_family(conn,fam))
+ for fam in ('reversal','momentum','order_flow'):out.append(await guided_family(conn,fam))
  return out

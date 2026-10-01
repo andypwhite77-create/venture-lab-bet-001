@@ -1,5 +1,9 @@
 colony.cobaltindustrial.tech {
     encode zstd gzip
+    @admin path /admin*
+    handle @admin {
+        reverse_proxy admin:8001
+    }
     @allowed path /dashboard /colony/live
     handle @allowed {
         reverse_proxy app:8000

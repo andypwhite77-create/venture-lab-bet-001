@@ -2,7 +2,7 @@
 Historical evidence is discovery only; it never counts as prospective proof or live authority.
 """
 from __future__ import annotations
-import copy, json, math, random, statistics
+import copy, json, math, random, statistics, hashlib
 from collections import defaultdict
 from pathlib import Path
 from colony.evaluator import matches
@@ -13,7 +13,7 @@ from colony.selection import ant_metrics
 from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured_roundtrip_network_fee_sol,sol_gbp_rate
 
 ROOT=Path(__file__).resolve().parent
-FAMILIES=('reversal','momentum','order_flow','exhaustion')
+FAMILIES=('reversal','momentum','order_flow')
 SEED=28092026
 
 def founders(): return {g['family']:g for g in json.load(open(ROOT/'control-founders.json'))}
@@ -50,23 +50,47 @@ def score(vals,stake_gbp=TARGET_STAKE_GBP,fixed_cost_gbp=0.0):
  break_even=(fixed_cost_gbp/(mean_positive/100.0)) if fixed_cost_gbp>0 and mean_positive>0 else (0.0 if mean_positive>0 else None)
  return {**m,'outlier':outlier,'nursery_score':s,'paper_stake_gbp':stake_gbp,'fixed_cost_gbp':fixed_cost_gbp,'avg_net_gbp':avg_net_gbp,'break_even_stake_gbp':break_even}
 
-def evaluate(genome,rows,stake_gbp=TARGET_STAKE_GBP,fixed_cost_gbp=0.0):
- bymint={}
+def raw_exact_return_pct(genome, returns):
  hold=int(genome.get('parameters',{}).get('hold_minutes',15))
+ v=returns.get(hold)
+ return float(v) if v is not None else None
+
+def sampled_path_return_pct(genome, returns):
+ """Exact hold outcome with conservative sampled-path risk handling.
+
+ No nearest-horizon substitution. A sampled stop breach exits at the observed
+ breached return (gap risk is not magically filled at the stop threshold). A
+ sampled take-profit breach is capped at the target. Between samples, no path is
+ invented.
+ """
+ hold=int(genome.get('parameters',{}).get('hold_minutes',15))
+ if hold not in returns:return None
+ prm=genome.get('parameters',{}); sl=prm.get('stop_loss_pct'); tp=prm.get('take_profit_pct')
+ for h in sorted(int(x) for x in returns if int(x)<=hold):
+  r=float(returns[h])
+  if sl is not None and r<=float(sl): return r
+  if tp is not None and r>=float(tp): return float(tp)
+ return float(returns[hold])
+
+def evaluate(genome,rows,stake_gbp=TARGET_STAKE_GBP,fixed_cost_gbp=0.0):
+ bymint={}; meta={}
  for r in rows:
   if matches(genome,r['flat']):
-   ret=r['returns'].get(hold)
-   if ret is None and r['returns']:
-    h=min(r['returns'],key=lambda x:abs(x-hold)); ret=r['returns'][h]
-   if ret is not None:
-    ret=float(ret)
-    # Conservative endpoint approximation for evolved risk management. Until path-level
-    # candles exist, never award a TP/SL that the observed endpoint did not cross.
-    sl=genome.get('parameters',{}).get('stop_loss_pct'); tp=genome.get('parameters',{}).get('take_profit_pct')
-    if sl is not None and ret <= float(sl): ret=float(sl)
-    if tp is not None and ret >= float(tp): ret=float(tp)
-    bymint.setdefault(r['mint'],ret)
- return score(list(bymint.items()),stake_gbp,fixed_cost_gbp)
+   ret=sampled_path_return_pct(genome,r['returns'])
+   if ret is not None and r['mint'] not in bymint:
+    bymint[r['mint']]=ret
+    f=r.get('flat',{})
+    try: age=float(f.get('pair_age_hours',0) or 0)
+    except: age=0.0
+    try: liq=float(f.get('liquidity_usd',0) or 0)
+    except: liq=0.0
+    meta[r['mint']]={'low_age':age<6,'low_liquidity':liq<25000}
+ out=score(list(bymint.items()),stake_gbp,fixed_cost_gbp)
+ n=max(1,len(meta))
+ out['low_age_fraction']=sum(1 for x in meta.values() if x['low_age'])/n
+ out['low_liquidity_fraction']=sum(1 for x in meta.values() if x['low_liquidity'])/n
+ out['event_signature']=hashlib.sha1('|'.join(sorted(bymint)).encode()).hexdigest()[:16] if bymint else 'none'
+ return out
 
 def split_rows(rows):
  # Entity-isolated chronological split: a mint belongs to exactly one partition.
@@ -85,6 +109,7 @@ def robust_score(parts):
  # reward survival across all time segments; weakest segment dominates
  train,val,hold=parts
  if train.get('n',0)<8 or val.get('n',0)<5:return -999.0
+ if float(train.get('avg_net_gbp',-1e9))<=0 or float(val.get('avg_net_gbp',-1e9))<=0:return -999.0
  # Holdout is deliberately excluded from selection fitness. It remains an untouched diagnostic.
  return .40*train['nursery_score']+.60*val['nursery_score'] + min(train['nursery_score'],val['nursery_score'])*.35
 

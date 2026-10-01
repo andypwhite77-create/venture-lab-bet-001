@@ -1,0 +1,3 @@
+FROM hummingbot/gateway@sha256:e64b8239be81644190aaedeba14b7a04f7c5c2acdc07894e00e5f733183dbecd
+# Preserve Jupiter's existing raw quote in the unified response; signing is unchanged.
+RUN node -e 'const fs=require("fs");const p="/home/gateway/dist/schemas/chain-schema.js";let s=fs.readFileSync(p,"utf8");const marker="quoteId: typebox_1.Type.String({";if(s.split(marker).length!==2)throw Error("schema changed");s=s.replace(marker,"quoteResponse: typebox_1.Type.Optional(typebox_1.Type.Any()),\n            "+marker);fs.writeFileSync(p,s)'

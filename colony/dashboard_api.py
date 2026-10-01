@@ -31,7 +31,7 @@ async def _run(conn,run_id):
  for x in curve:
   d=dict(x); q=d.pop('quote') or {}; q=json.loads(q) if isinstance(q,str) else q; d['family']=(q.get('attribution') or {}).get('family'); curve_out.append(d)
  return {'run_id':run_id,'summary':dict(summ),'trades':out,'curve':curve_out}
-async def snapshot():
+async def _snapshot_fresh():
  async with connection() as c:
   external=await _run(c,'paper-livequote-v1');native=await _run(c,['colony-native-v3-holdaware'])
   signals=await c.fetch('''SELECT id,created_at,mint,direction,confidence,reference_price FROM signal_events ORDER BY id DESC LIMIT 30''')
@@ -96,3 +96,32 @@ async def snapshot():
  payload['swarm_queen']=await swarm_queen_latest()
  payload['platform']=await platform_snapshot(rate)
  return payload
+
+
+# Stale-while-revalidate cache: the client dashboard should feel instant while
+# research aggregation refreshes independently in the background.
+_cache_payload=None
+_cache_at=0.0
+_cache_lock=asyncio.Lock()
+_refresh_task=None
+
+async def _refresh_cache():
+ global _cache_payload,_cache_at
+ async with _cache_lock:
+  payload=await _snapshot_fresh()
+  _cache_payload=payload; _cache_at=time.time()
+  return payload
+
+async def snapshot():
+ global _refresh_task
+ if _cache_payload is None:
+  return await _refresh_cache()
+ if time.time()-_cache_at>12 and (_refresh_task is None or _refresh_task.done()):
+  _refresh_task=asyncio.create_task(_refresh_cache())
+ return _cache_payload
+
+async def warm_loop():
+ while True:
+  try: await _refresh_cache()
+  except Exception: pass
+  await asyncio.sleep(12)

@@ -1,7 +1,7 @@
 """Swarm Queen: read-only executive intelligence over isolated strategy colonies.
 She monitors, synthesises and recommends; she never trades or rewrites colony genetics.
 """
-import json, os, time, httpx
+import json, os, time, httpx, collections, math
 from db import connection
 
 MODEL=os.getenv('SWARM_QUEEN_MODEL','qwen3:1.7b')
@@ -13,6 +13,94 @@ async def ensure_schema(c):
       id BIGSERIAL PRIMARY KEY, observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       model TEXT NOT NULL, status TEXT NOT NULL, briefing JSONB NOT NULL,
       input_snapshot JSONB NOT NULL)''')
+
+def _read_json(path, default=None):
+    try:
+        with open(path) as f:return json.load(f)
+    except Exception:
+        return {} if default is None else default
+
+def _queen_research_snapshot(finalists, summary, previous_finalists=None):
+    groups=collections.Counter(); holds=collections.Counter(); risks=collections.Counter(); sensors=collections.Counter(); combos=collections.Counter(); signatures=set()
+    for x in finalists or []:
+        g=x.get('genome',{}); prm=g.get('parameters',{})
+        key=(x.get('train',{}).get('event_signature'),x.get('validation',{}).get('event_signature'),
+             int(prm.get('hold_minutes',15)),prm.get('stop_loss_pct'),prm.get('take_profit_pct'))
+        rkey=repr(key); groups[rkey]+=1; signatures.add(rkey); holds[str(prm.get('hold_minutes'))]+=1
+        risks[f"{prm.get('stop_loss_pct')}|{prm.get('take_profit_pct')}"]+=1
+        combo=','.join(sorted(g.get('predicates',{}))); combos[combo]+=1
+        for k in g.get('predicates',{}):sensors[k]+=1
+    mem=_read_json('/data/queen_memory.json',{})
+    eco=_read_json('/data/queen_ecology.json',{})
+    exp=_read_json('/data/queen_experience.json',{})
+    total=max(1,sum(groups.values()))
+    shares=[v/total for v in groups.values()]
+    hhi=sum(x*x for x in shares) if shares else 1.0
+    entropy=-sum(x*math.log(x) for x in shares if x>0)
+    norm_entropy=(entropy/math.log(len(shares))) if len(shares)>1 else 0.0
+    effective_species=(1.0/hhi) if hhi>0 else 0.0
+
+    prev=set()
+    for x in previous_finalists or []:
+        g=x.get('genome',{}); prm=g.get('parameters',{})
+        key=(x.get('train',{}).get('event_signature'),x.get('validation',{}).get('event_signature'),
+             int(prm.get('hold_minutes',15)),prm.get('stop_loss_pct'),prm.get('take_profit_pct'))
+        prev.add(repr(key))
+    behaviour_novelty=(len(signatures-prev)/max(1,len(signatures))) if signatures else 0.0
+    grave=set((eco.get('graveyard') or {}).keys())
+    def niche_sig(x):
+        g=x.get('genome',{}); return f"h{g.get('parameters',{}).get('hold_minutes')}:"+','.join(sorted(g.get('predicates',{})))
+    revisits=sum(1 for x in finalists or [] if niche_sig(x) in grave)
+    hist_pref=list(mem.get('preferred_features',[]) or []); career_pref=list(exp.get('preferred_features',[]) or [])
+    pref_union=set(hist_pref)|set(career_pref); pref_inter=set(hist_pref)&set(career_pref)
+    career_history_agreement=(len(pref_inter)/max(1,len(pref_union))) if pref_union else 0.0
+    combo_total=max(1,sum(combos.values())); combo_shares=[v/combo_total for v in combos.values()]
+    combo_hhi=sum(x*x for x in combo_shares) if combo_shares else 1.0
+    return {
+      'tested':summary.get('tested'),'finalists':summary.get('finalists'),
+      'behaviour_groups':len(groups),'largest_behaviour_fraction':max(groups.values(),default=0)/total,
+      'behaviour_hhi':round(hhi,6),'behaviour_entropy':round(norm_entropy,6),'effective_behaviours':round(effective_species,2),
+      'behaviour_novelty_vs_previous':round(behaviour_novelty,4),'sensor_combo_count':len(combos),'sensor_combo_hhi':round(combo_hhi,6),
+      'hold_diversity':len(holds),'risk_control_diversity':len(risks),'graveyard_revisit_fraction':round(revisits/max(1,len(finalists or [])),4),
+      'career_history_feature_agreement':round(career_history_agreement,4),
+      'top_behaviour_group_sizes':sorted(groups.values(),reverse=True)[:8],
+      'holds':dict(holds),'risk_controls':dict(risks),'top_sensors':dict(sensors.most_common(12)),
+      'preferred_features':mem.get('preferred_features',[]),'underexplored_features':mem.get('underexplored_features',[]),
+      'graveyard_niches':list((eco.get('graveyard') or {}).keys())[:20],
+      'career_parent_templates':len(exp.get('parent_templates',[]) or []),
+      'career_preferred_features':exp.get('preferred_features',[]),
+      'current_ecology_plan':summary.get('ecology_plan',{}),'sensor_availability':summary.get('sensor_availability',{}),'active_sensor_count':summary.get('active_sensor_count'),'breeding_regime_coverage':summary.get('breeding_regime_coverage',{}),
+      'weak_niches':summary.get('weak_niches',[])[:12],
+      'note':'breeding-visible evidence only; no holdout or Spartan answers included'}
+
+def _bounded_research_plan(raw, e):
+    # IMPORTANT: this plan feeds breeding, so it is derived ONLY from research-safe
+    # evidence: Queen train/validation ecology plus prospective career evidence whose
+    # mints are quarantined from validation/holdout. The executive LLM may see broader
+    # operational context, but its free-form opinions never become breeding inputs.
+    q=e.get('queen_research') or {}
+    concentration=float(q.get('largest_behaviour_fraction',0) or 0); groups=int(q.get('behaviour_groups',0) or 0)
+    hhi=float(q.get('behaviour_hhi',1) or 1); ent=float(q.get('behaviour_entropy',0) or 0); eff=float(q.get('effective_behaviours',0) or 0)
+    # Diversity pressure uses actual behavioural concentration, not just raw group count.
+    if concentration>.60 or hhi>.30 or eff<5: w,a=.35,.35
+    elif concentration>.35 or hhi>.15 or eff<10: w,a=.30,.30
+    elif groups>=30 and concentration<.20 and ent>.75 and eff>=20: w,a=.22,.28
+    else: w,a=.25,.30
+    exploit=1.0-w-a
+    try:
+        from colony.queen_pattern_recognition import SENSORS
+        allowed=set(SENSORS)
+    except Exception: allowed=set()
+    focus=[]; availability=q.get('sensor_availability') or {}
+    for k in list(q.get('underexplored_features',[]) or [])+list(q.get('career_preferred_features',[]) or [])+list(q.get('preferred_features',[]) or []):
+        if k in allowed and float(availability.get(k,1.0) or 0)>=.10 and k not in focus:focus.append(k)
+        if len(focus)>=8:break
+    avoid=list(q.get('graveyard_niches',[]) or [])[:8]
+    return {'exploit':round(exploit,4),'adjacent_explore':round(a,4),'wild_scouts':round(w,4),
+            'focus_sensors':focus,'avoid_niches':avoid,'largest_behaviour_fraction':round(concentration,4),
+            'behaviour_groups':groups,'behaviour_hhi':round(hhi,4),'behaviour_entropy':round(ent,4),
+            'effective_behaviours':round(eff,2),'authority':'research_allocation_only',
+            'source':'research_safe_swarm_ecology'}
 
 async def evidence(c):
     roster=[]
@@ -26,29 +114,61 @@ async def evidence(c):
     perf=[dict(x) for x in await c.fetch('''SELECT quote->'attribution'->>'family' family,count(*) trades,count(*) FILTER(WHERE net_pnl>0) wins,coalesce(sum(net_pnl),0) net,avg(net_pnl) FILTER(WHERE net_pnl IS NOT NULL) avg_net FROM colony_execution_ledger WHERE run_id='colony-native-v3-holdaware' AND quote->'attribution'->>'family' IN ('reversal','exhaustion','momentum','order_flow') GROUP BY 1''')]
     queue=[dict(x) for x in await c.fetch("SELECT family,count(*) waiting,max(historical_score) best FROM evolution_candidate_queue WHERE status='ready' GROUP BY family")]
     providers=[dict(x) for x in await c.fetch("SELECT DISTINCT ON(provider) provider,ok,error,observed_at FROM colony_provider_health ORDER BY provider,observed_at DESC")]
-    recent=[dict(x) for x in await c.fetch("SELECT event_type,payload,created_at FROM colony_events ORDER BY id DESC LIMIT 12")]
-    return {'roster':roster,'performance':perf,'challenger_queue':queue,'providers':providers,'recent_events':recent,
+    recent=[dict(x) for x in await c.fetch("SELECT event_type,payload,created_at FROM colony_events ORDER BY id DESC LIMIT 6")]
+    qrecs=await c.fetch("SELECT finalists,summary,created_at FROM historical_nursery_runs WHERE family='queen_pattern' ORDER BY created_at DESC LIMIT 2")
+    queen_research={}
+    epoch=float((_read_json('/data/queen_semantic_epoch.json',{}) or {}).get('started_at',0) or 0)
+    if qrecs and (not epoch or qrecs[0]['created_at'].timestamp()>=epoch):
+        qrec=qrecs[0]; fs=qrec['finalists']; sm=qrec['summary']
+        fs=json.loads(fs) if isinstance(fs,str) else list(fs or [])
+        sm=json.loads(sm) if isinstance(sm,str) else dict(sm or {})
+        prev=[]
+        if len(qrecs)>1:
+            pf=qrecs[1]['finalists']; prev=json.loads(pf) if isinstance(pf,str) else list(pf or [])
+        queen_research=_queen_research_snapshot(fs,sm,prev)
+    return {'queen_research':queen_research,'performance':perf,'roster':roster,'challenger_queue':queue,'providers':providers,'recent_events':recent,
             'constitution':{'authority':'advisory_only','real_money':False,'may_rewrite_genetics':False,'may_relax_evidence_gates':False,
                             'shared_data':True,'isolated_colony_genetics':True,
                             'identity':'colony_mother_and_war_queen','prime_directive':'persist_adapt_dominate_expand',
                             'aggression':'extreme_within_evidence_law','survival_unit':'colony_not_individual_ant'}}
 
 def prompt(e):
-    return '''You are Swarm Queen, executive monitor for active research ecology: Reversal and Exhaustion, with Momentum and Order Flow retained as failed/control hypotheses. Wallet Convergence is shelved negative knowledge, not an active colony. You are Grace's point of contact. Summarise only material evidence. Never infer profit, loss, underperformance, regime deterioration, or edge from roster size/stage alone; those claims require explicit performance fields. A missing control may be intentional and is not itself a fault. Compare colonies, detect system faults, regime deterioration, correlation/corroboration, and recommend where research attention belongs. The scientific constitution is immutable to you: never trade real money, lower/change evidence gates, peek at sealed evidence, redefine failure, or grant yourself deployment authority. You may recommend breeding/culling/resource allocation, but deterministic machinery executes and Spartan remains an external examiner you cannot control. A colony may trade the same mint differently; shared observations are evidence, not genetic leakage. Return compact JSON only with keys status (healthy|warning|critical), summary, material_changes, colony_notes, recommendations. Summary max 45 words. material_changes max 3 short strings. colony_notes max 4 keys with one short sentence each. recommendations max 3 short strings. Evidence: '''+json.dumps(e,default=str,separators=(',',':'))[:4500]
+    compact={k:e.get(k) for k in ('queen_research','performance','roster','challenger_queue','providers','constitution')}
+    return ("You are Swarm Queen, executive ecologist for an evolutionary trading research system. "
+            "Scientific law: never trade, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite individual genomes. "
+            "Doctrine: SURVIVAL THROUGH VARIATION. Detect behavioural monoculture, weak coverage, system faults and useful research directions. "
+            "Return compact JSON with status, summary, material_changes, colony_notes, recommendations. "
+            "Do not invent performance from roster counts. Research allocation is handled separately by deterministic research-safe logic. Evidence: "
+            +json.dumps(compact,default=str,separators=(',',':'))[:2600])
 
-async def wake():
+async def wake(executive_inference=False):
     async with connection() as c:
         await ensure_schema(c); e=await evidence(c)
-    schema={'type':'object','properties':{'status':{'type':'string','enum':['healthy','warning','critical']},'summary':{'type':'string','maxLength':400},'material_changes':{'type':'array','maxItems':3,'items':{'type':'string','maxLength':180}},'colony_notes':{'type':'object'},'recommendations':{'type':'array','maxItems':3,'items':{'type':'string','maxLength':180}}},'required':['status','summary','material_changes','colony_notes','recommendations'],'additionalProperties':False}
-    started=time.time()
-    try:
-        async with httpx.AsyncClient(timeout=240) as h:
-            r=await h.post(OLLAMA,json={'model':MODEL,'prompt':prompt(e),'stream':False,'format':schema,'think':False,'options':{'num_ctx':2048,'num_predict':500,'temperature':0.1}}); r.raise_for_status(); b=json.loads(r.json()['response'])
-        state='ok'
-    except Exception as ex:
-        b={'status':'warning','summary':'Swarm Queen inference unavailable','material_changes':[str(ex)[:180]],'colony_notes':{},'recommendations':['Continue deterministic monitoring; no authority changes.']}; state='inference_error'
+    safe_plan=_bounded_research_plan({},e)
+    b={'status':'healthy','summary':'Research-safe Swarm ecology plan ready.',
+       'material_changes':[],'colony_notes':{},'recommendations':[],'research_plan':safe_plan}
+    # Publish the bounded plan immediately; executive inference must never block breeding support.
     async with connection() as c:
-        await ensure_schema(c); await c.execute("INSERT INTO swarm_queen_journal(model,status,briefing,input_snapshot) VALUES($1,$2,$3::jsonb,$4::jsonb)",MODEL,state,json.dumps(b),json.dumps(e,default=str))
+        await ensure_schema(c)
+        row_id=await c.fetchval("INSERT INTO swarm_queen_journal(model,status,briefing,input_snapshot) VALUES($1,$2,$3::jsonb,$4::jsonb) RETURNING id",
+                                MODEL,'plan_ready',json.dumps(b),json.dumps(e,default=str))
+    started=time.time(); state='plan_ready'
+    if executive_inference:
+        state='ok'
+        try:
+            async with httpx.AsyncClient(timeout=45) as h:
+                r=await h.post(OLLAMA,json={'model':MODEL,'prompt':prompt(e),'stream':False,'format':'json','think':False,
+                                           'options':{'num_ctx':1536,'num_predict':180,'temperature':0.1}})
+                r.raise_for_status(); x=json.loads(r.json()['response'])
+            if isinstance(x,dict):
+                for k in ('status','summary','material_changes','colony_notes','recommendations'):
+                    if k in x:b[k]=x[k]
+        except Exception as ex:
+            state='inference_error'; b['status']='warning'; b['material_changes']=[repr(ex)[:180]]
+            b['recommendations']=(b.get('recommendations') or [])[:2]+['Research-safe deterministic Swarm guidance remains active.']
+    b['research_plan']=safe_plan
+    async with connection() as c:
+        await c.execute("UPDATE swarm_queen_journal SET status=$1,briefing=$2::jsonb WHERE id=$3",state,json.dumps(b),row_id)
     return {'model':MODEL,'seconds':round(time.time()-started,2),'briefing':b}
 
 async def latest():

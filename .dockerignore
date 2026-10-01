@@ -1,0 +1,7 @@
+.git
+.env*
+secrets
+gateway-files
+gateway-certs
+__pycache__
+*.pyc

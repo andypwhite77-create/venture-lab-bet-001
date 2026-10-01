@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd /home/deploy/venture-lab
+docker compose run --rm --no-deps canary-executor python -m colony.canary_executor dry-run
+docker compose up -d --no-deps canary-executor

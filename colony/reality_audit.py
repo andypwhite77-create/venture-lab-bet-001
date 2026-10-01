@@ -11,8 +11,7 @@ async def reversal():
            row_number() over(partition by e.mint order by e.observed_at,e.id) rn
           FROM reversal_tournament_entries e
           JOIN reversal_tournament_ants a ON a.run_id=e.run_id AND a.genome_id=e.genome_id
-          JOIN LATERAL (SELECT net_return_pct FROM research_outcomes o WHERE o.candidate_id=e.candidate_id
-            ORDER BY abs(o.horizon_minutes-e.hold_minutes),o.horizon_minutes LIMIT 1) o ON true
+          JOIN LATERAL (SELECT net_return_pct FROM research_outcomes o WHERE o.candidate_id=e.candidate_id AND o.horizon_minutes=e.hold_minutes LIMIT 1) o ON true
           WHERE a.baseline=true AND a.active=true)
           SELECT * FROM x WHERE rn=1 ORDER BY observed_at''')
         reality=await c.fetchrow('''SELECT count(*) accepted,

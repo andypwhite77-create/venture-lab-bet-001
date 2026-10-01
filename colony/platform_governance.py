@@ -45,7 +45,7 @@ async def economics_snapshot(c, sol_gbp=None):
       'configured':{'vps':MONTHLY_VPS_GBP,'data':MONTHLY_DATA_GBP,'ai':MONTHLY_AI_GBP,'other':MONTHLY_OTHER_GBP}}
 
 async def graduation_snapshot(c):
-    families=('reversal','momentum','order_flow','wallet_convergence'); out=[]
+    families=('reversal','exhaustion','momentum','order_flow','mean_reversion','queen_pattern'); out=[]
     for fam in families:
         prod=await c.fetchval("SELECT count(*) FROM colony_genomes WHERE family=$1 AND status='production'",fam)
         hist=await c.fetchrow("SELECT tested_genomes,jsonb_array_length(finalists) finalists,created_at FROM historical_nursery_runs WHERE family=$1 ORDER BY created_at DESC LIMIT 1",fam)

@@ -33,6 +33,33 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
+  admin:
+    build: .
+    restart: unless-stopped
+    command: ["uvicorn", "admin_app:app", "--host", "0.0.0.0", "--port", "8001"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+      - ./secrets/admin.env
+    environment:
+      DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
+    expose:
+      - "8001"
+    volumes:
+      - queen_state:/run/queen:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/admin/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   app:
     build: .
     restart: unless-stopped
@@ -47,9 +74,9 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
       start_period: 20s
     logging:
@@ -77,6 +104,7 @@ services:
         max-file: "3"
 
   mind:
+    profiles: ["legacy"]
     build: .
     restart: unless-stopped
     network_mode: host
@@ -108,6 +136,9 @@ services:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@127.0.0.1:5432/venturelab
       OLLAMA_URL: http://127.0.0.1:11434/api/generate
       SWARM_QUEEN_MODEL: qwen3:1.7b
+      SWARM_QUEEN_INTERVAL_SECONDS: "300"
+    volumes:
+      - queen_state:/data:ro
     logging:
       options:
         max-size: "10m"
@@ -196,6 +227,9 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
+      QUEEN_EVAL_WORKERS: "2"
+      SWARM_STRATEGIC_EVERY_CAMPAIGNS: "3"
+    cpus: "2.0"
     volumes:
       - queen_state:/data
     logging:
@@ -222,14 +256,45 @@ services:
       CANARY_START_AFTER_CANDIDATE_ID: "2283"
       CANARY_ADDRESS_FILE: /run/canary/reversal_canary_address.txt
     volumes:
-      - ./secrets:/run/canary:ro
+      - ./secrets/reversal_canary_address.txt:/run/canary/reversal_canary_address.txt:ro
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  canary-executor:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    command: ["python", "-m", "colony.canary_executor"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      hummingbot-gateway:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@127.0.0.1:5432/venturelab
+      HUMMINGBOT_GATEWAY_API_KEY: ${HUMMINGBOT_GATEWAY_API_KEY}
+      SOLANA_SECONDARY_RPC_URL: ${SOLANA_SECONDARY_RPC_URL:-https://api.mainnet-beta.solana.com}
+      CANARY_ADDRESS_FILE: /run/canary/reversal_canary_address.txt
+    volumes:
+      - ./secrets/reversal_canary_address.txt:/run/canary/reversal_canary_address.txt:ro
+    healthcheck:
+      test: ["CMD", "python", "-m", "colony.canary_executor", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     logging:
       options:
         max-size: "10m"
         max-file: "3"
 
   hummingbot-gateway:
-    image: hummingbot/gateway:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    image: venture-lab-canary-gateway
     restart: unless-stopped
     ports:
       - "127.0.0.1:15888:15888"

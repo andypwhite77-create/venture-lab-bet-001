@@ -11,7 +11,7 @@ from research_db import due_candidate_outcomes, record_candidate_outcome
 
 log = logging.getLogger("signal-engine.evaluator")
 SIGNAL_HORIZONS_MINUTES = (5, 15, 60, 360, 1440)
-RESEARCH_HORIZONS_MINUTES = (5, 15, 30, 60, 240, 720, 1440)
+RESEARCH_HORIZONS_MINUTES = (5, 10, 15, 30, 45, 60, 240, 720, 1440)
 
 
 async def evaluate_due_signals():

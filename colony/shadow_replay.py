@@ -9,8 +9,7 @@ async def audit_plan(plan_id):
         plan=p['plan'] if isinstance(p['plan'],dict) else json.loads(p['plan'])
         cut=int(p['evidence_cutoff'] or 0); rejected=set(plan.get('replace',[]))
         rows=await conn.fetch("""SELECT e.genome_id,e.mint,o.net_return_pct FROM colony_forward_entries e
-          JOIN LATERAL (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id
-          ORDER BY abs(horizon_minutes-e.hold_minutes) LIMIT 1) o ON true
+          JOIN LATERAL (SELECT net_return_pct FROM research_outcomes WHERE candidate_id=e.candidate_id AND horizon_minutes=e.hold_minutes LIMIT 1) o ON true
           WHERE e.run_id=$1 AND e.candidate_id>$2""",p['run_id'],cut)
         future={}
         for r in rows: future.setdefault(r['genome_id'],{}).setdefault(r['mint'],float(r['net_return_pct']))
