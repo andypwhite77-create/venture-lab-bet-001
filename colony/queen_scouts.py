@@ -1,5 +1,6 @@
 """Queen brood lifecycle: nursery -> paper -> live-ready. No live execution authority."""
 import hashlib, json
+from datetime import datetime, timezone
 from db import connection
 from colony.genome import mutate, genome_id, MutationPolicy
 from colony.forward import eligible
@@ -76,6 +77,9 @@ async def ensure_schema():
         await c.execute('''CREATE TABLE IF NOT EXISTS colony_queen_scout_lifecycle(
           id BIGSERIAL PRIMARY KEY,scout_id BIGINT NOT NULL REFERENCES colony_queen_scouts(id),
           from_state TEXT,to_state TEXT NOT NULL,reason TEXT NOT NULL,created_at TIMESTAMPTZ DEFAULT now())''')
+        await c.execute('''CREATE TABLE IF NOT EXISTS colony_candidate_progress(
+          stream_key TEXT PRIMARY KEY,last_candidate_id BIGINT NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now())''')
         # Preserve historical duplicates as research memory but stop spending new evidence on them.
         dupes=await c.fetch('''SELECT phenotype_id,array_agg(id ORDER BY id) ids FROM colony_queen_scouts
           WHERE phenotype_id IS NOT NULL AND state IN ('nursery','paper') GROUP BY phenotype_id HAVING count(*)>1''')
@@ -152,20 +156,30 @@ async def create(experiment_id,run_id,cutoff,parent_ids,max_scouts=2):
             'requested':int(max_scouts or 0),'caps':{'family_nursery':MAX_NURSERY_PER_BLOODLINE,'global_nursery':GLOBAL_NURSERY_CAP,'bloodline_population':50}}
 
 async def process():
-    await ensure_schema(); inserted=0
+    await ensure_schema(); inserted=0; considered=0
     async with connection() as c:
         scouts=await c.fetch("SELECT id,genome,birth_cutoff FROM colony_queen_scouts WHERE state IN ('nursery','paper')")
-        for s in scouts:
-            g=s['genome'] if isinstance(s['genome'],dict) else json.loads(s['genome'])
-            rows=await c.fetch("SELECT id,created_at,mint,features,market FROM research_candidates WHERE id>$1 ORDER BY id",s['birth_cutoff'])
+        for scout in scouts:
+            g=scout['genome'] if isinstance(scout['genome'],dict) else json.loads(scout['genome'])
+            key=f"queen_scout:{scout['id']}"
+            last=await c.fetchval("SELECT last_candidate_id FROM colony_candidate_progress WHERE stream_key=$1",key)
+            if last is None:
+                last=int(scout['birth_cutoff'] or 0)
+                await c.execute("INSERT INTO colony_candidate_progress(stream_key,last_candidate_id) VALUES($1,$2) ON CONFLICT DO NOTHING",key,last)
+            rows=await c.fetch("SELECT id,created_at,mint,features,market FROM research_candidates WHERE id>$1 ORDER BY id",int(last))
+            if not rows: continue
+            prev_rows=await c.fetch("SELECT mint,max(observed_at) prev FROM colony_queen_scout_entries WHERE scout_id=$1 GROUP BY mint",scout['id'])
+            prev_by_mint={r['mint']:r['prev'] for r in prev_rows}
             for row in rows:
-                r=dict(row); prev=await c.fetchval("SELECT max(observed_at) FROM colony_queen_scout_entries WHERE scout_id=$1 AND mint=$2",s['id'],r['mint'])
+                considered+=1; r=dict(row); prev=prev_by_mint.get(r['mint'])
                 if not eligible(g,r,prev): continue
                 hold=int(g.get('parameters',{}).get('hold_minutes',15))
-                x=await c.execute('''INSERT INTO colony_queen_scout_entries(scout_id,mint,candidate_id,observed_at,hold_minutes)
-                  VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING''',s['id'],r['mint'],r['id'],r['created_at'],hold)
-                inserted += int(x.endswith('1'))
-    return {'active_brood':len(scouts),'inserted':inserted}
+                x=await c.execute("""INSERT INTO colony_queen_scout_entries(scout_id,mint,candidate_id,observed_at,hold_minutes)
+                  VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING""",scout['id'],r['mint'],r['id'],r['created_at'],hold)
+                if x.endswith('1'):
+                    inserted+=1; prev_by_mint[r['mint']]=r['created_at']
+            await c.execute("UPDATE colony_candidate_progress SET last_candidate_id=$2,updated_at=now() WHERE stream_key=$1",key,rows[-1]['id'])
+    return {'active_brood':len(scouts),'candidates_considered':considered,'inserted':inserted}
 async def _metrics(c,scout_id,parent_id):
     # One measured observation per mint is treated as one independent child opportunity.
     # Exact same-candidate overlap is reported separately from the parent's whole
@@ -179,15 +193,18 @@ async def _metrics(c,scout_id,parent_id):
     cm=sum(child_vals)/evidence_n if evidence_n else None
     worst=min(child_vals) if child_vals else None
 
-    paired=[]
-    for ce in child_rows:
-        pe=await c.fetchrow('''SELECT observed_at,hold_minutes FROM colony_forward_entries
-          WHERE genome_id=$1 AND candidate_id=$2 ORDER BY observed_at LIMIT 1''',parent_id,ce['candidate_id'])
-        if not pe: continue
-        po=await c.fetchval('''SELECT net_return_pct FROM research_outcomes
-          WHERE candidate_id=$1 AND measured_at>=$2 AND horizon_minutes=$3 LIMIT 1''',
-          ce['candidate_id'],pe['observed_at'],pe['hold_minutes'])
-        if po is not None: paired.append((float(ce['net_return_pct']),float(po)))
+    paired_rows=await c.fetch('''WITH child AS (
+      SELECT DISTINCT ON (e.mint) e.mint,e.candidate_id,e.observed_at,e.hold_minutes,o.net_return_pct child_return
+      FROM colony_queen_scout_entries e JOIN research_outcomes o
+        ON o.candidate_id=e.candidate_id AND o.measured_at>=e.observed_at AND o.horizon_minutes=e.hold_minutes
+      WHERE e.scout_id=$1 ORDER BY e.mint,e.observed_at), parent AS (
+      SELECT DISTINCT ON (candidate_id) candidate_id,observed_at,hold_minutes FROM colony_forward_entries
+      WHERE genome_id=$2 ORDER BY candidate_id,observed_at)
+      SELECT child.child_return,po.net_return_pct parent_return FROM child
+      JOIN parent ON parent.candidate_id=child.candidate_id
+      JOIN research_outcomes po ON po.candidate_id=parent.candidate_id
+        AND po.measured_at>=parent.observed_at AND po.horizon_minutes=parent.hold_minutes''',scout_id,parent_id)
+    paired=[(float(r['child_return']),float(r['parent_return'])) for r in paired_rows]
     pn=len(paired)
     pcm=sum(x for x,_ in paired)/pn if pn else None
     pm=sum(y for _,y in paired)/pn if pn else None
@@ -253,10 +270,14 @@ async def advance_lifecycle():
     await ensure_schema(); changes=[]
     async with connection() as c:
         scouts=await c.fetch("SELECT id,parent_genome_id,genome_id,genome,phenotype_id,state,created_at FROM colony_queen_scouts WHERE state IN ('nursery','paper') ORDER BY id")
+        ref_cache={}
         for s in scouts:
-            m=await _metrics(c,s['id'],s['parent_genome_id']); age_h=(await c.fetchval("SELECT extract(epoch from (now()-$1))/3600",s['created_at'])) or 0
+            m=await _metrics(c,s['id'],s['parent_genome_id'])
+            age_h=max(0.0,(datetime.now(timezone.utc)-s['created_at']).total_seconds()/3600.0)
             g=s['genome'] if isinstance(s['genome'],dict) else json.loads(s['genome'])
-            ref=await _bloodline_reference(c,g.get('family') or 'unknown',s['parent_genome_id'])
+            ref_key=(g.get('family') or 'unknown',s['parent_genome_id'])
+            if ref_key not in ref_cache: ref_cache[ref_key]=await _bloodline_reference(c,*ref_key)
+            ref=ref_cache[ref_key]
             inheritance=_inheritance_decision(m,ref)
             to_state=reason=None
             # Conservative negative-knowledge gate: only archive after enough independent

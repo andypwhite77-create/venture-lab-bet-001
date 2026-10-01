@@ -1,5 +1,5 @@
 """Periodic evolutionary accelerator. Runs only after enough genuinely new mints arrive."""
-import asyncio,json,logging
+import asyncio,json,logging,os
 from db import init_db,connection
 from colony.historical_nursery import FAMILIES,run_family
 from colony.exhaustion_evolve import run as run_exhaustion
@@ -9,6 +9,7 @@ from colony.continuous_evolution import seed_queue_from_latest_nursery
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 MIN_NEW_MINTS=25
 SLEEP_SECONDS=21600
+N_GENOMES=int(os.getenv('ACCELERATOR_N_GENOMES','10000'))
 async def cycle():
  async with connection() as c:
   current=await c.fetchval('''SELECT count(DISTINCT c.mint) FROM research_candidates c
@@ -22,11 +23,11 @@ async def cycle():
   if current-last<MIN_NEW_MINTS:return {'status':'waiting','unique_mints':current,'new_mints':current-last,'needed':MIN_NEW_MINTS}
   summaries=[]
   for fam in FAMILIES:
-   r=await run_family(c,fam,50000,10); finalists=r.pop('finalists')
+   r=await run_family(c,fam,N_GENOMES,10); finalists=r.pop('finalists')
    await c.execute('''INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary)
     VALUES($1,$2,$3,$4::jsonb,$5::jsonb)''',fam,r['tested'],r['rows'],json.dumps(finalists),json.dumps(r,default=str))
    summaries.append({k:v for k,v in r.items() if k!='best'})
-  exhaustion_summary,_=await run_exhaustion(c,50000)
+  exhaustion_summary,_=await run_exhaustion(c,N_GENOMES)
   summaries.append(exhaustion_summary)
   guided=await guided_all(c)
   patterns=await discover(c,30)

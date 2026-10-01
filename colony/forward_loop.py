@@ -1,6 +1,6 @@
-"""Long-running prospective colony logger."""
+"""Long-running prospective colony logger with bounded maintenance cadence."""
 import asyncio, logging
-from db import init_db
+from db import init_db, connection
 from colony.forward_worker import process
 from colony.control_worker import process_controls
 from colony.sensory_worker import process_senses
@@ -15,60 +15,57 @@ from colony.family_tournament import process_all as process_family_tournaments, 
 from colony.continuous_evolution import replenish as replenish_evolution, cull_obvious_failures, enforce_elite_training_only, challenger_turnover, challenger_queue_status, promote_reversal_elite_to_production_pool
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
+FAST_SECONDS=60
+MAINTENANCE_EVERY=5
+LIFECYCLE_EVERY=10
 
 async def main():
-    await init_db()
+    await init_db(); cycle=0
     while True:
+        cycle+=1
         try:
-            result=await process()
-            logging.info('forward_colony %s',result)
-            from db import connection
-            async with connection() as _elite:
-                elite_policy=await enforce_elite_training_only(_elite)
-                elite_fill=await replenish_evolution(_elite)
-            if elite_policy: logging.info('elite_training_policy %s',elite_policy)
-            if elite_fill: logging.info('elite_training_fill %s',elite_fill)
-            async with connection() as _rtc:
-                rt=await process_reversal_tournament(_rtc)
-                rtc=await maybe_cull_reversal(_rtc)
+            result=await process(); logging.info('forward_colony %s',result)
+            async with connection() as c:
+                rt=await process_reversal_tournament(c)
+                ftr=await process_family_tournaments(c)
             logging.info('reversal_tournament %s',rt)
-            logging.info('reversal_tournament_cull %s',rtc)
-            async with connection() as _ftc:
-                ftr=await process_family_tournaments(_ftc)
-                ftc=await maybe_cull_family_tournaments(_ftc)
             logging.info('family_tournaments %s',ftr)
-            logging.info('family_tournament_culls %s',ftc)
-            async with connection() as _cec:
-                early=await cull_obvious_failures(_cec)
-                ce=await replenish_evolution(_cec)
-                challengers=await challenger_turnover(_cec)
-                queue_state=await challenger_queue_status(_cec)
-                production_promotions=await promote_reversal_elite_to_production_pool(_cec,20,5)
-            if early: logging.info('continuous_culls %s',early)
-            if ce: logging.info('continuous_evolution %s',ce)
-            if challengers: logging.info('challenger_turnover %s',challengers)
-            logging.info('challenger_queue %s',queue_state)
-            if production_promotions: logging.info('reversal_production_pool %s',production_promotions)
+
             spep=await process_spep(result.get('run')) if result.get('run') else {}
             logging.info('spep %s',spep)
-            spep_marks=await mark_spep()
-            logging.info('spep_marks %s',spep_marks)
-            controls=await process_controls()
-            logging.info('control_colonies %s',controls)
-            senses=await process_senses()
-            logging.info('sensory_memory %s',senses)
-            observer=await persist_observer()
-            logging.info('observer %s',observer)
-            proposal=await propose()
-            logging.info('proposal_gate %s',proposal)
-            shadow=await shadow_cycle(result.get('run')) if result.get('run') else {}
-            logging.info('shadow_ecology %s',shadow)
-            queen_scouts=await process_queen_scouts()
-            logging.info('queen_scouts %s',queen_scouts)
-            lifecycle=await advance_lifecycle()
-            logging.info('queen_lifecycle %s',lifecycle)
+            logging.info('spep_marks %s',await mark_spep())
+            logging.info('control_colonies %s',await process_controls())
+            logging.info('sensory_memory %s',await process_senses())
+            logging.info('queen_scouts %s',await process_queen_scouts())
+
+            # Expensive ranking/culling/governance work does not need a 60-second cadence.
+            if cycle % MAINTENANCE_EVERY == 1:
+                async with connection() as c:
+                    elite_policy=await enforce_elite_training_only(c)
+                    rtc=await maybe_cull_reversal(c)
+                    ftc=await maybe_cull_family_tournaments(c)
+                    early=await cull_obvious_failures(c)
+                    evolved=await replenish_evolution(c)
+                    challengers=await challenger_turnover(c)
+                    queue_state=await challenger_queue_status(c)
+                    promotions=await promote_reversal_elite_to_production_pool(c,20,5)
+                if elite_policy: logging.info('elite_training_policy %s',elite_policy)
+                logging.info('reversal_tournament_cull %s',rtc)
+                logging.info('family_tournament_culls %s',ftc)
+                if early: logging.info('continuous_culls %s',early)
+                if evolved: logging.info('continuous_evolution %s',evolved)
+                if challengers: logging.info('challenger_turnover %s',challengers)
+                logging.info('challenger_queue %s',queue_state)
+                if promotions: logging.info('reversal_production_pool %s',promotions)
+                logging.info('observer %s',await persist_observer())
+                logging.info('proposal_gate %s',await propose())
+                shadow=await shadow_cycle(result.get('run')) if result.get('run') else {}
+                logging.info('shadow_ecology %s',shadow)
+
+            if cycle % LIFECYCLE_EVERY == 1:
+                logging.info('queen_lifecycle %s',await advance_lifecycle())
         except Exception:
             logging.exception('forward_colony_error')
-        await asyncio.sleep(60)
+        await asyncio.sleep(FAST_SECONDS)
 
 if __name__=='__main__': asyncio.run(main())

@@ -176,6 +176,8 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
+      ACCELERATOR_N_GENOMES: "10000"
+    cpus: "0.5"
     logging:
       options:
         max-size: "10m"
