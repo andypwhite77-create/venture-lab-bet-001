@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 import asyncio
-from db import init_db,connection
+import os
+import sys
+
+# Allow this script to be run directly from /app/scripts inside Compose.
+APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if APP_ROOT not in sys.path:
+    sys.path.insert(0, APP_ROOT)
+
+from db import init_db, connection
 from colony.admin_auth import create_recovery_token
 
 async def main():
     await init_db()
     async with connection() as c:
-        x=await create_recovery_token(c)
+        x = await create_recovery_token(c)
     print('Cobalt Labs admin recovery code')
-    print('Single use. Expires in %s minutes.'%x['ttl_minutes'])
+    print('Single use. Expires in %s minutes.' % x['ttl_minutes'])
     print(x['token'])
 
-if __name__=='__main__':asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())
