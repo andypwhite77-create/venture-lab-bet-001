@@ -63,3 +63,16 @@ Real-money Canary execution remains a separate human-controlled layer and is not
 New challengers can therefore be fast-tracked through the full accumulated corpus immediately. Chronological and forward evidence remain distinct: Arena replay can establish competitiveness quickly, but promotion still requires at least 25 genuinely post-enrollment forward observations across at least three days and must beat the weakest Elite on both Arena and forward scores.
 
 The admin control plane exposes the five Elite incumbents, the top Qualification leaderboard and corpus coverage. It also stores an operator-requested Elite capital mode (`off`, `canary`, `live`). This state is intentionally separate from execution authority: league promotion never grants money access, global live-stop forces the requested mode back to `off`, and `live` remains blocked unless a separate execution bridge is explicitly connected.
+
+
+## Reversal Canary hardening — 2 October 2026
+
+The Reversal Canary is an isolated, human-gated execution path with £1 maximum trade size, £4 wallet floor, >=80% active-Reversal consensus, one-position maximum, fresh Kraken SOL/GBP validation, Jupiter quote validation and fail-closed crash reconciliation. The controller creates intents but owns no broadcast capability; the executor/signer path remains disarmed until the dry-run gate is satisfied and the operator explicitly arms it.
+
+Two late hardening fixes are safety-relevant. First, the controller now excludes already-seen candidate IDs before applying its 50-row query limit; previously it could repeatedly read an old first page and silently miss newer signals. Second, execution sizing is recalculated at fresh SOL/GBP at execution time and may only shrink from the stored intent amount, so FX appreciation cannot turn an originally <=£1 intent into either an accidental oversize or a spurious rejection.
+
+A qualifying dry run must use a genuine future Reversal signal, claim it within the freshness window, validate all limits, acquire and validate a real Jupiter entry quote, persist a simulated open position for the strategy's original hold time, obtain the corresponding exit quote and persist the position closed. Historical/stale ready intents cannot satisfy the arm gate.
+
+### First qualifying end-to-end dry run
+
+On 2 October 2026, candidate 3112 satisfied the live dry-run requirement with 36/36 active Reversal votes. The executor completed the genuine future path using real Jupiter entry/exit quotes and the original five-minute hold, persisted the intent closed, and never broadcast a transaction. After the simulated exit the control latched `problem=dry_run_complete`, `stopped=true`, `armed=false`; the arm-gate query evaluates true. Live trading still requires the operator to run `scripts/canary-arm` explicitly.

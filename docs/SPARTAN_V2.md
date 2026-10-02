@@ -55,3 +55,10 @@ Spartan remains an external examiner. Its exact thresholds and sealed answers ar
 Failed finalists are no longer treated as disposable information. After each completed exam, up to the top three behaviourally distinct performers are copied into a permanent Hall of Fame with exam provenance and metrics. This archive does not convert failure into a pass.
 
 Selected Hall-of-Fame/finalist genomes may seed a quarantined Spartan Alumni paper pool. Alumni ancestry is explicitly exam-contaminated: old exam evidence may nominate genetics, but descendants start with zero prospective proof and must earn fresh forward evidence before any future untouched examination. Cosmetic/genetic duplicates do not receive extra archival slots.
+
+
+## Exact hold-time exploration
+
+Spartan Alumni are not restricted to the evaluator's canonical horizon grid. Active alumni may explore exact hold durations from 3 to 240 minutes. When an eligible alumni entry uses a noncanonical hold, the system registers that candidate/horizon prospectively in `research_outcome_requests`; the forward evaluator measures it when that exact horizon matures. Requests made after the target horizon has already passed are rejected rather than manufacturing retrospective evidence.
+
+A small `hold_probe` lane deliberately varies only `hold_minutes` around a parent while holding entry predicates constant. This separates exit-timing discovery from broader genome mutation. Alumni descendants still begin with zero inherited prospective proof, and ordinary parent-improvement / tail / concentration rules continue to apply once sufficient paired evidence exists.

@@ -4,7 +4,7 @@ Venture Lab Bet 001 is a live-market, **paper/shadow-trading research platform**
 
 It began as a single wallet-convergence experiment and now runs four distinct strategy families against shared blockchain and market data. The system records both trade-grade signals and sub-threshold observations, measures forward returns at fixed horizons, and maintains a common scoreboard so strategies can be compared without changing the rules after the fact.
 
-The project is intentionally research-first. It does **not** contain live-order execution and it refuses to start unless `PAPER_TRADING_ONLY=true`.
+The project is intentionally research-first. The main research application remains paper/shadow-only and refuses to start unless `PAPER_TRADING_ONLY=true`. A separate isolated Reversal Canary execution path exists behind deterministic risk limits, an end-to-end dry-run gate, and an explicit human arm action; research/Queen processes do not receive signer authority.
 
 ## Core objective
 
@@ -38,12 +38,11 @@ See `docs/QUEEN_ARCHITECTURE.md`, `docs/grace-colony-architecture.md`, `docs/gra
 
 The current build has deliberately hard boundaries:
 
-- paper/shadow trading only;
-- no private keys;
-- no exchange credentials;
-- no transaction signing;
+- the main research application is paper/shadow-only;
+- Queen/research services receive no private keys or signer credentials;
+- the isolated Canary signer path is disabled unless explicitly human-armed after a successful genuine future dry run;
 - no leverage or borrowing;
-- no real order submission;
+- £1 Canary max trade, £4 wallet floor, >=80% Reversal consensus, one-position maximum and fail-closed reconciliation;
 - conservative assumed round-trip friction on research trades;
 - RPC credit budgets with hard stops;
 - candidate deduplication/cooldowns;
@@ -74,7 +73,7 @@ Core tables include `rpc_samples`, `wallets`, `observed_transactions`, `signal_e
 Research tables:
 
 - `research_candidates`: all candidate events, including observe and trade tiers, with score, contemporaneous entry price, friction assumption, feature JSON and market JSON.
-- `research_outcomes`: prospective forward performance at 5, 15, 30, 60, 240, 720 and 1,440 minutes.
+- `research_outcomes`: prospective forward performance on the canonical horizon grid plus exact, prospectively requested horizons used by Spartan Alumni hold-time exploration. Bespoke horizons are requested before maturity; historical prices are never fabricated after the fact.
 - `market_snapshots`: market state attached to candidate events.
 - `research_price_path`: minute-by-minute forward price observations for active trade-grade shadow candidates during their first four hours, enabling later stop-loss, take-profit, trailing-exit, maximum favourable excursion and maximum adverse excursion research.
 
@@ -209,7 +208,7 @@ No strategy graduates because of one winner. Evaluate meaningful prospective sam
 
 ## Current status
 
-The platform is live in shadow mode on the VPS. RPC, PostgreSQL, Jupiter sampling, legacy convergence, Bots A-D, candidate logging, prospective pricing, outcome evaluation, price-path sampling and common scoreboards are active. No real-money execution path exists.
+The platform is live in shadow mode on the VPS. RPC, PostgreSQL, Jupiter sampling, legacy convergence, Bots A-D, candidate logging, prospective pricing, outcome evaluation, price-path sampling and common scoreboards are active. A separate bounded Reversal Canary execution path exists but remains human-gated; Elite/Queen status cannot grant transaction authority.
 
 ## Philosophy
 
@@ -261,3 +260,20 @@ A separate `historical-bank` service continuously archives hourly GeckoTerminal 
 
 ### Multi-colony swarm
 The four strategy families now operate as isolated evolutionary colonies over a shared evidence bank. Dashboard tabs expose Swarm, Reversal, Momentum, Order Flow, and Wallet Convergence independently. Each Queen owns only its family's genetics and tournament state; market data can be shared because different strategies may take different decisions on the same mint. Fresh-evidence accelerator sweeps now test 50,000 genomes per family and admit only historically qualified finalists to prospective testing.
+
+
+## 2 October 2026 late hardening and governance update
+
+- Champion/Challenger League added five founding Reversal Elite behaviours, a cumulative append-only Qualification corpus, and an admin Elite control plane. League status and requested capital mode do not grant signer authority.
+- Queen roles were split: the Breeding Queen owns bounded genome creation/evolution, while the Swarm Queen is a research director that can diagnose regimes and allocate research attention but cannot mutate genomes, promote candidates, change Spartan gates, trade, or sign.
+- Breeding Queen precision cadence is 10,000 genomes per wave, two waves per campaign, followed by cooldown/review; quality is preferred over forced throughput.
+- Admin password recovery was added with short-lived single-use recovery tokens, session invalidation, and Safari UI compatibility fixes.
+- Spartan Alumni now retain exact arbitrary hold durations from 3 to 240 minutes. A dedicated hold-probe lane tests timing independently (for example 3/4/6/8/15/30 minutes) and requests exact prospective outcomes dynamically.
+- Dynamic outcome requests are stored in `research_outcome_requests`; SQL parameter typing is explicit to avoid asyncpg ambiguity. No historical outcome is backfilled simply because a new horizon is requested.
+- Canary controller pagination now excludes already-seen intents before applying its page limit, preventing a healthy-looking controller from starving on an old first page.
+- Canary execution sizing is repriced at fresh SOL/GBP FX at execution time and can only shrink from the intent amount, preventing harmless FX movement from tripping or exceeding the £1 cap.
+- Canary dry-run remains mandatory: a genuine future >=80% Reversal intent must be claimed, quoted, simulated through the original hold, exited, and persisted closed before `canary-arm` can succeed.
+
+### Canary dry-run milestone
+
+The first qualifying end-to-end Reversal Canary dry run completed on 2 October 2026. A genuine future 100%-consensus signal was claimed fresh, quoted through Jupiter, simulated for its original five-minute hold, quoted for exit and persisted closed with `broadcast=false`. The arm gate is therefore satisfied, but the Canary remains stopped/disarmed until a human explicitly invokes `scripts/canary-arm`.
