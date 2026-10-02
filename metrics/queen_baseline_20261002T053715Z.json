@@ -1,0 +1,39 @@
+{
+  "purpose": "baseline for measuring progressive Queen/ant improvement toward Spartan graduation",
+  "methodology": "queen-v7-soft-floor-breadth-margin",
+  "completed_campaign_baseline": {
+    "tested": 340000,
+    "finalists": 17,
+    "holdout_positive": 17,
+    "spartan_survivors": 0,
+    "distinct_spartan_survivor_behaviours": 0,
+    "median_train_n": 19,
+    "median_validation_n": 12,
+    "median_train_outlier": 0.22589589335563395,
+    "median_validation_outlier": 0.2888633903387523,
+    "median_predicates": 3,
+    "median_selection_score": -0.4732353911739892,
+    "distinct_finalist_behaviours": 17
+  },
+  "current_spawn_checkpoint": {
+    "wave": 3,
+    "tested": 190000,
+    "eligible": 21656,
+    "best_selection_score": -0.46319994826366384,
+    "fresh_blood_rate": 0.22
+  },
+  "prospective_learning_inputs": {
+    "observations": 1584,
+    "careers": 174,
+    "eligible_careers": 85,
+    "parent_templates": 3,
+    "preferred_features": [
+      "price_change_h1",
+      "price_change_m5",
+      "dex_buy_ratio_m5",
+      "volume_liquidity_m5"
+    ]
+  },
+  "comparison_rule": "Compare later campaigns on Spartan survivors first, then broader train/validation coverage, lower concentration, behavioural diversity, simplicity, forward-career expectancy, and selection score. Do not count cosmetic genotype duplicates as improvement.",
+  "captured_at_utc": "2026-10-02T05:37:15.948806+00:00"
+}
