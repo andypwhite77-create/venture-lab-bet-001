@@ -8,11 +8,13 @@ from colony.evolution_value import ledger
 
 async def cycle(run_id):
     snap=await record(run_id)
-    async with connection() as conn:
-        plans=await conn.fetch("SELECT id FROM colony_shadow_plans WHERE run_id=$1 ORDER BY id",run_id)
+    pid=snap.get('plan_id') if isinstance(snap,dict) else None
+    if not pid:
+        async with connection() as conn:
+            pid=await conn.fetchval("SELECT id FROM colony_shadow_plans WHERE run_id=$1 ORDER BY id DESC LIMIT 1",run_id)
     reports=[]
-    for p in plans:
-        pid=p['id']; bred=await breed_plan(pid); audit=await audit_plan(pid); value=await ledger(pid)
+    if pid:
+        bred=await breed_plan(pid); audit=await audit_plan(pid); value=await ledger(pid)
         reports.append({'plan_id':pid,'bred':bred,'selection_audit':audit,'evolution_value':value})
     shadow=await process_shadow()
     return {'snapshot':snap,'shadow_entries':shadow,'plans':reports}

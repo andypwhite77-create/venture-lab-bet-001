@@ -122,6 +122,8 @@ async def snapshot():
 
 async def warm_loop():
  while True:
-  try: await _refresh_cache()
-  except Exception: pass
+  try:
+   await _refresh_cache()
+  except Exception:
+   logging.exception('dashboard_cache_refresh_failed')
   await asyncio.sleep(12)

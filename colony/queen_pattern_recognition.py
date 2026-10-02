@@ -291,8 +291,9 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
        'positive_total':len(positives),'first_positive_rank':positives[0][0] if positives else None,
        'best_positive':max(positives,key=lambda z:z[1]) if positives else None}
  try:
-  json.dump(diag,open('/data/queen_rank_diagnostic.json','w'),indent=2)
- except Exception: pass
+  with open('/data/queen_rank_diagnostic.json','w') as f: json.dump(diag,f,indent=2)
+ except Exception as e:
+  print(json.dumps({'event':'queen_rank_diagnostic_write_failed','error':type(e).__name__}),flush=True)
  print(json.dumps({'event':'queen_rank_diagnostic',**diag}),flush=True)
  exam_rows,exam_hash=_freeze_exam_rows(splits[2])
  # Research-safe regime coverage telemetry: train+validation only, after finalists are frozen.
