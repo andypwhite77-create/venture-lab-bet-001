@@ -174,8 +174,8 @@ async def request_candidate_outcome(conn, candidate_id: int, horizon_minutes: in
     await conn.execute(
         """
         INSERT INTO research_outcome_requests(candidate_id,horizon_minutes,source)
-        SELECT id,$2,$3 FROM research_candidates
-        WHERE id=$1 AND NOW() < created_at + ($2 * INTERVAL '1 minute')
+        SELECT id,$2::int,$3 FROM research_candidates
+        WHERE id=$1 AND NOW() < created_at + ($2::int * INTERVAL '1 minute')
         ON CONFLICT(candidate_id,horizon_minutes) DO NOTHING
         """,
         candidate_id,horizon,source,
