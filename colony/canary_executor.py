@@ -77,8 +77,13 @@ def limits(row,rate,balance):
         raise ValueError('consensus')
     if not row['hold_minutes'] or not 1<=row['hold_minutes']<=1440: raise ValueError('hold')
     if row['mint']==SOL: raise ValueError('native_mint')
-    amount=positive(row['requested_sol'])
-    if positive(row['requested_gbp'])>1 or amount*rate>1.00000001: raise ValueError('trade_cap')
+    requested_sol=positive(row['requested_sol'])
+    requested_gbp=positive(row['requested_gbp'])
+    if requested_gbp>1.00000001: raise ValueError('trade_cap')
+    # Intent sizing is only an upper bound. Reprice at execution-time FX so a
+    # harmless SOL/GBP move cannot turn a <=£1 intent into a rejected >£1 trade.
+    amount=positive(min(requested_sol, requested_gbp/rate, 1.0/rate))
+    if amount*rate>1.00000001: raise ValueError('trade_cap')
     if (balance-amount-RESERVE_SOL)*rate<4: raise ValueError('wallet_floor')
     return amount
 
