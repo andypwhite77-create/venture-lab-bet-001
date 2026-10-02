@@ -116,6 +116,7 @@ def score_record(returns: list[tuple[str,float]], baseline_map: dict[str,float],
     mean_positive=statistics.fmean(positive_raw) if positive_raw else 0.0
     break_even=(fixed_cost_gbp/(mean_positive/100.0)) if fixed_cost_gbp>0 and mean_positive>0 else (0.0 if mean_positive>0 else None)
     return {**m, "baseline_edge_pct": edge, "baseline_overlap_n": len(shared),
+            "win_rate": (sum(v>0 for v in vals)/len(vals) if vals else 0.0),
             "worst_return_pct": min(vals) if vals else None, "outlier_dependence": outlier,
             "tournament_score": tournament_score, "mints": set(first),"paper_stake_gbp":stake_gbp,
             "fixed_cost_gbp":fixed_cost_gbp,"avg_net_gbp":avg_net_gbp,"break_even_stake_gbp":break_even}
@@ -190,6 +191,10 @@ async def metrics(conn, run_id: str, since=None) -> dict[str,dict]:
 async def maybe_cull(conn) -> dict:
     run=await conn.fetchrow("SELECT * FROM reversal_tournament_runs WHERE status='collecting' ORDER BY created_at DESC LIMIT 1")
     if not run:return {"run":None}
+    config=run.get('config') or {}
+    if isinstance(config,str): config=json.loads(config)
+    if config.get('continuous_reversal_v2'):
+        return {"run":run["run_id"],"mode":"continuous_reversal_v2","culled":0}
     idx=int(run["stage_index"]); stage_size,min_n,target=STAGES[min(idx,len(STAGES)-1)]
     active=await conn.fetch("SELECT genome_id,baseline,cohort FROM reversal_tournament_ants WHERE run_id=$1 AND active=true",run["run_id"])
     # Final-five holdout only counts evidence arriving after the finalists were frozen.

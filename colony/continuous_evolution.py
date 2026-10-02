@@ -223,3 +223,105 @@ async def promote_reversal_elite_to_production_pool(conn, minimum_mints=20, keep
           ON CONFLICT(genome_id) DO UPDATE SET status='production'""",gid,parents,json.dumps(g))
         promoted.append({'genome_id':gid,'n':r.get('n'),'score':r.get('adjusted_score',r.get('tournament_score'))})
     return promoted
+
+async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=3, minimum_parent_mints=20):
+    """Bounded forward-only breeding for the profitable Reversal lineage.
+
+    Parents are selected only from prospective results. Children inherit genomes, never
+    evidence, and must earn their own forward record. Population stays bounded so the
+    Spartan/Queen search remains the primary compute consumer.
+    """
+    import copy, random, time, statistics
+    from colony.genome import mutate, crossover, MutationPolicy, genome_id
+    from colony.reversal_tournament import metrics as reversal_metrics, rank_with_correlation, catastrophic
+    run=await conn.fetchrow("SELECT * FROM reversal_tournament_runs WHERE status='collecting' ORDER BY created_at DESC LIMIT 1")
+    if not run:return {'run':None,'born':0}
+    config=run['config']; config=json.loads(config) if isinstance(config,str) else dict(config or {})
+    if not config.get('continuous_reversal_v2'):return {'run':run['run_id'],'enabled':False,'born':0}
+    await conn.execute('''CREATE TABLE IF NOT EXISTS reversal_evolution_log(
+      id BIGSERIAL PRIMARY KEY,run_id TEXT NOT NULL,generation INT NOT NULL,observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      active_ants INT NOT NULL,born INT NOT NULL DEFAULT 0,culled INT NOT NULL DEFAULT 0,
+      parent_ids JSONB NOT NULL DEFAULT '[]'::jsonb,metrics JSONB NOT NULL DEFAULT '{}'::jsonb)''')
+    for ddl in (
+      "ALTER TABLE reversal_tournament_ants ADD COLUMN IF NOT EXISTS generation INT NOT NULL DEFAULT 0",
+      "ALTER TABLE reversal_tournament_ants ADD COLUMN IF NOT EXISTS parent_ids JSONB NOT NULL DEFAULT '[]'::jsonb",
+      "ALTER TABLE reversal_tournament_ants ADD COLUMN IF NOT EXISTS born_at TIMESTAMPTZ NOT NULL DEFAULT now()"):
+        await conn.execute(ddl)
+    ants=await conn.fetch("SELECT genome_id,genome,baseline,cohort,generation,born_at FROM reversal_tournament_ants WHERE run_id=$1 AND active=true",run['run_id'])
+    recs=await reversal_metrics(conn,run['run_id'])
+    # Cull only after enough fresh proof, and only obvious laggards. Never kill baseline here.
+    losers=[]
+    for a in ants:
+        if a['baseline']:continue
+        r=recs.get(a['genome_id'],{})
+        if r.get('n',0)<20:continue
+        if catastrophic(r) or (r.get('avg_return_pct',0)<0 and r.get('median_return_pct',0)<0 and r.get('baseline_edge_pct',0)<=0):
+            losers.append(a['genome_id'])
+    # Avoid population collapse: at least 20 non-baseline ants survive every maintenance pass.
+    max_cull=max(0,len([a for a in ants if not a['baseline']])-20)
+    losers=losers[:max_cull]
+    if losers:
+        await conn.execute("UPDATE reversal_tournament_ants SET active=false,eliminated_at=now(),elimination_reason='continuous_v2_forward_cull' WHERE run_id=$1 AND genome_id=ANY($2::text[])",run['run_id'],losers)
+    ants=[a for a in ants if a['genome_id'] not in set(losers)]
+    # Parent pool requires real prospective evidence and positive centre-of-distribution.
+    eligible={}
+    amap={a['genome_id']:a for a in ants}
+    for a in ants:
+        if a['baseline']:continue
+        r=recs.get(a['genome_id'],{})
+        if r.get('n',0)<minimum_parent_mints or catastrophic(r):continue
+        # Two parent classes: proven-positive, or exploratory relative improvers whose
+        # typical trade is positive and which beat the baseline but still have tail damage.
+        proven = r.get('avg_return_pct',-999)>0 and r.get('median_return_pct',-999)>=0
+        relative = r.get('median_return_pct',-999)>0 and r.get('baseline_edge_pct',-999)>0 and r.get('catastrophe_rate',1)<.20
+        if not (proven or relative):continue
+        rr=dict(r); rr['parent_class']='proven' if proven else 'relative_tail_repair'
+        eligible[a['genome_id']]=rr
+    ranked=rank_with_correlation(eligible)
+    # Behavioural diversity: keep parents whose opportunity sets aren't near-identical.
+    parents=[]
+    for gid,r in ranked:
+        if all(len(r['mints'] & pr['mints'])/max(1,len(r['mints'] | pr['mints'])) < .92 for _,pr in parents):
+            parents.append((gid,r))
+        if len(parents)>=8:break
+    if not parents: parents=ranked[:4]
+    active_ids={a['genome_id'] for a in ants}; room=max(0,target_population-len(ants)); want=min(births_per_cycle,room)
+    # Rate limit births to once per ~20 minutes, unless population needs emergency refill.
+    last=await conn.fetchval("SELECT max(observed_at) FROM reversal_evolution_log WHERE run_id=$1 AND born>0",run['run_id'])
+    if last and room < 8:
+        age=(time.time()-last.timestamp())/60
+        if age<20:want=0
+    born=[]; parent_used=[]
+    generation=max([int(a['generation'] or 0) for a in ants] or [0])+1
+    rng=random.Random(int(time.time()//1200)+generation)
+    for i in range(want):
+        if not parents:break
+        p1=parents[i%len(parents)][0]; g1=amap[p1]['genome']; g1=json.loads(g1) if isinstance(g1,str) else dict(g1)
+        if len(parents)>1 and i%3==2:
+            p2=parents[(i+1)%len(parents)][0]; g2=amap[p2]['genome']; g2=json.loads(g2) if isinstance(g2,str) else dict(g2)
+            child=crossover(g1,g2,seed=rng.randrange(1,10**9)); pids=[p1,p2]
+            child=mutate(child,seed=rng.randrange(1,10**9),policy=MutationPolicy(numeric_sigma=.08,mutation_rate=.35,min_changes=1,max_changes=2))
+        else:
+            child=mutate(g1,seed=rng.randrange(1,10**9),policy=MutationPolicy(numeric_sigma=.08,mutation_rate=.35,min_changes=1,max_changes=2));pids=[p1]
+        child['parents']=pids;child['generation']=generation;child['evolution']='reversal_continuous_v2'
+        gid=genome_id(child)
+        if gid in active_ids:continue
+        res=await conn.execute("""INSERT INTO reversal_tournament_ants(run_id,genome_id,genome,cohort,baseline,generation,parent_ids,born_at)
+          VALUES($1,$2,$3::jsonb,'forward_bred',false,$4,$5::jsonb,now()) ON CONFLICT DO NOTHING""",run['run_id'],gid,json.dumps(child),generation,json.dumps(pids))
+        if res.endswith('1'):
+            active_ids.add(gid);born.append(gid);parent_used.extend(pids)
+    # Snapshot comparable colony health. £6 replay proxy is equal-weight simple average of compounded career returns.
+    vals=[]; win_rates=[]; ns=[]; scores=[]
+    for a in ants:
+        if a['baseline']:continue
+        r=recs.get(a['genome_id'],{})
+        if not r.get('n'):continue
+        vals.append(float(r.get('avg_return_pct',0)));win_rates.append(float(r.get('win_rate',0)));ns.append(int(r.get('n',0)));scores.append(float(r.get('tournament_score',-999)))
+    proven_parents=sum(1 for _,r in parents if r.get('parent_class')=='proven')
+    relative_parents=sum(1 for _,r in parents if r.get('parent_class')=='relative_tail_repair')
+    snap={'evidence_ants':len(vals),'median_n':statistics.median(ns) if ns else 0,'mean_avg_return_pct':statistics.fmean(vals) if vals else 0,
+          'median_avg_return_pct':statistics.median(vals) if vals else 0,'mean_win_rate':statistics.fmean(win_rates) if win_rates else 0,
+          'median_tournament_score':statistics.median(scores) if scores else None,'distinct_parent_behaviours':len(parents),
+          'proven_parent_behaviours':proven_parents,'tail_repair_parent_behaviours':relative_parents}
+    await conn.execute("INSERT INTO reversal_evolution_log(run_id,generation,active_ants,born,culled,parent_ids,metrics) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)",run['run_id'],generation,len(ants)+len(born),len(born),len(losers),json.dumps(sorted(set(parent_used))),json.dumps(snap))
+    return {'run':run['run_id'],'generation':generation,'active':len(ants)+len(born),'born':born,'culled':losers,'parents':sorted(set(parent_used)),'metrics':snap}

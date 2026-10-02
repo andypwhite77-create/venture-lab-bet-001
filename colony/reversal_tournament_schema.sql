@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS reversal_tournament_ants (
   eliminated_at TIMESTAMPTZ,
   eliminated_stage INT,
   elimination_reason TEXT,
+  generation INT NOT NULL DEFAULT 0,
+  parent_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  born_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY(run_id, genome_id)
 );
 CREATE TABLE IF NOT EXISTS reversal_tournament_entries (
@@ -33,3 +36,17 @@ CREATE TABLE IF NOT EXISTS reversal_tournament_entries (
 );
 CREATE INDEX IF NOT EXISTS reversal_tournament_entries_lookup
   ON reversal_tournament_entries(run_id, genome_id, mint, observed_at DESC);
+
+CREATE TABLE IF NOT EXISTS reversal_evolution_log (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  generation INT NOT NULL,
+  observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  active_ants INT NOT NULL,
+  born INT NOT NULL DEFAULT 0,
+  culled INT NOT NULL DEFAULT 0,
+  parent_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  metrics JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS reversal_evolution_log_run_generation
+  ON reversal_evolution_log(run_id,generation,observed_at);
