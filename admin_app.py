@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from db import connection, init_db
+from colony.live_registry import ensure_schema as ensure_live_schema, sync_spartan_passers, treasury_snapshot, update_treasury_policy, set_live_authority
 
 app = FastAPI(title="Venture Lab Control Plane", docs_url=None, redoc_url=None, openapi_url=None)
 USER = os.getenv("ADMIN_USERNAME", "admin")
@@ -24,6 +25,18 @@ LOGIN_FAILS = {}
 class Login(BaseModel): username:str; password:str
 class WalletIn(BaseModel): label:str; address:str
 class ComponentIn(BaseModel): mode:str; wallet_id:int|None=None; max_trade_gbp:float|None=None; floor_gbp:float|None=None
+class AuthorityIn(BaseModel): enabled:bool
+class TreasuryIn(BaseModel):
+    enabled:bool=False
+    auto_withdraw_enabled:bool=False
+    personal_wallet_id:int|None=None
+    withdraw_pct:float=0
+    reinvest_pct:float=100
+    withdraw_trigger_gbp:float=20
+    reinvest_trigger_gbp:float=5
+    min_operating_bankroll_gbp:float=25
+    max_family_exposure_pct:float=40
+    max_ant_stake_gbp:float=25
 
 def now(): return datetime.now(timezone.utc)
 def scrypt_hash(password, salt): return hashlib.scrypt(password.encode(),salt=salt,n=2**14,r=8,p=1,dklen=32)
@@ -106,6 +119,8 @@ async def sol_balance(address):
 async def startup():
     if not PASS or len(SECRET)<32: raise RuntimeError('admin_credentials_not_configured')
     await init_db(); await ensure_schema()
+    async with connection() as c:
+        await ensure_live_schema(c); await sync_spartan_passers(c)
 
 @app.post('/admin/api/login')
 async def login(data:Login,request:Request,response:Response):
@@ -135,13 +150,16 @@ async def api_state(request:Request):
         canary=await c.fetchrow('SELECT armed,stopped,since,heartbeat,problem FROM canary_control WHERE id=1')
         canary_counts=[dict(r) for r in await c.fetch("SELECT status,count(*)::int count FROM canary_trade_intents GROUP BY status ORDER BY status")]
         latest_intent=await c.fetchrow("SELECT candidate_id,status,vote_fraction,observed_at,reason FROM canary_trade_intents ORDER BY id DESC LIMIT 1")
+        await ensure_live_schema(c); await sync_spartan_passers(c)
+        live_ants=[dict(r) for r in await c.fetch('''SELECT id,genome_id,family,species,lineage,source,promotion_stage,spartan_passed,canary_profile,canary_passed,live_authorized,evidence_version,updated_at FROM live_ant_registry WHERE live_candidate=true ORDER BY family,species,genome_id''')]
+        treasury=await treasury_snapshot(c)
         audit_rows=[dict(r) for r in await c.fetch('SELECT created_at,action,target,detail FROM admin_audit ORDER BY id DESC LIMIT 25')]
     for w in wallets:
         try: w['balance_sol']=await sol_balance(w['address'])
         except Exception: w['balance_sol']=None
     qsurv=read_json(QUEEN_SURVIVAL); qmem=read_json(QUEEN_MEMORY)
     queen={'campaign':qsurv.get('campaign'),'tested':qsurv.get('tested'),'finalists':qsurv.get('finalists'),'holdout_positive':qsurv.get('holdout_positive'),'spartan_survivors':qsurv.get('spartan_survivors'),'memory_campaigns':qmem.get('campaigns'),'preferred_features':(qmem.get('preferred_features') or [])[:6]}
-    return {'wallets':wallets,'components':components,'control':control,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'audit':audit_rows}
+    return {'wallets':wallets,'components':components,'control':control,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
 
 @app.post('/admin/api/wallets')
 async def add_wallet(data:WalletIn,request:Request):
@@ -172,6 +190,32 @@ async def update_component(component_id:int,data:ComponentIn,request:Request):
           WHERE id=$1 RETURNING name''',component_id,data.mode,data.wallet_id,data.max_trade_gbp,data.floor_gbp)
     if not row: raise HTTPException(404,'component_not_found')
     await audit('component_update',row['name'],data.model_dump()); return {'ok':True}
+
+@app.post('/admin/api/live-ants/{ant_id}/authority')
+async def live_ant_authority(ant_id:int,data:AuthorityIn,request:Request):
+    s=auth(request); require_csrf(request,s)
+    async with connection() as c:
+        if data.enabled:
+            control=await c.fetchrow('SELECT global_live_stop FROM admin_control WHERE id=1')
+            if control and control['global_live_stop']:
+                raise HTTPException(409,'global_live_stop_active')
+        try: row=await set_live_authority(c,ant_id,data.enabled)
+        except ValueError as e: raise HTTPException(409,str(e))
+    await audit('live_ant_authority',str(ant_id),row)
+    return {'ok':True,**row}
+
+@app.post('/admin/api/treasury-policy')
+async def set_treasury_policy(data:TreasuryIn,request:Request):
+    s=auth(request); require_csrf(request,s)
+    if data.auto_withdraw_enabled and (not data.enabled or data.personal_wallet_id is None):
+        raise HTTPException(400,'auto_withdraw_requires_enabled_policy_and_wallet')
+    async with connection() as c:
+        if data.personal_wallet_id is not None and not await c.fetchval('SELECT 1 FROM admin_wallets WHERE id=$1',data.personal_wallet_id):
+            raise HTTPException(400,'treasury_wallet_not_found')
+        try: row=await update_treasury_policy(c,data.model_dump())
+        except ValueError as e: raise HTTPException(400,str(e))
+    await audit('treasury_policy_update','treasury',data.model_dump())
+    return {'ok':True,'policy':row}
 
 @app.post('/admin/api/global-stop')
 async def global_stop(request:Request):
