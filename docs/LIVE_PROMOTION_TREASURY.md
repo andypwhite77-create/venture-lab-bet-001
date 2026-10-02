@@ -43,3 +43,15 @@ The registry and treasury module do not hold signing keys and cannot transfer fu
 The five frozen Eve v2 reference ants continuously evaluate new research candidates in `eve_reference_paper_entries`. They have no signer or live authority and cannot mutate in the paper runner. An ant cannot open overlapping positions in the same mint; its hold horizon is the minimum re-entry interval.
 
 Closed forward outcomes are included in Queen prospective experience. Their mints are immediately quarantined from Queen validation and sealed holdout. A reference ant must accumulate at least five unique forward mints before it can influence descendants, and it must still satisfy the normal positive-career quality rules before its frozen genome is offered as a gene-seed template. Spartan answers are never fed into this path.
+
+## Champion / Challenger League (2026-10-02)
+
+The research promotion model now uses five incumbent **Elite** behaviours rather than treating Spartan as a binary executioner. The founding Elite are the five best distinct full-period Reversal behaviours from the forward tournament; duplicate entry signatures are collapsed so clones cannot manufacture consensus.
+
+All other existing candidates enter **Qualification**. The latest two Queen finalists from each observed Queen run are admitted to Qualification; the rest remain research history rather than bloating the active challenger pool. Qualification is continuously ranked in a public **Spartan Arena** over the broad historical dataset, while each challenger also accumulates prospective paper evidence from its enrollment cutoff.
+
+A challenger may replace the weakest Elite only when it is behaviourally distinct, has at least 25 forward observations across at least three days, and beats the incumbent on both conservative historical Arena score and conservative forward score. Arena results are intentionally not a sealed exam and may be used as ranking evidence. The existing sealed Spartan exam remains separate and is not fed back into breeding.
+
+`colony/champion_league.py` owns the research league. `scripts/champion_league_tick.py` performs a signer-free maintenance tick: seed/retain incumbents, admit the latest Queen top two, capture new forward-paper opportunities, refresh Arena ranking, and apply research-pool promotions. A five-minute cron runs this research-only tick under `flock`; it has no wallet, signer, or broadcast authority.
+
+Real-money Canary execution remains a separate human-controlled layer and is not automatically armed by Elite status or league promotion.
