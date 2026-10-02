@@ -11,6 +11,27 @@ from colony.selection import ant_metrics
 MIN_COMPARE_N=12
 TARGET_ACTIVE=24
 BIRTHS_PER_CYCLE=3
+SUPPORTED_OUTCOME_HORIZONS=(3,5,8,10,12,15,20,30,45,60,90,120,240,720,1440)
+
+def supported_hold(candidate:int, parent:int|None=None)->int:
+    candidate=int(candidate)
+    if candidate in SUPPORTED_OUTCOME_HORIZONS:
+        return candidate
+    options=list(SUPPORTED_OUTCOME_HORIZONS)
+    if parent in options and candidate != parent and len(options)>1:
+        # Preserve a genuine hold-time mutation instead of snapping straight back to the parent.
+        options=[h for h in options if h != parent]
+    return min(options,key=lambda h:(abs(h-candidate),-h))
+
+def normalize_evidence_horizon(genome:dict, parent_genome:dict|None=None)->dict:
+    params=genome.setdefault('parameters',{})
+    if 'hold_minutes' not in params:
+        return genome
+    parent_hold=None
+    if parent_genome:
+        parent_hold=parent_genome.get('parameters',{}).get('hold_minutes')
+    params['hold_minutes']=supported_hold(int(params['hold_minutes']), int(parent_hold) if parent_hold is not None else None)
+    return genome
 
 async def ensure_schema(conn):
     await conn.execute("""CREATE TABLE IF NOT EXISTS spartan_alumni_pool(
@@ -104,6 +125,7 @@ async def evolve(conn):
     for _,p in candidates[:births]:
         g=p['genome']; g=json.loads(g) if isinstance(g,str) else g
         child=mutate(g,seed=rng.randrange(2**31),policy=MutationPolicy(numeric_sigma=.10,mutation_rate=.5,min_changes=1,max_changes=2))
+        child=normalize_evidence_horizon(child,g)
         child['parents']=[p['genome_id']]; child['spartan_alumni']={'ancestry':'exam_contaminated','proof':'prospective_only'}
         cid=genome_id(child)
         if cid in active_ids: continue
