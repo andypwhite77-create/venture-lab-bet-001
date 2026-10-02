@@ -59,6 +59,8 @@ async def latest_reversal_groups(limit=50):
           JOIN reversal_tournament_ants a ON a.run_id=e.run_id AND a.genome_id=e.genome_id AND a.active=true
           WHERE e.candidate_id>$1 AND e.candidate_id <= r.last_candidate_id GROUP BY e.candidate_id,e.mint)
         SELECT x.*,aa.n active_ants FROM x CROSS JOIN aa
+        WHERE NOT EXISTS (
+          SELECT 1 FROM canary_trade_intents i WHERE i.candidate_id=x.candidate_id)
         ORDER BY x.candidate_id ASC LIMIT $2''',START_AFTER,limit)
     return [dict(r) for r in rows]
 
