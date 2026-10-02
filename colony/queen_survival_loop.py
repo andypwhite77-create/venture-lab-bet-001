@@ -6,7 +6,7 @@ import asyncio,json,os,time
 from db import init_db,connection
 from colony.queen_pattern_recognition import run as queen_run
 from colony.spartan_v2_runner import audit_family
-from colony.queen_memory import learn_campaign
+from colony.queen_memory import learn_campaign,record_exam_result
 from colony.queen_ecology import learn as ecology_learn,strategy as ecology_strategy
 from colony.queen_experience import learn as learn_ant_experience
 
@@ -35,7 +35,7 @@ async def main():
             public={'campaign':campaign,'tested':summary['tested'],'finalists':summary['finalists'],
                     'holdout_positive':summary['holdout_positive'],'spartan_survivors':len(passed),
                     'distinct_survivor_behaviours':len(distinct),'completed_at':time.time()}
-            save_state(public);print(json.dumps({'event':'campaign_examined',**public}),flush=True)
+            save_state(public);record_exam_result(public);print(json.dumps({'event':'campaign_examined',**public}),flush=True)
             # Queen receives only coarse ecological outcome, never examiner thresholds or answers.
             if passed and distinct:
                 print(json.dumps({'event':'soldiers_found','count':len(passed),'distinct':len(distinct),'action':'continue breeding challengers'}),flush=True)
@@ -45,7 +45,7 @@ async def main():
         # a larger strategic review. Only the campaign number crosses this boundary;
         # the reviewer fetches its own research-safe inputs and its prose never directly controls breeding.
         persistent_campaign=int(memory.get('campaigns',campaign) or campaign)
-        if persistent_campaign % int(os.getenv('SWARM_STRATEGIC_EVERY_CAMPAIGNS','3')) == 0:
+        if persistent_campaign % int(os.getenv('SWARM_STRATEGIC_EVERY_CAMPAIGNS','1')) == 0:
             try:
                 async with connection() as sc:
                     await sc.execute("CREATE TABLE IF NOT EXISTS swarm_strategy_requests(id BIGSERIAL PRIMARY KEY,campaign INTEGER NOT NULL UNIQUE,requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),started_at TIMESTAMPTZ,completed_at TIMESTAMPTZ,status TEXT NOT NULL DEFAULT 'pending',result JSONB)")

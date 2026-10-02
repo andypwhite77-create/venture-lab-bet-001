@@ -66,9 +66,12 @@ def _queen_research_snapshot(finalists, summary, previous_finalists=None):
       'top_behaviour_group_sizes':sorted(groups.values(),reverse=True)[:8],
       'holds':dict(holds),'risk_controls':dict(risks),'top_sensors':dict(sensors.most_common(12)),
       'preferred_features':mem.get('preferred_features',[]),'underexplored_features':mem.get('underexplored_features',[]),
+      'quality_history':(mem.get('quality_history',[]) or [])[-8:],'exam_history':(mem.get('exam_history',[]) or [])[-8:],
+      'spartan_drought_campaigns':int(mem.get('spartan_drought_campaigns',0) or 0),
       'graveyard_niches':list((eco.get('graveyard') or {}).keys())[:20],
       'career_parent_templates':len(exp.get('parent_templates',[]) or []),
       'career_preferred_features':exp.get('preferred_features',[]),
+      'prospective_experience_summary':{k:exp.get(k) for k in ('observations','career_count','eligible_careers')},
       'current_ecology_plan':summary.get('ecology_plan',{}),'sensor_availability':summary.get('sensor_availability',{}),'active_sensor_count':summary.get('active_sensor_count'),'breeding_regime_coverage':summary.get('breeding_regime_coverage',{}),
       'weak_niches':summary.get('weak_niches',[])[:12],
       'note':'breeding-visible evidence only; no holdout or Spartan answers included'}
@@ -81,25 +84,39 @@ def _bounded_research_plan(raw, e):
     q=e.get('queen_research') or {}
     concentration=float(q.get('largest_behaviour_fraction',0) or 0); groups=int(q.get('behaviour_groups',0) or 0)
     hhi=float(q.get('behaviour_hhi',1) or 1); ent=float(q.get('behaviour_entropy',0) or 0); eff=float(q.get('effective_behaviours',0) or 0)
+    drought=int(q.get('spartan_drought_campaigns',0) or 0)
     # Diversity pressure uses actual behavioural concentration, not just raw group count.
     if concentration>.60 or hhi>.30 or eff<5: w,a=.35,.35
     elif concentration>.35 or hhi>.15 or eff<10: w,a=.30,.30
     elif groups>=30 and concentration<.20 and ent>.75 and eff>=20: w,a=.22,.28
     else: w,a=.25,.30
-    exploit=1.0-w-a
+    # A sustained zero-graduate streak raises search diversity, but never changes the examiner or evidence gates.
+    if drought>=2:
+        w=max(w,.30);a=max(a,.30)
+    if drought>=5:
+        w=max(w,.35);a=max(a,.30)
     try:
         from colony.queen_pattern_recognition import SENSORS
         allowed=set(SENSORS)
     except Exception: allowed=set()
+    strategic=dict((e.get('strategic_guidance') or {}).get('research_adjustments') or {})
+    mode=str(strategic.get('mode','balanced')).lower()
+    if mode=='diversify': w=max(w,.32);a=max(a,.32)
+    elif mode=='exploit' and drought==0 and groups>=20 and concentration<.25:
+        w=min(w,.20);a=min(a,.25)
+    exploit=1.0-w-a
     focus=[]; availability=q.get('sensor_availability') or {}
-    for k in list(q.get('underexplored_features',[]) or [])+list(q.get('career_preferred_features',[]) or [])+list(q.get('preferred_features',[]) or []):
-        if k in allowed and float(availability.get(k,1.0) or 0)>=.10 and k not in focus:focus.append(k)
+    strategic_focus=[k for k in (strategic.get('focus_sensors') or []) if k in allowed and float(availability.get(k,1.0) or 0)>=.10]
+    strategic_avoid={k for k in (strategic.get('avoid_sensors') or []) if k in allowed}
+    # Forward career evidence gets first claim on sensor attention; exploration fills the remainder.
+    for k in strategic_focus+list(q.get('career_preferred_features',[]) or [])+list(q.get('preferred_features',[]) or [])+list(q.get('underexplored_features',[]) or []):
+        if k in allowed and k not in strategic_avoid and float(availability.get(k,1.0) or 0)>=.10 and k not in focus:focus.append(k)
         if len(focus)>=8:break
     avoid=list(q.get('graveyard_niches',[]) or [])[:8]
     return {'exploit':round(exploit,4),'adjacent_explore':round(a,4),'wild_scouts':round(w,4),
             'focus_sensors':focus,'avoid_niches':avoid,'largest_behaviour_fraction':round(concentration,4),
             'behaviour_groups':groups,'behaviour_hhi':round(hhi,4),'behaviour_entropy':round(ent,4),
-            'effective_behaviours':round(eff,2),'authority':'research_allocation_only',
+            'effective_behaviours':round(eff,2),'spartan_drought_campaigns':drought,'strategic_mode':mode,'strategic_focus_used':strategic_focus[:6],'authority':'research_allocation_only',
             'source':'research_safe_swarm_ecology'}
 
 async def evidence(c):
@@ -115,6 +132,13 @@ async def evidence(c):
     queue=[dict(x) for x in await c.fetch("SELECT family,count(*) waiting,max(historical_score) best FROM evolution_candidate_queue WHERE status='ready' GROUP BY family")]
     providers=[dict(x) for x in await c.fetch("SELECT DISTINCT ON(provider) provider,ok,error,observed_at FROM colony_provider_health ORDER BY provider,observed_at DESC")]
     recent=[dict(x) for x in await c.fetch("SELECT event_type,payload,created_at FROM colony_events ORDER BY id DESC LIMIT 6")]
+    strategic_guidance={}
+    try:
+        sr=await c.fetchrow("SELECT result FROM swarm_strategy_requests WHERE status='complete' ORDER BY completed_at DESC NULLS LAST,id DESC LIMIT 1")
+        if sr:
+            strategic_guidance=sr['result'];strategic_guidance=json.loads(strategic_guidance) if isinstance(strategic_guidance,str) else dict(strategic_guidance or {})
+    except Exception:
+        strategic_guidance={}
     qrecs=await c.fetch("SELECT finalists,summary,created_at FROM historical_nursery_runs WHERE family='queen_pattern' ORDER BY created_at DESC LIMIT 2")
     queen_research={}
     epoch=float((_read_json('/data/queen_semantic_epoch.json',{}) or {}).get('started_at',0) or 0)
@@ -126,7 +150,7 @@ async def evidence(c):
         if len(qrecs)>1:
             pf=qrecs[1]['finalists']; prev=json.loads(pf) if isinstance(pf,str) else list(pf or [])
         queen_research=_queen_research_snapshot(fs,sm,prev)
-    return {'queen_research':queen_research,'performance':perf,'roster':roster,'challenger_queue':queue,'providers':providers,'recent_events':recent,
+    return {'queen_research':queen_research,'performance':perf,'roster':roster,'challenger_queue':queue,'providers':providers,'recent_events':recent,'strategic_guidance':strategic_guidance,
             'constitution':{'authority':'advisory_only','real_money':False,'may_rewrite_genetics':False,'may_relax_evidence_gates':False,
                             'shared_data':True,'isolated_colony_genetics':True,
                             'identity':'colony_mother_and_war_queen','prime_directive':'persist_adapt_dominate_expand',

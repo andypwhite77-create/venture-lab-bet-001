@@ -6,7 +6,7 @@ import json, os, time, httpx
 from db import connection
 from colony.swarm_queen import evidence, ensure_schema
 
-MODEL=os.getenv('SWARM_STRATEGIC_MODEL','qwen3:4b')
+MODEL=os.getenv('SWARM_STRATEGIC_MODEL','qwen3:1.7b')
 OLLAMA=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
 
 async def ensure_request_schema(c):
@@ -21,33 +21,55 @@ async def ensure_request_schema(c):
 
 def _safe_snapshot(e):
     q=dict(e.get('queen_research') or {})
-    allowed_q={k:q.get(k) for k in (
-        'behaviour_groups','largest_behaviour_fraction','behaviour_hhi','behaviour_entropy','effective_behaviours',
-        'behaviour_novelty_vs_previous','sensor_combo_count','sensor_combo_hhi','hold_diversity','risk_control_diversity',
-        'graveyard_revisit_fraction','career_history_feature_agreement','top_behaviour_group_sizes','holds','risk_controls',
-        'top_sensors','preferred_features','underexplored_features','graveyard_niches','career_parent_templates',
-        'career_preferred_features','current_ecology_plan','sensor_availability','active_sensor_count','breeding_regime_coverage','weak_niches')}
-    return {'queen_research':allowed_q,'constitution':e.get('constitution',{})}
+    candidates=[]
+    for k in list(q.get('career_preferred_features') or [])+list(q.get('preferred_features') or [])+list(q.get('underexplored_features') or [])+list((q.get('top_sensors') or {}).keys()):
+        if k not in candidates:candidates.append(k)
+    quality=[]
+    for x in (q.get('quality_history') or [])[-4:]:
+        quality.append({k:x.get(k) for k in ('finalists','behaviour_groups','median_train_n','median_validation_n','median_concentration','median_predicates','median_selection_score')})
+    exams=[]
+    for x in (q.get('exam_history') or [])[-5:]:
+        exams.append({'survivors':x.get('spartan_survivors',0),'distinct':x.get('distinct_survivor_behaviours',0),'finalists':x.get('finalists',0)})
+    return {'ecology':{k:q.get(k) for k in ('behaviour_groups','largest_behaviour_fraction','behaviour_hhi','behaviour_entropy','effective_behaviours','behaviour_novelty_vs_previous','hold_diversity','risk_control_diversity','career_history_feature_agreement','spartan_drought_campaigns')},
+            'candidate_sensors':candidates[:20],'quality_history':quality,'exam_history':exams,
+            'prospective':q.get('prospective_experience_summary',{}),'career_parent_templates':q.get('career_parent_templates',0),
+            'constitution':e.get('constitution',{})}
+
+STRATEGY_SCHEMA={
+  'type':'object',
+  'properties':{
+    'diagnosis':{'type':'string'},
+    'mode':{'type':'string','enum':['diversify','balanced','exploit']},
+    'focus_sensors':{'type':'array','items':{'type':'string'},'maxItems':6},
+    'avoid_sensors':{'type':'array','items':{'type':'string'},'maxItems':4}},
+  'required':['diagnosis','mode','focus_sensors','avoid_sensors']}
 
 def _prompt(s):
-    return ("You are the strategic brain of Swarm Queen. Analyse only the supplied research-safe evolutionary ecology. "
-            "Never request or infer sealed holdout/Spartan answers. Never alter evidence gates, capital authority, or individual genomes. "
-            "Look for search traps, monoculture, stale niches, sensor blind spots, over/under-exploitation, and testable ways to increase useful variation. "
-            "Return JSON with diagnosis (max 80 words), priorities (max 5 strings), experiments (max 5 strings), warnings (max 4 strings). "
-            "All suggestions are advisory and must be testable with breeding-visible evidence. Data: "+json.dumps(s,separators=(',',':'))[:5000])
+    return ("You are Swarm Queen, strategic research director for an evolutionary trading research system. "
+            "Use only the supplied research-safe evidence. Never infer sealed holdout or Spartan thresholds. "
+            "Return ONLY valid JSON with exactly these keys: diagnosis (string under 30 words), mode (diversify, balanced, or exploit), "
+            "focus_sensors (array, max 6 observable sensor names), avoid_sensors (array, max 4 observable sensor names). "
+            "Choose actions that improve breadth, robustness, behavioural diversity, and prospective career quality over repeated campaigns. Data: "
+            +json.dumps(s,separators=(',',':'))[:3000])
 
 async def review(campaign:int):
     async with connection() as c:
         await ensure_schema(c); e=await evidence(c)
     safe=_safe_snapshot(e); started=time.time()
-    out={'campaign':campaign,'model':MODEL,'status':'unavailable','diagnosis':'','priorities':[],'experiments':[],'warnings':[]}
+    out={'campaign':campaign,'model':MODEL,'status':'unavailable','diagnosis':'','priorities':[],'experiments':[],'warnings':[],
+         'research_adjustments':{'mode':'balanced','focus_sensors':[],'avoid_sensors':[]}}
     try:
-        async with httpx.AsyncClient(timeout=150) as h:
-            r=await h.post(OLLAMA,json={'model':MODEL,'prompt':_prompt(safe),'stream':False,'format':'json','think':False,
-                                       'options':{'num_ctx':2048,'num_predict':350,'temperature':0.15}})
+        async with httpx.AsyncClient(timeout=45) as h:
+            r=await h.post(OLLAMA,json={'model':MODEL,'prompt':_prompt(safe),'stream':False,'format':STRATEGY_SCHEMA,'think':False,
+                                       'keep_alive':'30m','options':{'num_ctx':1024,'num_predict':180,'temperature':0.0}})
             r.raise_for_status(); x=json.loads(r.json()['response'])
         if isinstance(x,dict):
-            out.update({k:x.get(k,out[k]) for k in ('diagnosis','priorities','experiments','warnings')})
+            out['diagnosis']=str(x.get('diagnosis',''))[:240]
+            mode=str(x.get('mode','balanced')).lower()
+            if mode not in ('diversify','balanced','exploit'): mode='balanced'
+            out['research_adjustments']={'mode':mode,
+                'focus_sensors':list(x.get('focus_sensors') or [])[:6],
+                'avoid_sensors':list(x.get('avoid_sensors') or [])[:4]}
             out['status']='ok'
     except Exception as ex:
         out['status']='error'; out['warnings']=[repr(ex)[:220]]

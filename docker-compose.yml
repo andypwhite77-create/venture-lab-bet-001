@@ -136,7 +136,9 @@ services:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@127.0.0.1:5432/venturelab
       OLLAMA_URL: http://127.0.0.1:11434/api/generate
       SWARM_QUEEN_MODEL: qwen3:1.7b
+      SWARM_STRATEGIC_MODEL: qwen3:1.7b
       SWARM_QUEEN_INTERVAL_SECONDS: "300"
+      SWARM_STRATEGIC_POLL_SECONDS: "5"
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
@@ -235,7 +237,7 @@ services:
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
       QUEEN_EVAL_WORKERS: "2"
-      SWARM_STRATEGIC_EVERY_CAMPAIGNS: "3"
+      SWARM_STRATEGIC_EVERY_CAMPAIGNS: "1"
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
