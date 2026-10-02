@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from db import connection, init_db
 from colony.live_registry import ensure_schema as ensure_live_schema, sync_spartan_passers, treasury_snapshot, update_treasury_policy, set_live_authority
 from colony.eve_reference_paper import stats as eve_reference_stats
+from colony.champion_league import ensure_schema as ensure_champion_schema
+from colony.qualification_corpus import ensure_schema as ensure_corpus_schema, snapshot as qualification_corpus_snapshot
 
 app = FastAPI(title="Venture Lab Control Plane", docs_url=None, redoc_url=None, openapi_url=None)
 USER = os.getenv("ADMIN_USERNAME", "admin")
@@ -27,6 +29,7 @@ class Login(BaseModel): username:str; password:str
 class WalletIn(BaseModel): label:str; address:str
 class ComponentIn(BaseModel): mode:str; wallet_id:int|None=None; max_trade_gbp:float|None=None; floor_gbp:float|None=None
 class AuthorityIn(BaseModel): enabled:bool
+class EliteModeIn(BaseModel): mode:str
 class TreasuryIn(BaseModel):
     enabled:bool=False
     auto_withdraw_enabled:bool=False
@@ -92,6 +95,10 @@ async def ensure_schema():
         CREATE TABLE IF NOT EXISTS admin_control(
           id INT PRIMARY KEY CHECK(id=1),global_live_stop BOOLEAN NOT NULL DEFAULT true,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
         INSERT INTO admin_control(id) VALUES(1) ON CONFLICT DO NOTHING;
+        CREATE TABLE IF NOT EXISTS elite_control(
+          id INT PRIMARY KEY CHECK(id=1),desired_mode TEXT NOT NULL DEFAULT 'off' CHECK(desired_mode IN ('off','canary','live')),
+          execution_bridge_connected BOOLEAN NOT NULL DEFAULT false,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+        INSERT INTO elite_control(id) VALUES(1) ON CONFLICT DO NOTHING;
         CREATE TABLE IF NOT EXISTS admin_audit(
           id BIGSERIAL PRIMARY KEY,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),actor TEXT NOT NULL,
           action TEXT NOT NULL,target TEXT,detail JSONB NOT NULL DEFAULT '{}');''')
@@ -122,6 +129,7 @@ async def startup():
     await init_db(); await ensure_schema()
     async with connection() as c:
         await ensure_live_schema(c); await sync_spartan_passers(c)
+        await ensure_champion_schema(c); await ensure_corpus_schema(c)
 
 @app.post('/admin/api/login')
 async def login(data:Login,request:Request,response:Response):
@@ -148,6 +156,11 @@ async def api_state(request:Request):
         wallets=[dict(r) for r in await c.fetch('SELECT * FROM admin_wallets ORDER BY id')]
         components=[dict(r) for r in await c.fetch('SELECT * FROM admin_components ORDER BY id')]
         control=dict(await c.fetchrow('SELECT * FROM admin_control WHERE id=1'))
+        elite_control=dict(await c.fetchrow('SELECT * FROM elite_control WHERE id=1'))
+        await ensure_champion_schema(c); await ensure_corpus_schema(c)
+        elite_roster=[dict(r) for r in await c.fetch("SELECT elite_slot,genome_id,family,source,arena_score,forward_score,total_score,arena_stats,forward_stats,promoted_at FROM champion_league WHERE pool='elite' ORDER BY elite_slot")]
+        qualification_top=[dict(r) for r in await c.fetch("SELECT qualification_rank,genome_id,family,source,arena_score,forward_score,total_score,arena_stats,forward_stats FROM champion_league WHERE pool='qualification' ORDER BY qualification_rank NULLS LAST,total_score DESC NULLS LAST LIMIT 10")]
+        qualification_corpus=await qualification_corpus_snapshot(c)
         canary=await c.fetchrow('SELECT armed,stopped,since,heartbeat,problem FROM canary_control WHERE id=1')
         canary_counts=[dict(r) for r in await c.fetch("SELECT status,count(*)::int count FROM canary_trade_intents GROUP BY status ORDER BY status")]
         latest_intent=await c.fetchrow("SELECT candidate_id,status,vote_fraction,observed_at,reason FROM canary_trade_intents ORDER BY id DESC LIMIT 1")
@@ -162,7 +175,7 @@ async def api_state(request:Request):
         except Exception: w['balance_sol']=None
     qsurv=read_json(QUEEN_SURVIVAL); qmem=read_json(QUEEN_MEMORY)
     queen={'campaign':qsurv.get('campaign'),'tested':qsurv.get('tested'),'finalists':qsurv.get('finalists'),'holdout_positive':qsurv.get('holdout_positive'),'spartan_survivors':qsurv.get('spartan_survivors'),'memory_campaigns':qmem.get('campaigns'),'preferred_features':(qmem.get('preferred_features') or [])[:6]}
-    return {'wallets':wallets,'components':components,'control':control,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
+    return {'wallets':wallets,'components':components,'control':control,'elite_control':elite_control,'elite_roster':elite_roster,'qualification_top':qualification_top,'qualification_corpus':qualification_corpus,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
 
 @app.post('/admin/api/wallets')
 async def add_wallet(data:WalletIn,request:Request):
@@ -207,6 +220,20 @@ async def live_ant_authority(ant_id:int,data:AuthorityIn,request:Request):
     await audit('live_ant_authority',str(ant_id),row)
     return {'ok':True,**row}
 
+@app.post('/admin/api/elite-mode')
+async def set_elite_mode(data:EliteModeIn,request:Request):
+    s=auth(request); require_csrf(request,s)
+    mode=data.mode.strip().lower()
+    if mode not in {'off','canary','live'}: raise HTTPException(400,'bad_elite_mode')
+    async with connection() as c:
+        row=await c.fetchrow('SELECT global_live_stop FROM admin_control WHERE id=1')
+        ctl=await c.fetchrow('SELECT execution_bridge_connected FROM elite_control WHERE id=1')
+        if mode!='off' and row and row['global_live_stop']: raise HTTPException(409,'global_live_stop_active')
+        if mode=='live' and not bool(ctl['execution_bridge_connected']): raise HTTPException(409,'elite_execution_bridge_not_connected')
+        await c.execute('UPDATE elite_control SET desired_mode=$1,updated_at=now() WHERE id=1',mode)
+    await audit('elite_mode_request','elite',{'mode':mode})
+    return {'ok':True,'desired_mode':mode,'execution_bridge_connected':bool(ctl['execution_bridge_connected'])}
+
 @app.post('/admin/api/treasury-policy')
 async def set_treasury_policy(data:TreasuryIn,request:Request):
     s=auth(request); require_csrf(request,s)
@@ -226,6 +253,7 @@ async def global_stop(request:Request):
     async with connection() as c:
         async with c.transaction():
             await c.execute('UPDATE admin_control SET global_live_stop=true,updated_at=now() WHERE id=1')
+            await c.execute("UPDATE elite_control SET desired_mode='off',updated_at=now() WHERE id=1")
             if await c.fetchval("SELECT to_regclass('public.canary_control') IS NOT NULL"):
                 await c.execute("UPDATE canary_control SET armed=false,stopped=true,since=now(),problem='admin_global_stop' WHERE id=1")
     await audit('global_live_stop'); return {'ok':True}

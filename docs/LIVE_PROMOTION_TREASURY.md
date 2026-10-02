@@ -55,3 +55,11 @@ A challenger may replace the weakest Elite only when it is behaviourally distinc
 `colony/champion_league.py` owns the research league. `scripts/champion_league_tick.py` performs a signer-free maintenance tick: seed/retain incumbents, admit the latest Queen top two, capture new forward-paper opportunities, refresh Arena ranking, and apply research-pool promotions. A five-minute cron runs this research-only tick under `flock`; it has no wallet, signer, or broadcast authority.
 
 Real-money Canary execution remains a separate human-controlled layer and is not automatically armed by Elite status or league promotion.
+
+## Cumulative Qualification Corpus and Elite control
+
+`qualification_corpus` is the permanent append-only benchmark for Champion League replay. Every completed `research_candidates` / `research_outcomes` horizon is copied once with the market/features observed at decision time. Existing corpus rows are never updated. Dynamic model-vote features are deliberately excluded from replay so later models cannot rewrite old benchmark inputs.
+
+New challengers can therefore be fast-tracked through the full accumulated corpus immediately. Chronological and forward evidence remain distinct: Arena replay can establish competitiveness quickly, but promotion still requires at least 25 genuinely post-enrollment forward observations across at least three days and must beat the weakest Elite on both Arena and forward scores.
+
+The admin control plane exposes the five Elite incumbents, the top Qualification leaderboard and corpus coverage. It also stores an operator-requested Elite capital mode (`off`, `canary`, `live`). This state is intentionally separate from execution authority: league promotion never grants money access, global live-stop forces the requested mode back to `off`, and `live` remains blocked unless a separate execution bridge is explicitly connected.

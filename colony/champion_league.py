@@ -9,7 +9,8 @@ from __future__ import annotations
 import hashlib,json,math,statistics
 from colony.evaluator import matches
 from colony.forward import eligible
-from colony.historical_nursery import load_rows,sampled_path_return_pct
+from colony.historical_nursery import sampled_path_return_pct
+from colony.qualification_corpus import load_rows, sync as sync_corpus
 from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured_roundtrip_network_fee_sol,sol_gbp_rate
 
 FOUNDER_ELITES=(
@@ -149,7 +150,7 @@ async def _forward_for(c,gid,fixed_gbp):
  s=_score(vals);s['days']=len(days);return s
 
 async def refresh_rankings(c,allow_promotion=True):
- await ensure_schema(c);rows=await load_rows(c);fee=await measured_roundtrip_network_fee_sol(c);rate,_=sol_gbp_rate();fixed=fee*rate
+ await ensure_schema(c);await sync_corpus(c);rows=await load_rows(c);fee=await measured_roundtrip_network_fee_sol(c);rate,_=sol_gbp_rate();fixed=fee*rate
  ants=await c.fetch('SELECT * FROM champion_league ORDER BY genome_id');computed=[]
  for a in ants:
   g=_json(a['genome']);vals=[];events=[];seen=set()
