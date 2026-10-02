@@ -28,7 +28,7 @@ async def main():
         async with connection() as c:
             experience=await learn_ant_experience(c)
             print(json.dumps({'event':'ant_experience_ingested','observations':experience.get('observations',0),'careers':experience.get('career_count',0),'eligible_careers':experience.get('eligible_careers',0),'reference_observations':experience.get('reference_observations',0),'reference_eligible_careers':experience.get('reference_eligible_careers',0),'preferred_features':experience.get('preferred_features',[]),'parent_templates':len(experience.get('parent_templates',[])),'quarantined_mints':len(experience.get('experienced_mints',[]))}),flush=True)
-            print(json.dumps({'event':'campaign_start','campaign':campaign,'queen_role':BREEDING_QUEEN['authority'],'role_version':ROLE_VERSION,'qualification_handoff':BREEDING_QUEEN['qualification_handoff'],'directive':'BREED ADAPT DIVERSIFY; PRODUCE CHALLENGERS'}),flush=True)
+            print(json.dumps({'event':'campaign_start','campaign':campaign,'queen_role':BREEDING_QUEEN['authority'],'role_version':ROLE_VERSION,'qualification_handoff':BREEDING_QUEEN['qualification_handoff'],'batch_size':int(os.getenv('QUEEN_BATCH_SIZE','10000')),'waves':int(os.getenv('QUEEN_WAVES_PER_CAMPAIGN','2')),'directive':'PRECISION BREEDING; QUALITY OVER VOLUME'}),flush=True)
             summary,finalists=await queen_run(c,seed=300933+campaign,checkpoint='/data/queen_pattern_checkpoint.pkl')
             memory=learn_campaign(finalists,summary)
             summary['underexplored_sensors']=memory.get('underexplored_features',[])
@@ -76,6 +76,8 @@ async def main():
                     print(json.dumps({'event':'swarm_strategic_review_timeout','campaign':persistent_campaign}),flush=True)
             except Exception as ex:
                 print(json.dumps({'event':'swarm_strategic_review_error','campaign':persistent_campaign,'error':repr(ex)[:180]}),flush=True)
-        await asyncio.sleep(5)
+        cooldown=max(300,int(os.getenv('QUEEN_CAMPAIGN_COOLDOWN_SECONDS','86400')))
+        print(json.dumps({'event':'breeding_cooldown','seconds':cooldown,'policy':'quality_over_volume'}),flush=True)
+        await asyncio.sleep(cooldown)
 
 if __name__=='__main__': asyncio.run(main())

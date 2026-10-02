@@ -237,6 +237,10 @@ services:
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
       QUEEN_EVAL_WORKERS: "2"
+      QUEEN_BATCH_SIZE: "10000"
+      QUEEN_WAVES_PER_CAMPAIGN: "2"
+      QUEEN_GENE_SEED_FRACTION: "0.20"
+      QUEEN_CAMPAIGN_COOLDOWN_SECONDS: "86400"
       SWARM_STRATEGIC_EVERY_CAMPAIGNS: "1"
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"

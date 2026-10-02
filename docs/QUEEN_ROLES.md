@@ -22,4 +22,10 @@ Ethereum is the intended second market. Before activating it, review and upgrade
 
 A future ETH Market Expert should own persistent ETH-specific market understanding and measured prediction quality. Swarm Queen should compare and coordinate market experts; Breeding Queen should remain the single genome-production engine.
 
-Role contract version: `queen-roles-v1`.
+Role contract version: `queen-roles-v2`.
+
+## Precision breeding cadence
+
+Breeding Queen now runs in precision mode because a viable Elite roster exists. Each wave is a hard 10,000-genome batch; career-seeded descendants are included inside that total rather than added on top. A campaign uses two batches, then pauses for 24 hours after Swarm review. The objective is better challengers, not maximum genome throughput.
+
+Elite promotion is deliberately slower than qualification discovery. A successful Elite replacement starts a 72-hour research-pool promotion cooldown. This is a churn guard, not a performance quota: no challenger is promoted merely to hit a weekly target, and strong challengers keep accumulating forward evidence while they wait. The operating target is roughly one or two genuine Elite improvements per week.

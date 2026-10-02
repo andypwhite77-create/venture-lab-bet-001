@@ -213,7 +213,9 @@ def _freeze_exam_rows(rows):
  import hashlib
  return frozen,hashlib.sha256(payload.encode()).hexdigest()
 
-async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_pattern_checkpoint.pkl'):
+async def run(conn,wave_size=None,waves=None,seed=300933,checkpoint='/data/queen_pattern_checkpoint.pkl'):
+ wave_size=max(1000,int(wave_size if wave_size is not None else os.getenv('QUEEN_BATCH_SIZE','10000')))
+ waves=max(1,int(waves if waves is not None else os.getenv('QUEEN_WAVES_PER_CAMPAIGN','2')))
  rng=random.Random(seed);memory=load_memory();eco_state=load_ecology();eco_plan=ecology_strategy(eco_state)
  swarm_plan=await _load_swarm_plan(conn)
  if swarm_plan:
@@ -267,16 +269,19 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
    cp=pickle.load(open(checkpoint,'rb'))
    if cp.get('methodology_version')!=METHODOLOGY_VERSION: raise ValueError('checkpoint_methodology_mismatch')
    parents=cp['parents'];tested=cp['tested'];start_wave=cp['wave']+1;rng.setstate(cp['rng_state']);fresh_rate=float(cp.get('fresh_rate',fresh_rate));behaviour_archive=cp.get('behaviour_archive',{})
-   print(json.dumps({'event':'queen_resumed','from_wave':start_wave,'tested':tested,'urgency':'EXTREME','methodology_version':METHODOLOGY_VERSION}),flush=True)
+   print(json.dumps({'event':'queen_resumed','from_wave':start_wave,'tested':tested,'mode':'precision','methodology_version':METHODOLOGY_VERSION}),flush=True)
   except Exception as e: print(json.dumps({'event':'checkpoint_rejected','error':str(e)}),flush=True)
  for wave in range(start_wave,waves+1):
   provenance=[]
   if not parents:
    templates=[z for z in (_career_pattern_seed(x.get('genome')) for x in memory.get('prospective_parent_templates',[]) if isinstance(x.get('genome'),dict)) if z]
-   pop=[random_genome(rng,memory,eco_plan,eco_state) for _ in range(wave_size)]; provenance=[None]*len(pop)
-   # Dedicated gene-seed injection: add a separate 40k descendant cohort without
-   # replacing wild exploration. This preserves creativity while exploiting robust careers.
-   gene_seed_n=int(os.getenv('QUEEN_GENE_SEED_N','40000')) if templates else 0
+   # Precision mode: the configured batch size is a hard total, including career-seeded
+   # descendants. Proven careers receive a bounded share of the batch rather than creating
+   # an extra population on top of it.
+   seed_fraction=max(0.0,min(.50,float(os.getenv('QUEEN_GENE_SEED_FRACTION','.20')))) if templates else 0.0
+   gene_seed_n=min(wave_size,int(round(wave_size*seed_fraction)))
+   fresh_n=wave_size-gene_seed_n
+   pop=[random_genome(rng,memory,eco_plan,eco_state) for _ in range(fresh_n)]; provenance=[None]*len(pop)
    for _ in range(gene_seed_n):
     base=copy.deepcopy(rng.choice(templates));pop.append(mutate(base,rng,active_sensors,sensor_ranges));provenance.append(None)
   else:
@@ -329,7 +334,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
   fresh_rate=max(base_fresh,.50 if behaviour_groups<10 else (.40 if behaviour_groups<20 else (.30 if behaviour_groups<40 else base_fresh)))
   last=ranked
   eligible=sum(x['selection_score']>-900 for x in ranked)
-  print(json.dumps({'wave':wave,'tested':tested,'eligible':eligible,'best':ranked[0]['selection_score'],'parent_behaviour_groups':behaviour_groups,'fresh_blood_rate':fresh_rate,'urgency':'EXTREME','directive':'breed faster; kill fragility; earn expansion','mutation_credit':mutation_summary}),flush=True)
+  print(json.dumps({'wave':wave,'batch_size':len(pop),'tested':tested,'eligible':eligible,'best':ranked[0]['selection_score'],'parent_behaviour_groups':behaviour_groups,'fresh_blood_rate':fresh_rate,'mode':'precision','directive':'select carefully; preserve diversity; no promotion pressure','mutation_credit':mutation_summary}),flush=True)
   if checkpoint:
    os.makedirs(os.path.dirname(checkpoint),exist_ok=True);pickle.dump({'methodology_version':METHODOLOGY_VERSION,'wave':wave,'tested':tested,'parents':parents,'rng_state':rng.getstate(),'best':ranked[0]['selection_score'],'eligible':eligible,'fresh_rate':fresh_rate,'behaviour_archive':behaviour_archive,'saved_at':time.time()},open(checkpoint,'wb'))
  # Only after breeding is completely finished do we open holdout. The candidate pool is
@@ -378,7 +383,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
                         'positive_finalists':sum(v>0 for v in vals),'median_avg_net_gbp':statistics.median(vals) if vals else None}
  weak_counts=collections.Counter(_ecology_signature(x['genome']) for x in last if x.get('selection_score',-999)<=-900)
  weak_niches=[{'signature':sig,'count':cnt} for sig,cnt in weak_counts.most_common(20) if cnt>=5]
- summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'finalist_handoff':'behaviour_capped_from_top1000','historical_holdout_used_for_algorithm_design':True,'prospective_proof_required':True,'min_train_events':18,'min_validation_events':12,'breeding_diversity_cap_per_behaviour':3,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':fresh_rate,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[]),'prospective_preferred_features':memory.get('prospective_preferred_features',[]),'prospective_parent_templates':len(memory.get('prospective_parent_templates',[])),'prospective_mints_forced_train':len(exp_mints),'active_ant_genomes_frozen':True,'experience_breeds_descendants':True,'gene_seed_extra_first_wave':int(os.getenv('QUEEN_GENE_SEED_N','40000')) if memory.get('prospective_parent_templates') else 0,'ecology_plan':eco_plan,'swarm_research_plan':swarm_plan,'behavioral_parent_cap':3,'behavioral_finalist_cap':1,'cross_wave_behaviour_archive':len(behaviour_archive),'methodology_version':METHODOLOGY_VERSION,'exam_snapshot_version':2,'exam_snapshot_sha256':exam_hash,'exam_holdout_rows':exam_rows,'sensor_availability':{k:round(v,4) for k,v in sensor_availability.items()},'active_sensor_count':len(active_sensors),'empirical_sensor_range_count':len(sensor_ranges),'breeding_regime_coverage':regime_coverage,'weak_niches':weak_niches,'mutation_credit':summarise_mutation_credit(mutation_credit)}
+ summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'finalist_handoff':'behaviour_capped_from_top1000','historical_holdout_used_for_algorithm_design':True,'prospective_proof_required':True,'min_train_events':18,'min_validation_events':12,'breeding_diversity_cap_per_behaviour':3,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':fresh_rate,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[]),'prospective_preferred_features':memory.get('prospective_preferred_features',[]),'prospective_parent_templates':len(memory.get('prospective_parent_templates',[])),'prospective_mints_forced_train':len(exp_mints),'active_ant_genomes_frozen':True,'experience_breeds_descendants':True,'batch_size':wave_size,'precision_mode':True,'gene_seed_fraction':max(0.0,min(.50,float(os.getenv('QUEEN_GENE_SEED_FRACTION','.20')))) if memory.get('prospective_parent_templates') else 0.0,'ecology_plan':eco_plan,'swarm_research_plan':swarm_plan,'behavioral_parent_cap':3,'behavioral_finalist_cap':1,'cross_wave_behaviour_archive':len(behaviour_archive),'methodology_version':METHODOLOGY_VERSION,'exam_snapshot_version':2,'exam_snapshot_sha256':exam_hash,'exam_holdout_rows':exam_rows,'sensor_availability':{k:round(v,4) for k,v in sensor_availability.items()},'active_sensor_count':len(active_sensors),'empirical_sensor_range_count':len(sensor_ranges),'breeding_regime_coverage':regime_coverage,'weak_niches':weak_niches,'mutation_credit':summarise_mutation_credit(mutation_credit)}
  if checkpoint and os.path.exists(checkpoint): os.remove(checkpoint)
  await conn.execute("INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary) VALUES('queen_pattern',$1,$2,$3::jsonb,$4::jsonb)",tested,len(rows),json.dumps(finalists,default=str),json.dumps(summary,default=str))
  return summary,finalists

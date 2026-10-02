@@ -4,7 +4,7 @@ Role metadata is operational telemetry and a guardrail contract. It does not gra
 trading authority and deliberately keeps future multi-market expansion separate from
 today's SOL-only implementation.
 """
-ROLE_VERSION = "queen-roles-v1"
+ROLE_VERSION = "queen-roles-v2"
 
 BREEDING_QUEEN = {
     "id": "breeding_queen",
@@ -25,6 +25,11 @@ BREEDING_QUEEN = {
         "allocate_real_capital",
     ],
     "qualification_handoff": 2,
+    "operating_mode": "precision",
+    "batch_size": 10000,
+    "waves_per_campaign": 2,
+    "campaign_cooldown_hours": 24,
+    "elite_promotion_target_per_week": "1-2 (target, never quota)",
 }
 
 SWARM_QUEEN = {

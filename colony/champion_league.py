@@ -6,7 +6,8 @@ historical comparison; a separate sealed Spartan exam remains untouched. Promoti
 also requires prospective evidence, so a backtest alone cannot displace an elite.
 """
 from __future__ import annotations
-import hashlib,json,math,statistics
+import hashlib,json,math,statistics,os
+from datetime import datetime,timezone
 from colony.evaluator import matches
 from colony.forward import eligible
 from colony.historical_nursery import sampled_path_return_pct
@@ -19,6 +20,12 @@ FOUNDER_ELITES=(
  'g_d20b45ea6d9be79a','g_b14e95af529a77d9')
 MIN_FORWARD_EVENTS=25
 MIN_FORWARD_DAYS=3
+PROMOTION_COOLDOWN_SECONDS=int(os.getenv('CHAMPION_PROMOTION_COOLDOWN_SECONDS','259200'))
+
+def _cooldown_remaining(last_promotion,now=None,cooldown_seconds=PROMOTION_COOLDOWN_SECONDS):
+ if not last_promotion:return 0
+ now=now or datetime.now(timezone.utc)
+ return max(0,int(cooldown_seconds-(now-last_promotion).total_seconds()))
 
 async def ensure_schema(c):
  await c.execute("""CREATE TABLE IF NOT EXISTS champion_league(
@@ -172,7 +179,9 @@ async def refresh_rankings(c,allow_promotion=True):
  quals=sorted([x for x in computed if x['pool']=='qualification'],key=lambda x:(x['total'] is not None,x['total'] or -1e9),reverse=True)
  for i,x in enumerate(quals,1):await c.execute('UPDATE champion_league SET qualification_rank=$2 WHERE genome_id=$1',x['genome_id'],i)
  elites=[x for x in computed if x['pool']=='elite'];promotion=None
- if allow_promotion and len(elites)>=1:
+ last_promotion=await c.fetchval("SELECT max(promoted_at) FROM champion_league WHERE source<>'reversal_founder' AND promoted_at IS NOT NULL")
+ promotion_cooldown_remaining=_cooldown_remaining(last_promotion)
+ if allow_promotion and len(elites)>=1 and promotion_cooldown_remaining==0:
   worst=min(elites,key=lambda x:x['total'] if x['total'] is not None else -1e9);elite_sigs={x['sig'] for x in elites}
   for q in quals:
    f=q['forward'];a=q['arena']
@@ -185,4 +194,4 @@ async def refresh_rankings(c,allow_promotion=True):
     await c.execute("UPDATE champion_league SET pool='qualification',elite_slot=NULL,qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",worst['genome_id'])
     await c.execute("UPDATE champion_league SET pool='elite',elite_slot=$2,promoted_at=now(),qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",q['genome_id'],slot)
    promotion={'in':q['genome_id'],'out':worst['genome_id'],'slot':slot,'challenger_total':q['total'],'incumbent_total':worst['total']};break
- return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'promotion':promotion}
+ return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'promotion':promotion,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}
