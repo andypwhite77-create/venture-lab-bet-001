@@ -26,6 +26,14 @@ The development sequence is:
 PUBLIC LIVE DATA -> SHARED DATA LAYER -> STRATEGY ENGINE -> research_candidates -> FORWARD EVALUATOR -> research_outcomes -> SCOREBOARD
 ```
 
+### Current evolutionary platform — 2 October 2026
+
+The research platform has expanded beyond the original four fixed strategy engines. The current hierarchy is **Swarm Queen → deterministic Breeding Queen → specialist ant populations**, with Spartan v2 acting as an external adversarial examiner. The active general-Queen methodology is `queen-v8-directed-mutation-credit`: parent→child train/validation deltas teach the breeder whether local, standard or wide mutation is currently producing stronger descendants, while every operator keeps a mandatory exploration floor. Sealed holdout and Spartan answers never feed this mutation credit.
+
+Reversal runs a bounded continuous-v2 prospective lineage; failed but informative Spartan finalists can enter a quarantined paper-only Alumni breeding pool; and a permanent Hall of Fame stores up to three behaviourally distinct top performers from every completed Spartan exam. Alumni/Hall-of-Fame ancestry inherits genetics only, never validation credit. Real-money execution authority remains a separate deterministic/human gate; the presence of canary execution infrastructure does not imply that live trading is enabled.
+
+See `docs/QUEEN_ARCHITECTURE.md`, `docs/grace-colony-architecture.md`, `docs/grace-evolutionary-trading-swarm.md`, and `docs/SPARTAN_V2.md` for the current platform model.
+
 ## Safety / research guardrails
 
 The current build has deliberately hard boundaries:

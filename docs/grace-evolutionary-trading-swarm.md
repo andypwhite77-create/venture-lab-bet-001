@@ -1,7 +1,7 @@
 # Grace Evolutionary Trading Swarm
 
 Status: implemented prospective paper experiment
-Updated: 2026-09-28
+Updated: 2026-10-02
 
 ## Core idea
 
@@ -241,3 +241,13 @@ Reversal's current evolutionary funnel breeds 50,000 variants against chronologi
 A historically selected survivor must then accumulate at least 20 independent future mints in live-market paper observation. Positive mean and median net return, positive matched control edge, acceptable tail behaviour and correlation-adjusted rank are mandatory. No more than five can join the production pool, and their parents remain. This is population admission, not real-money authority.
 
 The colony also maintains a growing historical bank of candidate features, outcomes, price paths and market snapshots, supplemented by a rate-limited GeckoTerminal OHLCV backfill for observed Solana pools. Historical data is explicitly separated from prospective proof to prevent leakage.
+
+## Directed mutation learning and Spartan genetic archive — 2 October 2026
+
+The general Breeding Queen now uses `queen-v8-directed-mutation-credit`. Instead of applying one undifferentiated mutation law, breeding chooses among local, standard and wide mutation operators. Every bred child retains research-only parent/operator provenance outside the genome. After train+validation evaluation, the operator receives bounded credit for the child's score delta versus that exact parent.
+
+This credit changes only future mutation allocation. All three operators retain a minimum exploration probability, preventing premature lock-in. Credit is derived solely from breeding-visible evidence; sealed holdout and Spartan answers never update it. The intended test is whether the breeding process itself learns which mutation scale produces stronger descendants, rather than merely learning which parents look good.
+
+Reversal continuous-v2 and the Spartan Alumni pool provide parallel prospective evolutionary paths. Reversal descendants must earn fresh forward evidence and are culled when they fail parent/bloodline improvement rules. Spartan Alumni preserves selected failed finalists as paper-only breeding ancestry, while the Hall of Fame permanently stores up to three behaviourally distinct top performers per exam. Old exam evidence may select ancestry but never counts as prospective proof for descendants.
+
+The external examiner remains unchanged. A stronger breeding system is required to meet Spartan; Spartan is not weakened to accommodate the colony.

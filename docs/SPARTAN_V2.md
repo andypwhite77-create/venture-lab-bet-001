@@ -47,3 +47,11 @@ Momentum: original and Early Acceleration formulations failed chronological robu
 Order Flow: original formulation failed as evidence bank grew. Breakout Failure replacement
 completed 50,000 genomes on 1,857 rows / 162 mints with zero eligible candidates and zero finalists.
 This is retained as a clean pre-v2 falsification baseline.
+
+## 2 October 2026 — external examiner, Hall of Fame and Alumni
+
+Spartan remains an external examiner. Its exact thresholds and sealed answers are not returned to the Breeding Queen or mutation-credit system. Queen v8 may learn which mutation operators improve train+validation descendants, but Spartan evidence cannot alter those operator weights.
+
+Failed finalists are no longer treated as disposable information. After each completed exam, up to the top three behaviourally distinct performers are copied into a permanent Hall of Fame with exam provenance and metrics. This archive does not convert failure into a pass.
+
+Selected Hall-of-Fame/finalist genomes may seed a quarantined Spartan Alumni paper pool. Alumni ancestry is explicitly exam-contaminated: old exam evidence may nominate genetics, but descendants start with zero prospective proof and must earn fresh forward evidence before any future untouched examination. Cosmetic/genetic duplicates do not receive extra archival slots.

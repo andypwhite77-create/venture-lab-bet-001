@@ -1,7 +1,7 @@
 # Grace Colony Architecture
 
 Status: implemented prototype / prospective paper experiment
-Updated: 2026-09-28
+Updated: 2026-10-02
 
 ## Purpose
 
@@ -213,3 +213,13 @@ The research bank grows continuously: raw prospective candidates/outcomes/price 
 
 ## Strategy-colony isolation (29 September 2026)
 Reversal, Momentum, Order Flow, and Wallet Convergence are governed as separate evolutionary colonies. Each has its own founder/control, historical nursery, candidate queue, prospective tournament, culling, and production-elite path. Shared market observations are evidence infrastructure, not shared Queen state: multiple colonies may evaluate and trade the same mint differently. Reversal remains the original Queen and is not loaded with the other colonies' evolutionary state. The dashboard exposes Swarm plus one tab per strategy colony. Mass historical sweeps test 50,000 genomes per family when genuinely new independent evidence accumulates; historical profitability is discovery only and can never grant live-money authority.
+
+## Platform update — 2 October 2026
+
+The trading colony now has a three-part evolutionary memory stack: Queen cross-campaign feature/niche memory, parent→child mutation-operator credit, and permanent failed-strategy archives. The Breeding Queen's current methodology is `queen-v8-directed-mutation-credit`.
+
+Mutation provenance is kept outside the operative genome. Local, standard and wide mutation operators are evaluated by each child's train+validation score delta versus its exact parent. Better operators gain research allocation, while every operator retains a hard exploration floor. Sealed holdout and Spartan results are excluded from this learning loop, preserving the external-exam boundary.
+
+Failed but informative Spartan finalists are no longer discarded. A Hall of Fame stores up to three behaviourally distinct top performers per exam, and a quarantined Spartan Alumni paper pool may breed fresh descendants from selected failed ancestry. Descendants inherit genetics, not validation credit: they begin with zero prospective proof and must earn future evidence normally.
+
+Reversal also has a bounded continuous-v2 lineage with generation logging and prospective parent/child comparison. These additions change research and breeding only; deterministic live-execution authority and capital controls remain separate.

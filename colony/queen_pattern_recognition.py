@@ -9,9 +9,10 @@ from colony.historical_nursery import load_rows,split_rows,evaluate,regime_name
 from colony.queen_memory import load_memory
 from colony.paper_economics import TARGET_STAKE_GBP,measured_roundtrip_network_fee_sol,sol_gbp_rate
 from colony.queen_ecology import load as load_ecology, strategy as ecology_strategy
+from colony.queen_mutation_credit import load as load_mutation_credit, save as save_mutation_credit, choose as choose_mutation_operator, record as record_mutation_credit, summarise as summarise_mutation_credit
 SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000),'trend_alignment':(-1200,1800),'short_vs_hour':(-30,30),'flow_imbalance_15':(-1,1),'flow_imbalance_30':(-1,1),'flow_shift':(-2,2),'activity_30':(0,1600),'activity_h1':(0,5000),'flow_imbalance_h1':(-1,1),'buy_activity_change':(-1,12),'volume_liquidity_h1':(0,10),'fdv_liquidity_ratio':(0,1000),'marketcap_liquidity_ratio':(0,1000),'pair_age_hours':(0,10000),'advisor_reversal':(0,1),'advisor_momentum':(0,1),'advisor_order_flow':(0,1),'advisor_exhaustion':(0,1),'advisor_mean_reversion':(0,1),'advisor_count':(0,5),'live_signal_reversal':(0,1),'live_signal_exhaustion':(0,1),'live_signal_momentum':(0,1),'live_signal_order_flow':(0,1),'live_signal_wallet_convergence':(0,1),'live_signal_mean_reversion':(0,1),'live_signal_count':(0,6),'live_council_available':(0,1),'hist_context_available':(0,1),'hist_return_24h':(-100,500),'hist_return_7d':(-100,5000),'hist_volatility_24h':(0,300),'hist_volume_ratio_24h':(0,20),'hist_drawdown_7d_pct':(-100,0),'hist_position_7d':(0,1)}
 HOLDS=(5,10,15,30,45,60,240)
-METHODOLOGY_VERSION='queen-v7-soft-floor-breadth-margin'
+METHODOLOGY_VERSION='queen-v8-directed-mutation-credit'
 # Queen may evolve simple risk management; all decisions are fixed before sealed holdout.
 STOP_LOSSES=(None,-5,-8,-12,-18,-25)
 TAKE_PROFITS=(None,5,8,12,20,35,60)
@@ -91,21 +92,28 @@ def _behaviour_key(x):
  g=x['genome']; prm=g.get('parameters',{})
  return (x['train'].get('event_signature'),x['validation'].get('event_signature'),int(prm.get('hold_minutes',15)),prm.get('stop_loss_pct'),prm.get('take_profit_pct'))
 
-def mutate(g,rng,allowed_sensors=None,sensor_ranges=None):
+MUTATION_MODES={
+ 'local':{'add':.02,'delete':.12,'touch':.55,'sigma':.025,'hold':.08,'risk':.05},
+ 'standard':{'add':.05,'delete':.30,'touch':.60,'sigma':.05,'hold':.20,'risk':.12},
+ 'wide':{'add':.12,'delete':.35,'touch':.82,'sigma':.12,'hold':.35,'risk':.22},
+}
+
+def mutate(g,rng,allowed_sensors=None,sensor_ranges=None,operator='standard'):
  x=copy.deepcopy(g);p=x['predicates']; allowed=list(allowed_sensors or SENSORS); sensor_ranges=sensor_ranges or {}
+ cfg=MUTATION_MODES.get(operator,MUTATION_MODES['standard'])
  def rr(k):
   r=sensor_ranges.get(k); return (float(r[0]),float(r[1])) if isinstance(r,(list,tuple)) and len(r)==2 and float(r[0])<float(r[1]) else SENSORS[k]
- if rng.random()<.05 and len(p)<5:
+ if rng.random()<cfg['add'] and len(p)<5:
   avail=[k for k in allowed if k not in p]
   if avail:
    k=rng.choice(avail);lo,hi=rr(k);p[k]={rng.choice(('min','max')):rng.uniform(lo,hi)}
- if rng.random()<.30 and len(p)>1:del p[rng.choice(list(p))]
+ if rng.random()<cfg['delete'] and len(p)>1:del p[rng.choice(list(p))]
  for k,r in p.items():
-  if rng.random()<.6:
-   lo,hi=rr(k);op=next(iter(r));r[op]=max(lo,min(hi,r[op]+rng.gauss(0,(hi-lo)*.05)))
- if rng.random()<.2:x['parameters']['hold_minutes']=rng.choice(HOLDS)
- if rng.random()<.12:x['parameters']['stop_loss_pct']=rng.choice(STOP_LOSSES)
- if rng.random()<.12:x['parameters']['take_profit_pct']=rng.choice(TAKE_PROFITS)
+  if rng.random()<cfg['touch']:
+   lo,hi=rr(k);op=next(iter(r));r[op]=max(lo,min(hi,r[op]+rng.gauss(0,(hi-lo)*cfg['sigma'])))
+ if rng.random()<cfg['hold']:x['parameters']['hold_minutes']=rng.choice(HOLDS)
+ if rng.random()<cfg['risk']:x['parameters']['stop_loss_pct']=rng.choice(STOP_LOSSES)
+ if rng.random()<cfg['risk']:x['parameters']['take_profit_pct']=rng.choice(TAKE_PROFITS)
  return x
 
 def selection_fitness(parts,genome=None):
@@ -226,7 +234,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
  memory['underexplored_features']=[k for k in memory.get('underexplored_features',[]) if k in active_sensors]
  memory['preferred_features']=[k for k in memory.get('preferred_features',[]) if k in active_sensors]
  fee=await measured_roundtrip_network_fee_sol(conn);rate,_=sol_gbp_rate();cost=fee*rate
- parents=[];last=[];tested=0;start_wave=1
+ parents=[];last=[];tested=0;start_wave=1;mutation_credit=load_mutation_credit()
  if checkpoint and os.path.exists(checkpoint):
   try:
    cp=pickle.load(open(checkpoint,'rb'))
@@ -235,16 +243,24 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
    print(json.dumps({'event':'queen_resumed','from_wave':start_wave,'tested':tested,'urgency':'EXTREME','methodology_version':METHODOLOGY_VERSION}),flush=True)
   except Exception as e: print(json.dumps({'event':'checkpoint_rejected','error':str(e)}),flush=True)
  for wave in range(start_wave,waves+1):
+  provenance=[]
   if not parents:
    templates=[x.get('genome') for x in memory.get('prospective_parent_templates',[]) if isinstance(x.get('genome'),dict)]
-   pop=[random_genome(rng,memory,eco_plan,eco_state) for _ in range(wave_size)]
+   pop=[random_genome(rng,memory,eco_plan,eco_state) for _ in range(wave_size)]; provenance=[None]*len(pop)
    # Dedicated gene-seed injection: add a separate 40k descendant cohort without
    # replacing wild exploration. This preserves creativity while exploiting robust careers.
    gene_seed_n=int(os.getenv('QUEEN_GENE_SEED_N','40000')) if templates else 0
    for _ in range(gene_seed_n):
-    base=copy.deepcopy(rng.choice(templates));base['family']='queen_pattern';base['species']='career_descendant';pop.append(mutate(base,rng,active_sensors,sensor_ranges))
+    base=copy.deepcopy(rng.choice(templates));base['family']='queen_pattern';base['species']='career_descendant';pop.append(mutate(base,rng,active_sensors,sensor_ranges));provenance.append(None)
   else:
-   pop=[mutate(rng.choice(parents),rng,active_sensors,sensor_ranges) if rng.random()<(1.0-fresh_rate) else random_genome(rng,memory,eco_plan,eco_state) for _ in range(wave_size)]
+   pop=[];provenance=[]
+   for _ in range(wave_size):
+    if rng.random()<(1.0-fresh_rate):
+     parent=rng.choice(parents); op=choose_mutation_operator(rng,mutation_credit)
+     child=mutate(parent['genome'],rng,active_sensors,sensor_ranges,operator=op)
+     pop.append(child);provenance.append((op,float(parent['selection_score']),parent['genome_id']))
+    else:
+     pop.append(random_genome(rng,memory,eco_plan,eco_state));provenance.append(None)
   # Breeding never evaluates sealed holdout. Score train+validation only, in parallel.
   workers=max(1,min(int(os.getenv('QUEEN_EVAL_WORKERS','2')),os.cpu_count() or 1))
   if workers==1:
@@ -257,6 +273,12 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
     ranked=list(ex.map(_worker_score,pop,chunksize=128))
    for x in ranked:x['wave']=wave
   tested+=len(pop)
+  if any(provenance):
+   for x,prov in zip(ranked,provenance):
+    if prov:
+     op,parent_score,_=prov; mutation_credit=record_mutation_credit(op,parent_score,x['selection_score'],mutation_credit)
+   save_mutation_credit(mutation_credit)
+  mutation_summary=summarise_mutation_credit(mutation_credit)
   ranked.sort(key=lambda x:x['selection_score'],reverse=True)
   # Preserve actual behavioural diversity: identical executed opportunity sets + risk
   # controls may contribute only a few parents, regardless of cosmetic genome differences.
@@ -265,14 +287,14 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
    if x['selection_score']<=-900: continue
    sig=_behaviour_key(x)
    if phenos.get(sig,0)>=3: continue
-   phenos[sig]=phenos.get(sig,0)+1;parents.append(x['genome'])
+   phenos[sig]=phenos.get(sig,0)+1;parents.append({'genome_id':x['genome_id'],'genome':x['genome'],'selection_score':x['selection_score']})
    if len(parents)>=300: break
   behaviour_groups=len(phenos)
   base_fresh=max(.20,min(.50,float(eco_plan.get('wild_scouts',.20))))
   fresh_rate=max(base_fresh,.50 if behaviour_groups<10 else (.40 if behaviour_groups<20 else (.30 if behaviour_groups<40 else base_fresh)))
   last=ranked
   eligible=sum(x['selection_score']>-900 for x in ranked)
-  print(json.dumps({'wave':wave,'tested':tested,'eligible':eligible,'best':ranked[0]['selection_score'],'parent_behaviour_groups':behaviour_groups,'fresh_blood_rate':fresh_rate,'urgency':'EXTREME','directive':'breed faster; kill fragility; earn expansion'}),flush=True)
+  print(json.dumps({'wave':wave,'tested':tested,'eligible':eligible,'best':ranked[0]['selection_score'],'parent_behaviour_groups':behaviour_groups,'fresh_blood_rate':fresh_rate,'urgency':'EXTREME','directive':'breed faster; kill fragility; earn expansion','mutation_credit':mutation_summary}),flush=True)
   if checkpoint:
    os.makedirs(os.path.dirname(checkpoint),exist_ok=True);pickle.dump({'methodology_version':METHODOLOGY_VERSION,'wave':wave,'tested':tested,'parents':parents,'rng_state':rng.getstate(),'best':ranked[0]['selection_score'],'eligible':eligible,'fresh_rate':fresh_rate,'saved_at':time.time()},open(checkpoint,'wb'))
  # Only after breeding is completely finished do we open holdout for the fixed top pool.
@@ -319,7 +341,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
                         'positive_finalists':sum(v>0 for v in vals),'median_avg_net_gbp':statistics.median(vals) if vals else None}
  weak_counts=collections.Counter(_ecology_signature(x['genome']) for x in last if x.get('selection_score',-999)<=-900)
  weak_niches=[{'signature':sig,'count':cnt} for sig,cnt in weak_counts.most_common(20) if cnt>=5]
- summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'finalist_handoff':'behaviour_capped_from_top1000','historical_holdout_used_for_algorithm_design':True,'prospective_proof_required':True,'min_train_events':18,'min_validation_events':12,'breeding_diversity_cap_per_behaviour':3,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':fresh_rate,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[]),'prospective_preferred_features':memory.get('prospective_preferred_features',[]),'prospective_parent_templates':len(memory.get('prospective_parent_templates',[])),'prospective_mints_forced_train':len(exp_mints),'active_ant_genomes_frozen':True,'experience_breeds_descendants':True,'gene_seed_extra_first_wave':int(os.getenv('QUEEN_GENE_SEED_N','40000')) if memory.get('prospective_parent_templates') else 0,'ecology_plan':eco_plan,'swarm_research_plan':swarm_plan,'behavioral_parent_cap':3,'behavioral_finalist_cap':1,'methodology_version':METHODOLOGY_VERSION,'exam_snapshot_version':2,'exam_snapshot_sha256':exam_hash,'exam_holdout_rows':exam_rows,'sensor_availability':{k:round(v,4) for k,v in sensor_availability.items()},'active_sensor_count':len(active_sensors),'empirical_sensor_range_count':len(sensor_ranges),'breeding_regime_coverage':regime_coverage,'weak_niches':weak_niches}
+ summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'finalist_handoff':'behaviour_capped_from_top1000','historical_holdout_used_for_algorithm_design':True,'prospective_proof_required':True,'min_train_events':18,'min_validation_events':12,'breeding_diversity_cap_per_behaviour':3,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':fresh_rate,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[]),'prospective_preferred_features':memory.get('prospective_preferred_features',[]),'prospective_parent_templates':len(memory.get('prospective_parent_templates',[])),'prospective_mints_forced_train':len(exp_mints),'active_ant_genomes_frozen':True,'experience_breeds_descendants':True,'gene_seed_extra_first_wave':int(os.getenv('QUEEN_GENE_SEED_N','40000')) if memory.get('prospective_parent_templates') else 0,'ecology_plan':eco_plan,'swarm_research_plan':swarm_plan,'behavioral_parent_cap':3,'behavioral_finalist_cap':1,'methodology_version':METHODOLOGY_VERSION,'exam_snapshot_version':2,'exam_snapshot_sha256':exam_hash,'exam_holdout_rows':exam_rows,'sensor_availability':{k:round(v,4) for k,v in sensor_availability.items()},'active_sensor_count':len(active_sensors),'empirical_sensor_range_count':len(sensor_ranges),'breeding_regime_coverage':regime_coverage,'weak_niches':weak_niches,'mutation_credit':summarise_mutation_credit(mutation_credit)}
  if checkpoint and os.path.exists(checkpoint): os.remove(checkpoint)
  await conn.execute("INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary) VALUES('queen_pattern',$1,$2,$3::jsonb,$4::jsonb)",tested,len(rows),json.dumps(finalists,default=str),json.dumps(summary,default=str))
  return summary,finalists
