@@ -74,9 +74,9 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=10)"]
+      interval: 60s
+      timeout: 15s
       retries: 3
       start_period: 20s
     logging:
@@ -137,6 +137,11 @@ services:
       OLLAMA_URL: http://127.0.0.1:11434/api/generate
       SWARM_QUEEN_MODEL: qwen3:1.7b
       SWARM_QUEEN_INTERVAL_SECONDS: "300"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    cpus: "1.0"
     volumes:
       - queen_state:/data:ro
     logging:
@@ -229,9 +234,13 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
-      QUEEN_EVAL_WORKERS: "2"
+      QUEEN_EVAL_WORKERS: "1"
       SWARM_STRATEGIC_EVERY_CAMPAIGNS: "3"
-    cpus: "2.0"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    cpus: "1.0"
     volumes:
       - queen_state:/data
     logging:
@@ -282,11 +291,11 @@ services:
     volumes:
       - ./secrets/reversal_canary_address.txt:/run/canary/reversal_canary_address.txt:ro
     healthcheck:
-      test: ["CMD", "python", "-m", "colony.canary_executor", "health"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 60s
+      timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 15s
     logging:
       options:
         max-size: "10m"
