@@ -1,5 +1,6 @@
 from html import escape
 import statistics
+from datetime import datetime, timezone, timedelta
 
 def _f(x,d=4):
     try:return f'{float(x):.{d}f}'
@@ -8,7 +9,7 @@ def _f(x,d=4):
 def _label(f):
     return str(f or 'unknown').replace('_',' ').title()
 
-def _bloodline_cards(j):
+def _bloodline_cards(j, period_label="24h"):
     perf={x.get('family') or 'unknown':x for x in j.get('family_performance',[])}
     roster={x.get('family'):x for x in j.get('elite_roster',[])}
     ants=(j.get('selection') or {}).get('ants',[])
@@ -35,15 +36,41 @@ def _bloodline_cards(j):
           <div class='mini-grid'><div><strong>{elites}</strong><span>elite</span></div><div><strong>{controls}</strong><span>control</span></div><div><strong>{chall}</strong><span>waiting</span></div></div>
           <div class='bloodline-meta'>Stage <b>{r.get('stage_size','—')}</b> • evidence-ready <b>{len(mature)}</b> • mature median <b>{_f(statistics.median(returns) if returns else None,2)}%</b></div>
           <div class='bloodline-meta'>Research <b>{tested:,}</b> genomes • finalists <b>{finalists}</b> • holdout+ <b>{hp}</b></div>
-          <div class='bloodline-meta'>Paper bets <b>{trades}</b> • win rate <b>{_f(wr,1)}%</b> • net <b class={'pos' if net>=0 else 'neg'}>{'£'+_f(net_gbp,2) if net_gbp is not None else '—'}</b> <span class='muted'>• {_f(net,6)} SOL</span></div>
+          <div class='bloodline-meta'>{escape(period_label)} marked bets <b>{trades}</b> • win rate <b>{_f(wr,1)}%</b> • net <b class={'pos' if net>=0 else 'neg'}>{'£'+_f(net_gbp,2) if net_gbp is not None else '—'}</b> <span class='muted'>• {_f(net,6)} SOL</span></div>
         </article>""")
     return ''.join(cards)
 
-def _chart(curve, rate, period='7d', metric='net_gbp'):
-    from datetime import datetime, timezone, timedelta
+
+_PERIODS={
+    '24h':('24h',timedelta(hours=24)),
+    '7d':('7d',timedelta(days=7)),
+    '30d':('30d',timedelta(days=30)),
+    '90d':('90d',timedelta(days=90)),
+    'all':('all time',None),
+}
+
+def _period_rows(curve, period):
+    if period not in _PERIODS: period='24h'
+    delta=_PERIODS[period][1]
+    if delta is None: return list(curve),period
+    cutoff=datetime.now(timezone.utc)-delta
+    return [x for x in curve if not x.get('created_at') or x.get('created_at')>=cutoff],period
+
+def _family_performance_from_curve(curve):
+    out={}
+    for x in curve:
+        fam=x.get('family') or 'unknown'
+        row=out.setdefault(fam,{'family':fam,'trades':0,'wins':0,'net':0.0})
+        row['trades']+=1
+        net=float(x.get('net_pnl') or 0)
+        row['wins']+=int(net>0)
+        row['net']+=net
+    return sorted(out.values(),key=lambda x:x['net'],reverse=True)
+
+def _chart(curve, rate, period='24h', metric='net_gbp'):
     periods={'24h':('24 hours',timedelta(hours=24)),'7d':('7 days',timedelta(days=7)),'30d':('30 days',timedelta(days=30)),'90d':('90 days',timedelta(days=90)),'all':('All time',None)}
     metrics={'net_gbp':'Cumulative net £','net_sol':'Cumulative net SOL','trade_gbp':'Per-bet P/L £','gross_gbp':'Cumulative gross £','friction_gbp':'Cumulative friction £','win_rate':'Cumulative win rate %'}
-    if period not in periods: period='7d'
+    if period not in periods: period='24h'
     if metric not in metrics: metric='net_gbp'
     now=datetime.now(timezone.utc); delta=periods[period][1]
     rows=[]
@@ -84,11 +111,16 @@ def _chart(curve, rate, period='7d', metric='net_gbp'):
     summary=f"<div class='chart-summary'><b>{escape(metrics[metric])}</b><span>{escape(periods[period][0])} • {len(vals)} marked bets • latest <b>{escape(fmt(vals[-1]))}</b></span></div>"
     return controls+summary+f"<div class='chartbox'>{svg}</div>"
 
-def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
+def render(j, chart_period="24h", chart_metric="net_gbp", selected_family="all"):
+    j=dict(j)
+    native=dict(j.get("native") or {})
+    period_curve,chart_period=_period_rows(native.get("curve",[]),chart_period)
+    native["curve"]=period_curve
+    j["native"]=native
+    j["family_performance"]=_family_performance_from_curve(period_curve)
     valid={"all","reversal","exhaustion","queen_pattern","mean_reversion"}
     selected_family=selected_family if selected_family in valid else "all"
     if selected_family != "all":
-        j=dict(j)
         j["elite_roster"]=[x for x in j.get("elite_roster",[]) if x.get("family")==selected_family]
         j["family_performance"]=[x for x in j.get("family_performance",[]) if x.get("family")==selected_family]
         sel=dict(j.get("selection") or {})
@@ -98,24 +130,24 @@ def render(j, chart_period="7d", chart_metric="net_gbp", selected_family="all"):
         native["trades"]=[x for x in native.get("trades",[]) if (x.get("attribution") or {}).get("family")==selected_family]
         native["curve"]=[x for x in native.get("curve",[]) if x.get("family")==selected_family]
         j["native"]=native
-    n=j['native'];s=n['summary'];curve=n['curve'];marked=len(curve);wins=sum(1 for x in curve if float(x.get('net_pnl') or 0)>0)
-    rate=j.get('sol_gbp');net=float(s.get('net_pnl') or 0);gbp='' if rate is None else f'£{net*float(rate):.2f}'
+    n=j['native'];curve=n['curve'];marked=len(curve);wins=sum(1 for x in curve if float(x.get('net_pnl') or 0)>0)
+    rate=j.get('sol_gbp');net=sum(float(x.get('net_pnl') or 0) for x in curve);gbp='' if rate is None else f'£{net*float(rate):.2f}'
     roster=j.get('elite_roster',[]);active=sum(int(x.get('active') or 0) for x in roster);elites=sum(int(x.get('elites') or 0) for x in roster);chall=sum(int(x.get('challengers') or 0) for x in roster)
     real=sum(bool(x.get('broadcast')) for x in n.get('trades',[]))+sum(bool(x.get('broadcast')) for x in j['external'].get('trades',[]))
     acc=j.get('accelerator') or {};left=max(0,int(acc.get('trigger_at',25))-int(acc.get('new_mints',0)))
     rw=j.get('reversal_wallet') or {}; rwbal=rw.get('balance_gbp'); rwret=rw.get('return_pct'); rwtr=rw.get('trades',0)
     if selected_family=='all':
         total_net=sum(float(x.get('net') or 0) for x in j.get('family_performance',[])); total_gbp=total_net*float(rate) if rate is not None else None
-        money_card=('SWARM TOTAL',('£'+_f(total_gbp,2)) if total_gbp is not None else '—','combined net from all strategy colonies')
+        money_card=('SWARM '+chart_period.upper(),('£'+_f(total_gbp,2)) if total_gbp is not None else '—','net from marked bets in selected window')
     else:
         fp=next((x for x in j.get('family_performance',[]) if x.get('family')==selected_family),{})
         family_net=float(fp.get('net') or 0); family_gbp=family_net*float(rate) if rate is not None else None
-        money_card=('COLONY TOTAL',('£'+_f(family_gbp,2)) if family_gbp is not None else '—',f"{_label(selected_family)} only • no other colony P&L")
+        money_card=('COLONY '+chart_period.upper(),('£'+_f(family_gbp,2)) if family_gbp is not None else '—',f"{_label(selected_family)} • selected window only")
     cards=[('ACTIVE ANTS',active,'prospective roster'),('QUALIFIED ELITES',elites,'earned training seats'),('CHALLENGERS',chall,'waiting for a seat'),money_card,('EXECUTION TESTS',marked,'independent £25-scale observations; not a wallet'),('NEXT EVOLUTION',f'{left} mints','until accelerator sweep')]
     cards_html=''.join(f"<div class='metric'><div class='metric-label'>{escape(k)}</div><div class='metric-value'>{escape(str(v))}</div><div class='metric-note'>{escape(str(note))}</div></div>" for k,v,note in cards)
     tabs=''.join(f"<a class='colony-tab {'active' if selected_family==f else ''}' href='/dashboard?family={f}&period={chart_period}&metric={chart_metric}'>{_label(f) if f!='all' else 'Swarm'}</a>" for f in ['all','reversal','exhaustion','queen_pattern','mean_reversion'])
     cards_html=f"<div class='colony-tabs'>{tabs}</div>"+cards_html
-    fam=_bloodline_cards(j)
+    fam=_bloodline_cards(j,_PERIODS.get(chart_period,(chart_period,None))[0])
     if selected_family != 'all':
         # _bloodline_cards sees a family-filtered snapshot; suppress zero cards from other colonies.
         import re

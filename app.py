@@ -260,7 +260,7 @@ async def colony_live():
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(period: str = "7d", metric: str = "net_gbp", family: str = "all"):
+async def dashboard(period: str = "24h", metric: str = "net_gbp", family: str = "all"):
     from pathlib import Path
     from colony.dashboard_api import snapshot
     from colony.dashboard_server import render
