@@ -19,6 +19,12 @@ class QueenQualityTests(unittest.TestCase):
         broad = selection_fitness([metrics(60), metrics(30)], genome)
         self.assertGreater(broad, thin)
 
+    def test_floor_preserves_viable_funnel(self):
+        genome = {'predicates': {'a': {'min': 1}}}
+        self.assertGreater(selection_fitness([metrics(18), metrics(12)], genome), -900)
+        self.assertLess(selection_fitness([metrics(17), metrics(12)], genome), -900)
+        self.assertLess(selection_fitness([metrics(18), metrics(11)], genome), -900)
+
     def test_parsimony_penalises_needless_complexity(self):
         parts = [metrics(60), metrics(30)]
         simple = {'predicates': {str(i): {'min': 1} for i in range(3)}}
