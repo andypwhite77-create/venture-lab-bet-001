@@ -34,6 +34,10 @@ async def learn(conn):
         SELECT r.family,e.run_id,e.genome_id,e.mint,e.candidate_id,e.observed_at,e.hold_minutes,a.genome
         FROM family_tournament_entries e JOIN family_tournament_ants a USING(run_id,genome_id)
         JOIN family_tournament_runs r ON r.run_id=e.run_id
+        UNION ALL
+        SELECT 'eve_reference:'||r.family,r.id::text,e.genome_id,e.mint,e.candidate_id,e.observed_at,e.hold_minutes,r.genome
+        FROM eve_reference_paper_entries e JOIN live_ant_registry r ON r.id=e.ant_id
+        WHERE r.source='eve_reference' AND r.live_candidate=true
       ), firsts AS (
         SELECT DISTINCT ON(family,run_id,genome_id,mint) * FROM all_entries
         ORDER BY family,run_id,genome_id,mint,observed_at
@@ -82,9 +86,13 @@ async def learn(conn):
         if sig in seen: continue
         seen.add(sig);parents.append({'family':c['family'],'genome_id':c['genome_id'],'experience_score':c['experience_score'],'events':c['unique_mints'],'mean_return_pct':c['mean_return_pct'],'genome':c['genome']})
         if len(parents)>=24:break
+    reference=[c for c in careers if str(c.get('family','')).startswith('eve_reference:')]
     out={'updated_at':time.time(),'observations':len(rows),'career_count':len(careers),'eligible_careers':len(eligible),
          'experienced_mints':sorted(experienced),'preferred_features':preferred,'feature_stats':feature,
-         'parent_templates':parents,'careers':[{k:v for k,v in c.items() if k!='genome'} for c in ranked[:50]]}
+         'parent_templates':parents,'careers':[{k:v for k,v in c.items() if k!='genome'} for c in ranked[:50]],
+         'reference_careers':[{k:v for k,v in c.items() if k!='genome'} for c in reference],
+         'reference_observations':sum(int(c.get('n') or 0) for c in reference),
+         'reference_eligible_careers':sum(int(c.get('unique_mints') or 0)>=5 for c in reference)}
     os.makedirs(os.path.dirname(PATH),exist_ok=True);tmp=PATH+'.tmp'
     with open(tmp,'w') as f:json.dump(out,f,indent=2,default=str)
     os.replace(tmp,PATH)

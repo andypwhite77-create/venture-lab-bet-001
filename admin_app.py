@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from db import connection, init_db
 from colony.live_registry import ensure_schema as ensure_live_schema, sync_spartan_passers, treasury_snapshot, update_treasury_policy, set_live_authority
+from colony.eve_reference_paper import stats as eve_reference_stats
 
 app = FastAPI(title="Venture Lab Control Plane", docs_url=None, redoc_url=None, openapi_url=None)
 USER = os.getenv("ADMIN_USERNAME", "admin")
@@ -152,6 +153,8 @@ async def api_state(request:Request):
         latest_intent=await c.fetchrow("SELECT candidate_id,status,vote_fraction,observed_at,reason FROM canary_trade_intents ORDER BY id DESC LIMIT 1")
         await ensure_live_schema(c); await sync_spartan_passers(c)
         live_ants=[dict(r) for r in await c.fetch('''SELECT id,genome_id,family,species,lineage,source,promotion_stage,spartan_passed,canary_profile,canary_passed,live_authorized,evidence_version,updated_at FROM live_ant_registry WHERE live_candidate=true ORDER BY family,species,genome_id''')]
+        paper_stats={x['genome_id']:x for x in await eve_reference_stats(c)}
+        for a in live_ants:a['paper']=paper_stats.get(a['genome_id'])
         treasury=await treasury_snapshot(c)
         audit_rows=[dict(r) for r in await c.fetch('SELECT created_at,action,target,detail FROM admin_audit ORDER BY id DESC LIMIT 25')]
     for w in wallets:

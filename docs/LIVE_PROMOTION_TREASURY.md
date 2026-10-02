@@ -35,3 +35,9 @@ Reinvested profit belongs to a colony-level growth bucket rather than automatica
 ## Execution boundary
 
 The registry and treasury module do not hold signing keys and cannot transfer funds. Wallet signing remains isolated. Auto-withdraw configuration is policy state only until a dedicated, fail-closed settlement worker is connected to the signer and explicitly armed.
+
+## Eve reference forward paper trading
+
+The five frozen Eve v2 reference ants continuously evaluate new research candidates in `eve_reference_paper_entries`. They have no signer or live authority and cannot mutate in the paper runner. An ant cannot open overlapping positions in the same mint; its hold horizon is the minimum re-entry interval.
+
+Closed forward outcomes are included in Queen prospective experience. Their mints are immediately quarantined from Queen validation and sealed holdout. A reference ant must accumulate at least five unique forward mints before it can influence descendants, and it must still satisfy the normal positive-career quality rules before its frozen genome is offered as a gene-seed template. Spartan answers are never fed into this path.

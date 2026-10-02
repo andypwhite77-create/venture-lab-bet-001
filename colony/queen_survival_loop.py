@@ -23,7 +23,7 @@ async def main():
         campaign+=1
         async with connection() as c:
             experience=await learn_ant_experience(c)
-            print(json.dumps({'event':'ant_experience_ingested','observations':experience.get('observations',0),'careers':experience.get('career_count',0),'eligible_careers':experience.get('eligible_careers',0),'preferred_features':experience.get('preferred_features',[]),'parent_templates':len(experience.get('parent_templates',[])),'quarantined_mints':len(experience.get('experienced_mints',[]))}),flush=True)
+            print(json.dumps({'event':'ant_experience_ingested','observations':experience.get('observations',0),'careers':experience.get('career_count',0),'eligible_careers':experience.get('eligible_careers',0),'reference_observations':experience.get('reference_observations',0),'reference_eligible_careers':experience.get('reference_eligible_careers',0),'preferred_features':experience.get('preferred_features',[]),'parent_templates':len(experience.get('parent_templates',[])),'quarantined_mints':len(experience.get('experienced_mints',[]))}),flush=True)
             print(json.dumps({'event':'campaign_start','campaign':campaign,'directive':'PERSIST ADAPT BREED KILL FRAGILITY'}),flush=True)
             summary,finalists=await queen_run(c,seed=300933+campaign,checkpoint='/data/queen_pattern_checkpoint.pkl')
             memory=learn_campaign(finalists,summary)
