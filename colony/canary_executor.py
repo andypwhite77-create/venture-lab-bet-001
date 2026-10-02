@@ -7,6 +7,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from db import connection, init_db
 from colony.canary_controller import ensure_schema as controller_schema, rpc_call, wallet_address, wallet_balance_sol
@@ -30,13 +31,43 @@ async def schema():
         CREATE UNIQUE INDEX IF NOT EXISTS canary_one_position ON canary_trade_intents ((1))
           WHERE status IN ('claimed','open','submitting_entry','submitting_exit','uncertain');''')
 
+class GatewayPreBroadcastRejected(Exception):
+    def __init__(self, code):
+        self.code=str(code)
+        super().__init__(self.code)
+
+_PREBROADCAST_CODES={'SIMULATION_FAILED','SLIPPAGE_EXCEEDED','INSUFFICIENT_BALANCE','INVALID_PARAMS','NO_ROUTE_FOUND'}
+
+def classify_gateway_http_error(status, body):
+    try:
+        payload=json.loads(body.decode() if isinstance(body,(bytes,bytearray)) else str(body))
+    except Exception:
+        payload={}
+    code=str(payload.get('code') or '')
+    if status==400 and code in _PREBROADCAST_CODES:
+        return code
+    # Older Gateway serializers may omit the structured code. Keep this fallback
+    # deliberately narrow to failures proven to occur in pre-send simulation.
+    msg=str(payload.get('message') or '').lower()
+    if status==400 and 'slippage tolerance exceeded' in msg:
+        return 'SLIPPAGE_EXCEEDED'
+    if status==400 and 'transaction simulation failed' in msg:
+        return 'SIMULATION_FAILED'
+    return None
+
 def gateway(path, payload=None):
     key=os.environ.get('HUMMINGBOT_GATEWAY_API_KEY','')
     if not key: raise ValueError('gateway_key_missing')
     req=urllib.request.Request('http://127.0.0.1:15888'+path,
         data=json.dumps(payload).encode() if payload is not None else None,
         headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
-    with urllib.request.urlopen(req,timeout=90) as r: return json.load(r)
+    try:
+        with urllib.request.urlopen(req,timeout=90) as r: return json.load(r)
+    except urllib.error.HTTPError as e:
+        body=e.read(65536)
+        code=classify_gateway_http_error(e.code,body)
+        if code: raise GatewayPreBroadcastRejected(code) from None
+        raise
 
 def positive(x):
     x=float(x)
@@ -130,7 +161,20 @@ async def submit(c,row,data,q,leg):
         data['pending_leg']=leg; data[leg+'_quote']=q; data[leg+'_submitted_at']=time.time()
         await save(c,row,'submitting_'+leg,data)
         await c.execute('UPDATE canary_trade_intents SET broadcast=true,live_enabled=true WHERE id=$1',row['id'])
-    result=await asyncio.to_thread(gateway,'/trading/router/execute-quote',dict(chainNetwork='solana-mainnet-beta',connector='jupiter',walletAddress=EXPECTED,quoteId=q['quoteId']))
+    try:
+        result=await asyncio.to_thread(gateway,'/trading/router/execute-quote',dict(chainNetwork='solana-mainnet-beta',connector='jupiter',walletAddress=EXPECTED,quoteId=q['quoteId']))
+    except GatewayPreBroadcastRejected as e:
+        data[leg+'_prebroadcast_rejection']=e.code
+        if leg=='entry':
+            await save(c,row,'rejected',data,'gateway_'+e.code.lower())
+            # Gateway proved the transaction never reached the signing/send stage.
+            await c.execute('UPDATE canary_trade_intents SET broadcast=false WHERE id=$1',row['id'])
+        else:
+            # An entry already exists; preserve the open position and stop for an
+            # operator-controlled re-quote/exit rather than pretending it closed.
+            await save(c,row,'open',data,'exit_gateway_'+e.code.lower())
+        await halt(c,('entry_' if leg=='entry' else 'exit_')+'gateway_'+e.code.lower())
+        return False
     if result.get('signature'):
         data[leg+'_signature']=result['signature']; await save(c,row,'submitting_'+leg,data)
     return True

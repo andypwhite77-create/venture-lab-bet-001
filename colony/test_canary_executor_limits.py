@@ -25,4 +25,16 @@ class CanaryLimitTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'trade_cap'):
             ce.limits(row,90.0,0.0674)
 
+    def test_gateway_slippage_http_error_is_prebroadcast(self):
+        body=b'{"statusCode":400,"code":"SLIPPAGE_EXCEEDED","message":"price moved"}'
+        self.assertEqual(ce.classify_gateway_http_error(400,body),'SLIPPAGE_EXCEEDED')
+
+    def test_gateway_timeout_is_not_classified_prebroadcast(self):
+        body=b'{"statusCode":504,"code":"TRANSACTION_TIMEOUT","message":"unknown"}'
+        self.assertIsNone(ce.classify_gateway_http_error(504,body))
+
+    def test_landed_failure_is_not_classified_prebroadcast(self):
+        body=b'{"statusCode":400,"code":"TRANSACTION_FAILED","message":"landed"}'
+        self.assertIsNone(ce.classify_gateway_http_error(400,body))
+
 if __name__=='__main__': unittest.main()

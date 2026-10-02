@@ -102,3 +102,14 @@ This proves the required end-to-end simulation gate. It does not itself enable l
 ## Dashboard P&L window semantics — 2026-10-03
 
 Dashboard headline P&L now defaults to the last 24 hours and the Swarm/colony/bloodline figures use the same selected period as the chart. This prevents early experimental ledger history from being presented as current performance. The 7d/30d/90d/all-time views remain selectable and historical rows are unchanged.
+
+
+## First live Canary attempt — 2026-10-02 / 2026-10-03
+
+The operator armed the Reversal Canary after the genuine-future dry-run gate passed. Candidate 3119 qualified at 35/36 active Reversal votes (97.22%) and the executor entered the live submission path for a <=£1 SOL→token swap.
+
+The transaction did not reach chain. Hummingbot Gateway's mandatory pre-send simulation rejected the Jupiter swap with `SLIPPAGE_EXCEEDED` (custom program error 6001 / 0x1771) because market movement pushed expected output below the quoted minimum. Independent reconciliation found the Canary SOL balance unchanged, no token account/balance for the target mint, and no new wallet transaction signature. Intent 84 was therefore reconciled from `uncertain/submission_outcome_unknown` to `rejected/gateway_slippage_exceeded`, with `broadcast=false`. The Canary remains fail-closed and stopped until an explicit operator re-arm.
+
+`canary_executor.py` now distinguishes Gateway errors that are provably pre-broadcast (`SIMULATION_FAILED`, `SLIPPAGE_EXCEEDED`, `INSUFFICIENT_BALANCE`, `INVALID_PARAMS`, `NO_ROUTE_FOUND`) from genuinely ambiguous submission failures. Entry-side pre-broadcast rejection is safely rejected without fabricating a broadcast. Exit-side pre-broadcast rejection preserves the existing open position and stops for operator-controlled exit handling. Timeouts and landed transaction failures remain uncertain/fail-closed.
+
+The research dashboard now reads the actual `canary_control` state instead of inferring real-money authority from historical broadcast rows. Its Authority Boundary reports ARMED / STOPPED / DISARMED plus the current problem and most recent live intent. P&L windowing remains separate: the default dashboard window is 24h, while 7d/all-time history remains selectable.

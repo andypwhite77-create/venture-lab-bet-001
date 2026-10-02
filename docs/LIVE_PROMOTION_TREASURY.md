@@ -76,3 +76,10 @@ A qualifying dry run must use a genuine future Reversal signal, claim it within 
 ### First qualifying end-to-end dry run
 
 On 2 October 2026, candidate 3112 satisfied the live dry-run requirement with 36/36 active Reversal votes. The executor completed the genuine future path using real Jupiter entry/exit quotes and the original five-minute hold, persisted the intent closed, and never broadcast a transaction. After the simulated exit the control latched `problem=dry_run_complete`, `stopped=true`, `armed=false`; the arm-gate query evaluates true. Live trading still requires the operator to run `scripts/canary-arm` explicitly.
+
+
+## First live-attempt reconciliation
+
+The first armed Reversal Canary opportunity (candidate 3119, 35/36 consensus) reached Hummingbot Gateway but failed its mandatory pre-send simulation because Jupiter slippage tolerance was exceeded. No transaction landed: SOL balance remained unchanged, no target-token account appeared, and no new wallet signature existed. The attempt is recorded as `gateway_slippage_exceeded`, not as a live fill.
+
+Executor handling now separates definitive pre-broadcast Gateway rejections from ambiguous submission outcomes. A pre-broadcast entry rejection never becomes a fill; an exit rejection preserves the already-open live position. Network/confirmation ambiguity still stops the Canary and requires reconciliation. This keeps the system conservative without treating known simulation failures as unknowable broadcasts.

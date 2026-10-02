@@ -79,10 +79,13 @@ async def _snapshot_fresh():
   health=[dict(x) for x in health]
   research=await c.fetch('''SELECT DISTINCT ON(family) family,created_at,tested_genomes,historical_rows,summary FROM historical_nursery_runs ORDER BY family,created_at DESC''')
   research=[dict(x) for x in research]
+  canary_control=await c.fetchrow('SELECT armed,stopped,since,heartbeat,problem FROM canary_control WHERE id=1')
+  canary_latest=await c.fetchrow("SELECT candidate_id,status,reason,broadcast,live_enabled,updated_at,execution->>'mode' mode FROM canary_trade_intents WHERE live_enabled=true ORDER BY id DESC LIMIT 1")
   payload={'external':external,'native':native,'sol_gbp':rate,'signals':[dict(x) for x in signals],
    'genomes':[dict(x) for x in genomes],'events':[dict(x) for x in events],
    'mind':[dict(x) for x in mind],'experiments':[dict(x) for x in exps],
-   'lineage':[dict(x) for x in lineage],'provider_health':health,'research_bloodlines':research,'family_performance':families,'elite_roster':elite,'accelerator':accel,'stake_model':stake_model}
+   'lineage':[dict(x) for x in lineage],'provider_health':health,'research_bloodlines':research,'family_performance':families,'elite_roster':elite,'accelerator':accel,'stake_model':stake_model,
+   'canary_control':dict(canary_control) if canary_control else None,'canary_latest':dict(canary_latest) if canary_latest else None}
  # IMPORTANT: release the dashboard DB connection before selection telemetry, which
  # acquires its own connection. Otherwise concurrent dashboard requests can exhaust
  # the small asyncpg pool and deadlock each other.

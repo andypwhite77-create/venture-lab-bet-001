@@ -167,7 +167,13 @@ def render(j, chart_period="24h", chart_metric="net_gbp", selected_family="all")
         for h in ph:
             ok=bool(h.get('ok')); bits.append(f"<span>{h.get('provider','?').upper()} <b class={'pos' if ok else 'neg'}>{'OK' if ok else 'DEGRADED'}</b></span>")
         evo+="<div class='gate compact'><b>Data providers</b><div class='authority'>"+''.join(bits)+"</div><small>Latest recorded provider observation. Degraded corroboration does not override Jupiter execution truth.</small></div>"
-    evo+=f"<div class='gate compact'><b>Authority boundary</b><div class='authority'><span>Paper/shadow <b class=pos>ON</b></span><span>Real-money authority <b class=neg>OFF</b></span><span>Fission progress <b>{_f(float(fd.get('progress_fraction') or 0)*100,4)}%</b></span></div></div>"
+    cc=j.get('canary_control') or {}; cl=j.get('canary_latest') or {}
+    canary_armed=bool(cc.get('armed')) and not bool(cc.get('stopped'))
+    canary_state='ARMED' if canary_armed else ('STOPPED' if cc.get('stopped') else 'DISARMED')
+    canary_cls='pos' if canary_armed else 'neg'
+    canary_problem=escape(str(cc.get('problem') or 'none'))
+    latest_canary=(f"#{cl.get('candidate_id')} {cl.get('status')}" if cl else 'none')
+    evo+=f"<div class='gate compact'><b>Authority boundary</b><div class='authority'><span>Paper/shadow <b class=pos>ON</b></span><span>Real-money Canary <b class={canary_cls}>{canary_state}</b></span><span>Problem <b class={canary_cls}>{canary_problem}</b></span><span>Latest intent <b>{escape(latest_canary)}</b></span><span>Fission progress <b>{_f(float(fd.get('progress_fraction') or 0)*100,4)}%</b></span></div><small>This reflects the actual Reversal Canary control state, not whether a historical live-fill row exists.</small></div>"
     sm=j.get('stake_model') or {}
     if selected_family in {'all','reversal'}:
         evo+=f"<div class='gate compact'><b>Reversal canary wallet</b><div class='authority'><span>Start <b>£{_f(rw.get('start_gbp'),2)}</b></span><span>Current <b class={'pos' if float(rw.get('profit_gbp') or 0)>=0 else 'neg'}>£{_f(rw.get('balance_gbp'),2)}</b></span><span>Profit <b>£{_f(rw.get('profit_gbp'),2)}</b></span><span>Trades <b>{rw.get('trades',0)}</b></span><span>Win rate <b>{_f(rw.get('win_rate_pct'),1)}%</b></span><span>Worst drawdown <b>{_f(rw.get('worst_drawdown_pct'),1)}%</b></span></div><small>Sequential single-wallet counterfactual using unique prospective Reversal mints and each signal's hold horizon. Research economics only; LIVE-FILL VERIFIED: NO.</small></div>"
