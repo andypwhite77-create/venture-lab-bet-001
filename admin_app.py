@@ -9,6 +9,7 @@ from colony.eve_reference_paper import stats as eve_reference_stats
 from colony.champion_league import ensure_schema as ensure_champion_schema
 from colony.qualification_corpus import ensure_schema as ensure_corpus_schema, snapshot as qualification_corpus_snapshot
 from colony.queen_roles import snapshot as queen_role_snapshot
+from colony.admin_auth import ensure_schema as ensure_auth_schema, current_password_hash, verify_password as verify_admin_password, reset_password_with_token
 
 app = FastAPI(title="Venture Lab Control Plane", docs_url=None, redoc_url=None, openapi_url=None)
 USER = os.getenv("ADMIN_USERNAME", "admin")
@@ -25,8 +26,11 @@ def read_json(path):
 
 MODES = {"disabled","research","paper","shadow","live-ready","live"}
 LOGIN_FAILS = {}
+RECOVERY_FAILS = {}
+AUTH_EPOCH = 1
 
 class Login(BaseModel): username:str; password:str
+class RecoverIn(BaseModel): username:str; recovery_code:str; new_password:str
 class WalletIn(BaseModel): label:str; address:str
 class ComponentIn(BaseModel): mode:str; wallet_id:int|None=None; max_trade_gbp:float|None=None; floor_gbp:float|None=None
 class AuthorityIn(BaseModel): enabled:bool
@@ -44,23 +48,17 @@ class TreasuryIn(BaseModel):
     max_ant_stake_gbp:float=25
 
 def now(): return datetime.now(timezone.utc)
-def scrypt_hash(password, salt): return hashlib.scrypt(password.encode(),salt=salt,n=2**14,r=8,p=1,dklen=32)
-def verify_password(password):
-    try:
-        salt_hex,digest_hex=PASS.split("$",1)
-        return hmac.compare_digest(scrypt_hash(password,bytes.fromhex(salt_hex)),bytes.fromhex(digest_hex))
-    except Exception: return False
 def make_session():
-    exp=str(int(time.time())+8*3600); nonce=secrets.token_hex(16); raw=f"{USER}|{exp}|{nonce}"
+    exp=str(int(time.time())+8*3600); nonce=secrets.token_hex(16); raw=f"{USER}|{exp}|{nonce}|{AUTH_EPOCH}"
     sig=hmac.new(SECRET,raw.encode(),hashlib.sha256).hexdigest(); return raw+"|"+sig
 
 def parse_session(value):
     try:
-        user,exp,nonce,sig=value.split("|",3); raw=f"{user}|{exp}|{nonce}"
+        user,exp,nonce,epoch,sig=value.split("|",4); raw=f"{user}|{exp}|{nonce}|{epoch}"
         good=hmac.compare_digest(sig,hmac.new(SECRET,raw.encode(),hashlib.sha256).hexdigest())
-        if not good or user!=USER or int(exp)<time.time(): return None
+        if not good or user!=USER or int(exp)<time.time() or int(epoch)!=AUTH_EPOCH:return None
         return {"user":user,"exp":int(exp),"nonce":nonce,"raw":raw}
-    except Exception: return None
+    except Exception:return None
 
 def auth(request):
     s=parse_session(request.cookies.get("vl_admin",""))
@@ -126,9 +124,12 @@ async def sol_balance(address):
 
 @app.on_event('startup')
 async def startup():
+    global AUTH_EPOCH
     if not PASS or len(SECRET)<32: raise RuntimeError('admin_credentials_not_configured')
     await init_db(); await ensure_schema()
     async with connection() as c:
+        await ensure_auth_schema(c)
+        AUTH_EPOCH=int((await c.fetchrow('SELECT auth_epoch FROM admin_auth_state WHERE id=1'))['auth_epoch'])
         await ensure_live_schema(c); await sync_spartan_passers(c)
         await ensure_champion_schema(c); await ensure_corpus_schema(c)
 
@@ -137,11 +138,30 @@ async def login(data:Login,request:Request,response:Response):
     ip=request.client.host if request.client else 'unknown'; cutoff=time.time()-600
     LOGIN_FAILS[ip]=[t for t in LOGIN_FAILS.get(ip,[]) if t>cutoff]
     if len(LOGIN_FAILS[ip])>=5: raise HTTPException(429,'try_later')
-    if data.username!=USER or not verify_password(data.password):
+    async with connection() as c:
+        encoded=await current_password_hash(c,PASS)
+    if data.username!=USER or not verify_admin_password(encoded,data.password):
         LOGIN_FAILS[ip].append(time.time()); await asyncio.sleep(.4); raise HTTPException(401,'invalid_login')
     LOGIN_FAILS.pop(ip,None); token=make_session()
     response.set_cookie('vl_admin',token,max_age=8*3600,httponly=True,secure=True,samesite='strict',path='/admin')
     await audit('login'); return {'ok':True}
+
+@app.post('/admin/api/recover')
+async def recover(data:RecoverIn,request:Request,response:Response):
+    global AUTH_EPOCH
+    ip=request.client.host if request.client else 'unknown'; cutoff=time.time()-600
+    RECOVERY_FAILS[ip]=[t for t in RECOVERY_FAILS.get(ip,[]) if t>cutoff]
+    if len(RECOVERY_FAILS[ip])>=5: raise HTTPException(429,'try_later')
+    if data.username!=USER:
+        RECOVERY_FAILS[ip].append(time.time()); await asyncio.sleep(.5); raise HTTPException(401,'invalid_recovery')
+    async with connection() as c:
+        result=await reset_password_with_token(c,data.recovery_code,data.new_password)
+    if not result.get('ok'):
+        RECOVERY_FAILS[ip].append(time.time()); await asyncio.sleep(.5); raise HTTPException(401,result.get('reason','invalid_recovery'))
+    AUTH_EPOCH=int(result['auth_epoch']); RECOVERY_FAILS.pop(ip,None); LOGIN_FAILS.pop(ip,None)
+    response.delete_cookie('vl_admin',path='/admin')
+    await audit('password_recovered','admin',{'sessions_invalidated':True})
+    return {'ok':True,'sessions_invalidated':True}
 
 @app.post('/admin/api/logout')
 async def logout(request:Request,response:Response):

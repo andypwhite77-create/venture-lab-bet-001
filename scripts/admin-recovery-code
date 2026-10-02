@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+import asyncio
+from db import init_db,connection
+from colony.admin_auth import create_recovery_token
+
+async def main():
+    await init_db()
+    async with connection() as c:
+        x=await create_recovery_token(c)
+    print('Cobalt Labs admin recovery code')
+    print('Single use. Expires in %s minutes.'%x['ttl_minutes'])
+    print(x['token'])
+
+if __name__=='__main__':asyncio.run(main())
