@@ -9,6 +9,7 @@ from colony.spartan_v2_runner import audit_family
 from colony.queen_memory import learn_campaign,record_exam_result
 from colony.queen_ecology import learn as ecology_learn,strategy as ecology_strategy
 from colony.queen_experience import learn as learn_ant_experience
+from colony.spartan_hall_of_fame import archive_exam
 
 STATE='/data/queen_survival_state.json'
 
@@ -30,6 +31,8 @@ async def main():
             ecology=ecology_learn(finalists,summary,campaign); plan=ecology_strategy(ecology)
             print(json.dumps({'event':'queen_learned','memory_campaigns':memory.get('campaigns'),'preferred_features':memory.get('preferred_features',[]),'strategy':plan}),flush=True)
             audit=await audit_family(c,'queen_pattern')
+            hall=await archive_exam(c,'queen_pattern',campaign,audit)
+            print(json.dumps({'event':'spartan_hall_of_fame',**hall}),flush=True)
             passed=[x for x in audit['results'] if x.get('qualification_pass')]
             distinct={x.get('behaviour_id') or str(tuple(x['events'])) for x in passed}
             public={'campaign':campaign,'tested':summary['tested'],'finalists':summary['finalists'],

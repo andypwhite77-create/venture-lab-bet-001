@@ -14,6 +14,7 @@ from colony.reversal_tournament import process as process_reversal_tournament, m
 from colony.family_tournament import process_all as process_family_tournaments, maybe_cull_all as maybe_cull_family_tournaments
 from colony.continuous_evolution import replenish as replenish_evolution, cull_obvious_failures, enforce_elite_training_only, challenger_turnover, challenger_queue_status, promote_reversal_elite_to_production_pool, evolve_reversal_forward
 from colony.spartan_alumni import process as process_spartan_alumni, evolve as evolve_spartan_alumni
+from colony.spartan_hall_of_fame import archive_latest_if_new
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 FAST_SECONDS=60
@@ -55,6 +56,7 @@ async def main():
                     promotions=await promote_reversal_elite_to_production_pool(c,20,5)
                     reversal_evolution=await evolve_reversal_forward(c)
                     alumni_evolution=await evolve_spartan_alumni(c)
+                    hall_archive=await archive_latest_if_new(c)
                 if elite_policy: logging.info('elite_training_policy %s',elite_policy)
                 logging.info('reversal_tournament_cull %s',rtc)
                 logging.info('family_tournament_culls %s',ftc)
@@ -64,6 +66,7 @@ async def main():
                 logging.info('challenger_queue %s',queue_state)
                 if promotions: logging.info('reversal_production_pool %s',promotions)
                 logging.info('spartan_alumni_evolution %s',alumni_evolution)
+                logging.info('spartan_hall_of_fame %s',hall_archive)
                 logging.info('reversal_evolution_v2 %s',reversal_evolution)
                 logging.info('observer %s',await persist_observer())
                 logging.info('proposal_gate %s',await propose())
