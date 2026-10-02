@@ -53,7 +53,7 @@ async def run_once(conn, limit=1000):
     await ensure_schema(conn)
     ants=await _ants(conn)
     if not ants:return {'ants':0,'candidates':0,'entries':0,'reason':'no_reference_ants'}
-    cutoff=max(a['prospective_after'] for a in ants)
+    cutoff=min(a['prospective_after'] for a in ants)
     progress=await conn.fetchrow('SELECT * FROM eve_reference_paper_progress WHERE id=1 FOR UPDATE')
     last=int(progress['last_candidate_id'] or 0)
     if not progress['initialized_at']:
@@ -70,6 +70,8 @@ async def run_once(conn, limit=1000):
     for row in rows:
         rr=dict(row)
         for a in ants:
+            if rr['created_at'].timestamp() < a['prospective_after']:
+                continue
             hold=int(a['genome'].get('parameters',{}).get('hold_minutes',15))
             previous=latest.get((a['genome_id'],rr['mint']))
             # A paper ant cannot open overlapping positions in the same mint. Even when

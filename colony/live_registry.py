@@ -17,6 +17,11 @@ FAMILY_MAP = {
     "order_flow_tempered": "order_flow",
     "trend_pullback": "pullback",
     "low_churn": "liquidity",
+    "pullback_hammer": "pullback",
+    "quiet_accumulation": "accumulation",
+    "coiled_spring": "compression",
+    "seller_exhaustion": "exhaustion",
+    "deep_drawdown_bid": "drawdown_reversal",
 }
 
 async def ensure_schema(conn):
@@ -130,8 +135,10 @@ async def sync_spartan_passers(conn):
 
 
 async def seed_reference_ants(conn, benchmark):
-    """Register only the five designed ants; the naive control is not a live candidate."""
+    """Register a frozen Eve reference cohort; controls are never live candidates."""
     await ensure_schema(conn)
+    experiment=str(benchmark.get('experiment') or 'eve_reference')
+    evidence_version=experiment.replace('_','-')
     n=0
     for item in benchmark.get('ants',[]):
         g=item.get('genome') or {}
@@ -141,19 +148,21 @@ async def seed_reference_ants(conn, benchmark):
         gid=item.get('genome_id')
         if not gid or not g:
             continue
-        family=FAMILY_MAP.get(species,species or 'eve_reference')
+        family=item.get('family_tag') or FAMILY_MAP.get(species,species or 'eve_reference')
+        notes={'freeze_sha256':benchmark.get('freeze_sha256'),'prospective_after':benchmark.get('prospective_after'),
+               'mechanism':item.get('mechanism'),'walk_forward':item.get('folds') or item.get('walk_forward'),
+               'economics_stress':benchmark.get('economics_stress')}
         await conn.execute("""INSERT INTO live_ant_registry(
           genome_id,family,species,lineage,source,genome,live_candidate,promotion_stage,spartan_passed,
           canary_profile,evidence_version,notes)
-          VALUES($1,$2,$3,'eve_reference_v2','eve_reference',$4::jsonb,true,'reference-testing',false,
-                 'individual-ant-v1','eve-reference-v2',$5::jsonb)
+          VALUES($1,$2,$3,$4,'eve_reference',$5::jsonb,true,'reference-testing',false,
+                 'individual-ant-v1',$6,$7::jsonb)
           ON CONFLICT(genome_id) DO UPDATE SET family=excluded.family,species=excluded.species,
             lineage=excluded.lineage,source=excluded.source,genome=excluded.genome,live_candidate=true,
             evidence_version=excluded.evidence_version,notes=excluded.notes,updated_at=now()""",
-          gid,family,species,json.dumps(g),json.dumps({'freeze_sha256':benchmark.get('freeze_sha256'),
-          'prospective_after':benchmark.get('prospective_after'),'walk_forward':item.get('folds') or item.get('walk_forward')}))
+          gid,family,species,experiment,json.dumps(g),evidence_version,json.dumps(notes))
         n+=1
-    return {'reference_candidates':n}
+    return {'reference_candidates':n,'experiment':experiment}
 
 
 async def record_canary_result(conn, ant_id, passed, detail=None):

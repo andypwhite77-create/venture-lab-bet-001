@@ -12,6 +12,8 @@ A genuine Spartan pass moves an ant to `canary-ready`. A canary pass may move it
 
 The five Eve v2 reference ants are registered as `reference-testing` across reversal, momentum, order-flow, pullback and liquidity families. The naive control is intentionally excluded.
 
+The five frozen Eve v3 Beast Cohort ants are also registered as `reference-testing` across pullback, accumulation, compression, exhaustion and drawdown-reversal families. They begin forward paper evidence only after the v3 freeze and do not inherit v2 paper history.
+
 ## Canary profiles
 
 The existing Reversal canary remains unchanged and consensus-based. Individual Spartan graduates and Eve reference ants use the registry profile `individual-ant-v1`; this is a routing contract for the future individual-ant canary runner and does not reuse the Reversal consensus exam.

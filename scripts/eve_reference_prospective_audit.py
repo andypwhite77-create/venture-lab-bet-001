@@ -1,4 +1,4 @@
-"""Prospective-only audit for frozen Eve reference ants v2.
+"""Prospective-only audit for a frozen Eve reference cohort.
 
 Uses only assets first observed after the freeze timestamp. Historical folds are
 never reused as proof, and pre-v10 Spartan answers are deliberately ignored.
@@ -12,7 +12,7 @@ from colony.historical_nursery import load_rows, sampled_path_return_pct
 from colony.paper_economics import TARGET_STAKE_GBP, measured_roundtrip_network_fee_sol, sol_gbp_rate
 from colony.spartan_v2 import stress_returns, opportunity_efficiency, qualifies
 
-FAMILY = "eve_reference_v2"
+FAMILY = sys.argv[1] if len(sys.argv)>1 else "eve_reference_v3"
 MIN_EVENTS = 25
 
 async def main():
@@ -23,7 +23,7 @@ async def main():
         rows = await load_rows(c)
         fee = await measured_roundtrip_network_fee_sol(c)
     if not rec:
-        raise SystemExit("eve_reference_v2 is not frozen")
+        raise SystemExit(f"{FAMILY} is not frozen")
     ants = rec['finalists']; ants = json.loads(ants) if isinstance(ants,str) else list(ants or [])
     summary = rec['summary']; summary = json.loads(summary) if isinstance(summary,str) else dict(summary or {})
     cutoff = float(summary['prospective_after'])
@@ -49,7 +49,7 @@ async def main():
         row={'species':g.get('species'),'genome_id':x.get('genome_id'),'n':len(rs),'evidence_sufficient':sufficient,
              'mean_raw':expectation,'winner_concentration':concentration}
         if sufficient:
-            stress=stress_returns(rs,base,500,seed='prospective-v2:'+x['genome_id'])
+            stress=stress_returns(rs,base,500,seed='prospective:'+FAMILY+':'+x['genome_id'])
             eff=opportunity_efficiency(rs,rejected)
             row.update({'opportunity_efficiency':eff,'stress':stress.__dict__,
                         'qualification_pass':bool(qualifies(stress,expectation,eff,concentration))})

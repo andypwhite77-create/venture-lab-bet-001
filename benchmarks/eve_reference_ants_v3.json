@@ -1,0 +1,479 @@
+{
+  "experiment": "eve_reference_v3",
+  "cohort_name": "Eve v3 Beast Cohort",
+  "status": "frozen_for_prospective_observation",
+  "frozen_at": 1790943269.7224116,
+  "prospective_after": 1790943269.7224116,
+  "design_rule": "breeding-visible missingness-safe history only; four chronological discovery folds; no Spartan/holdout outcomes used; historical exam diagnostics treated as burned and excluded from design",
+  "proof_rule": "only observations first seen after prospective_after count as independent proof; genomes are immutable after freeze",
+  "economics_stress": {
+    "paper_stake_gbp": 0.5,
+    "research_returns_already_include_assumed_roundtrip_cost_bps": 80,
+    "additional_adverse_friction_pct_points": 1.5,
+    "measured_roundtrip_network_fee_sol": 2.2424e-05,
+    "sol_gbp": 92.33,
+    "sol_gbp_source": "kraken_public",
+    "measured_roundtrip_network_fee_gbp": 0.00207040792,
+    "fixed_fee_pct_of_50p_stake": 0.414081584,
+    "total_additional_stress_pct_points": 1.914081584
+  },
+  "historical_rows": 2775,
+  "historical_unique_mints": 248,
+  "chronological_folds": 4,
+  "ants": [
+    {
+      "genome_id": "g_3c9714b448cc8104",
+      "family_tag": "pullback",
+      "mechanism": "strong hourly trend suffers a sharp five-minute pullback while turnover remains meaningful",
+      "genome": {
+        "family": "eve_reference_v3",
+        "species": "pullback_hammer",
+        "parameters": {
+          "hold_minutes": 30,
+          "stop_loss_pct": null,
+          "take_profit_pct": 35
+        },
+        "predicates": {
+          "price_change_h1": {
+            "min": 8.8458
+          },
+          "price_change_m5": {
+            "max": -7.0946
+          },
+          "dex_buy_ratio_m5": {
+            "max": 0.64996
+          },
+          "volume_liquidity_m5": {
+            "min": 0.030795
+          }
+        },
+        "bounds": {}
+      },
+      "historical_unique_mints": 36,
+      "folds": [
+        {
+          "fold": 1,
+          "n": 14,
+          "avg_net_return_pct": 11.760937704814552,
+          "median_net_return_pct": 16.368387298724013,
+          "win_rate": 0.7142857142857143,
+          "worst_net_return_pct": -22.25729942435872,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 3.5267875571861613,
+          "avg_raw_research_return_pct": 13.675019288814553
+        },
+        {
+          "fold": 2,
+          "n": 6,
+          "avg_net_return_pct": 3.835982503862413,
+          "median_net_return_pct": 11.662731107050256,
+          "win_rate": 0.6666666666666666,
+          "worst_net_return_pct": -23.397632495229256,
+          "best_net_return_pct": 14.748785522523272,
+          "profit_factor": 1.7993112106359122,
+          "avg_raw_research_return_pct": 5.7500640878624125
+        },
+        {
+          "fold": 3,
+          "n": 7,
+          "avg_net_return_pct": 6.869792824020955,
+          "median_net_return_pct": 7.986412378387236,
+          "win_rate": 0.5714285714285714,
+          "worst_net_return_pct": -11.985386709300311,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 2.763613501627326,
+          "avg_raw_research_return_pct": 8.783874408020955
+        },
+        {
+          "fold": 4,
+          "n": 9,
+          "avg_net_return_pct": 4.888224463628943,
+          "median_net_return_pct": 2.2753842154790096,
+          "win_rate": 0.6666666666666666,
+          "worst_net_return_pct": -42.56567384473708,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 1.7091095772039904,
+          "avg_raw_research_return_pct": 6.802306047628944
+        }
+      ],
+      "all_folds_positive": true,
+      "threshold_perturbation": {
+        "method": "all predicate thresholds x {0.95,1.00,1.05}",
+        "tests": 81,
+        "survival_rate": 0.7777777777777778,
+        "median_worst_fold_avg_return_pct": 4.57884463567062
+      }
+    },
+    {
+      "genome_id": "g_abec3d527f9ee1cb",
+      "family_tag": "accumulation",
+      "mechanism": "strong immediate buyers accumulate below the midpoint of the seven-day range without frantic turnover",
+      "genome": {
+        "family": "eve_reference_v3",
+        "species": "quiet_accumulation",
+        "parameters": {
+          "hold_minutes": 15,
+          "stop_loss_pct": null,
+          "take_profit_pct": 12
+        },
+        "predicates": {
+          "hist_position_7d": {
+            "max": 0.484469
+          },
+          "dex_buy_ratio_m5": {
+            "min": 0.72842
+          },
+          "volume_liquidity_m5": {
+            "max": 0.07081
+          }
+        },
+        "bounds": {}
+      },
+      "historical_unique_mints": 38,
+      "folds": [
+        {
+          "fold": 1,
+          "n": 16,
+          "avg_net_return_pct": 2.131743214738016,
+          "median_net_return_pct": 2.7056081170789894,
+          "win_rate": 0.625,
+          "worst_net_return_pct": -22.377338947168397,
+          "best_net_return_pct": 10.085918416,
+          "profit_factor": 1.8841337861636032,
+          "avg_raw_research_return_pct": 4.045824798738016
+        },
+        {
+          "fold": 2,
+          "n": 8,
+          "avg_net_return_pct": 0.5986595314984726,
+          "median_net_return_pct": 2.9678183808948213,
+          "win_rate": 0.625,
+          "worst_net_return_pct": -23.76482603308064,
+          "best_net_return_pct": 10.085918416,
+          "profit_factor": 1.152504731829552,
+          "avg_raw_research_return_pct": 2.5127411154984727
+        },
+        {
+          "fold": 3,
+          "n": 8,
+          "avg_net_return_pct": 0.7472768516467523,
+          "median_net_return_pct": 2.2196813498335075,
+          "win_rate": 0.5,
+          "worst_net_return_pct": -16.55815000147261,
+          "best_net_return_pct": 10.085918416,
+          "profit_factor": 1.2345057601223044,
+          "avg_raw_research_return_pct": 2.6613584356467523
+        },
+        {
+          "fold": 4,
+          "n": 6,
+          "avg_net_return_pct": 3.3836446740652444,
+          "median_net_return_pct": 3.314225639484463,
+          "win_rate": 0.5,
+          "worst_net_return_pct": -3.551177908720721,
+          "best_net_return_pct": 10.085918416,
+          "profit_factor": 3.837876297296671,
+          "avg_raw_research_return_pct": 5.297726258065244
+        }
+      ],
+      "all_folds_positive": true,
+      "threshold_perturbation": {
+        "method": "all predicate thresholds x {0.95,1.00,1.05}",
+        "tests": 27,
+        "survival_rate": 0.5925925925925926,
+        "median_worst_fold_avg_return_pct": 0.2731871078295189
+      }
+    },
+    {
+      "genome_id": "g_96c00c15109c87ee",
+      "family_tag": "compression",
+      "mechanism": "volume compresses relative to liquidity without an active short-term breakdown",
+      "genome": {
+        "family": "eve_reference_v3",
+        "species": "coiled_spring",
+        "parameters": {
+          "hold_minutes": 30,
+          "stop_loss_pct": null,
+          "take_profit_pct": 35
+        },
+        "predicates": {
+          "volume_liquidity_m5": {
+            "max": 0.01471
+          },
+          "price_change_m5": {
+            "min": -5.504
+          }
+        },
+        "bounds": {}
+      },
+      "historical_unique_mints": 51,
+      "folds": [
+        {
+          "fold": 1,
+          "n": 21,
+          "avg_net_return_pct": 1.3764441979706188,
+          "median_net_return_pct": -4.084242756491402,
+          "win_rate": 0.3333333333333333,
+          "worst_net_return_pct": -12.844597700050326,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 1.2471754682906002,
+          "avg_raw_research_return_pct": 3.290525781970619
+        },
+        {
+          "fold": 2,
+          "n": 13,
+          "avg_net_return_pct": 10.563593338526914,
+          "median_net_return_pct": 1.1973424893568951,
+          "win_rate": 0.6923076923076923,
+          "worst_net_return_pct": -17.204410090464926,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 5.817382291931371,
+          "avg_raw_research_return_pct": 12.477674922526916
+        },
+        {
+          "fold": 3,
+          "n": 10,
+          "avg_net_return_pct": 4.605497948750612,
+          "median_net_return_pct": -0.21778948247813135,
+          "win_rate": 0.5,
+          "worst_net_return_pct": -18.20432510284123,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 2.0868044373726677,
+          "avg_raw_research_return_pct": 6.519579532750612
+        },
+        {
+          "fold": 4,
+          "n": 7,
+          "avg_net_return_pct": 10.019295080537804,
+          "median_net_return_pct": 10.730361033591633,
+          "win_rate": 0.7142857142857143,
+          "worst_net_return_pct": -3.696882066180346,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 16.249279706342776,
+          "avg_raw_research_return_pct": 11.933376664537805
+        }
+      ],
+      "all_folds_positive": true,
+      "threshold_perturbation": {
+        "method": "all predicate thresholds x {0.95,1.00,1.05}",
+        "tests": 9,
+        "survival_rate": 1.0,
+        "median_worst_fold_avg_return_pct": 2.1107457090987363
+      }
+    },
+    {
+      "genome_id": "g_d50580e2e7cb5127",
+      "family_tag": "exhaustion",
+      "mechanism": "hourly seller dominance is treated as a potential exhaustion/rebound state",
+      "genome": {
+        "family": "eve_reference_v3",
+        "species": "seller_exhaustion",
+        "parameters": {
+          "hold_minutes": 30,
+          "stop_loss_pct": null,
+          "take_profit_pct": 35
+        },
+        "predicates": {
+          "flow_imbalance_h1": {
+            "max": -0.040701
+          }
+        },
+        "bounds": {}
+      },
+      "historical_unique_mints": 52,
+      "folds": [
+        {
+          "fold": 1,
+          "n": 23,
+          "avg_net_return_pct": 1.0893865397379447,
+          "median_net_return_pct": -6.548137012304927,
+          "win_rate": 0.391304347826087,
+          "worst_net_return_pct": -22.361645530700876,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 1.1485566037051744,
+          "avg_raw_research_return_pct": 3.0034681237379455
+        },
+        {
+          "fold": 2,
+          "n": 12,
+          "avg_net_return_pct": 8.027193780763726,
+          "median_net_return_pct": 1.0607107047115372,
+          "win_rate": 0.5833333333333334,
+          "worst_net_return_pct": -12.740311353160033,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 3.704970324404961,
+          "avg_raw_research_return_pct": 9.941275364763728
+        },
+        {
+          "fold": 3,
+          "n": 7,
+          "avg_net_return_pct": 15.660067102805124,
+          "median_net_return_pct": 33.085918416,
+          "win_rate": 0.5714285714285714,
+          "worst_net_return_pct": -14.089656014966197,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 5.82416432066677,
+          "avg_raw_research_return_pct": 17.574148686805124
+        },
+        {
+          "fold": 4,
+          "n": 10,
+          "avg_net_return_pct": 3.276916482196596,
+          "median_net_return_pct": -3.4017754057969416,
+          "win_rate": 0.4,
+          "worst_net_return_pct": -22.37002826755796,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 1.5332864575712164,
+          "avg_raw_research_return_pct": 5.190998066196597
+        }
+      ],
+      "all_folds_positive": true,
+      "threshold_perturbation": {
+        "method": "all predicate thresholds x {0.95,1.00,1.05}",
+        "tests": 3,
+        "survival_rate": 1.0,
+        "median_worst_fold_avg_return_pct": 1.0893865397379447
+      }
+    },
+    {
+      "genome_id": "g_4b3c30554fca627e",
+      "family_tag": "drawdown_reversal",
+      "mechanism": "strong immediate buyers appear while price remains deeply below its seven-day high",
+      "genome": {
+        "family": "eve_reference_v3",
+        "species": "deep_drawdown_bid",
+        "parameters": {
+          "hold_minutes": 30,
+          "stop_loss_pct": null,
+          "take_profit_pct": 35
+        },
+        "predicates": {
+          "dex_buy_ratio_m5": {
+            "min": 0.68
+          },
+          "hist_drawdown_7d_pct": {
+            "max": -38.5
+          }
+        },
+        "bounds": {}
+      },
+      "historical_unique_mints": 44,
+      "folds": [
+        {
+          "fold": 1,
+          "n": 21,
+          "avg_net_return_pct": 4.56090937201346,
+          "median_net_return_pct": 1.6234674061525733,
+          "win_rate": 0.6666666666666666,
+          "worst_net_return_pct": -23.608972258124926,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 1.9598093363804818,
+          "avg_raw_research_return_pct": 6.474990956013459
+        },
+        {
+          "fold": 2,
+          "n": 9,
+          "avg_net_return_pct": 6.313025994468645,
+          "median_net_return_pct": 7.39541313424718,
+          "win_rate": 0.6666666666666666,
+          "worst_net_return_pct": -23.944650482699465,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 2.1318955909163146,
+          "avg_raw_research_return_pct": 8.227107578468646
+        },
+        {
+          "fold": 3,
+          "n": 7,
+          "avg_net_return_pct": 9.112686252865158,
+          "median_net_return_pct": 13.099266469359277,
+          "win_rate": 0.5714285714285714,
+          "worst_net_return_pct": -21.35358018958535,
+          "best_net_return_pct": 33.085918416,
+          "profit_factor": 3.143275037759345,
+          "avg_raw_research_return_pct": 11.02676783686516
+        },
+        {
+          "fold": 4,
+          "n": 7,
+          "avg_net_return_pct": 6.863918460566778,
+          "median_net_return_pct": 3.554646500416542,
+          "win_rate": 0.8571428571428571,
+          "worst_net_return_pct": -8.243026245418879,
+          "best_net_return_pct": 19.45067101346737,
+          "profit_factor": 6.828857969567929,
+          "avg_raw_research_return_pct": 8.778000044566777
+        }
+      ],
+      "all_folds_positive": true,
+      "threshold_perturbation": {
+        "method": "all predicate thresholds x {0.95,1.00,1.05}",
+        "tests": 9,
+        "survival_rate": 1.0,
+        "median_worst_fold_avg_return_pct": 2.175120072961886
+      }
+    }
+  ],
+  "exact_entry_overlap": [
+    {
+      "a": "pullback_hammer",
+      "b": "quiet_accumulation",
+      "exact_entry_intersection": 0,
+      "exact_entry_jaccard": 0.0
+    },
+    {
+      "a": "pullback_hammer",
+      "b": "coiled_spring",
+      "exact_entry_intersection": 0,
+      "exact_entry_jaccard": 0.0
+    },
+    {
+      "a": "pullback_hammer",
+      "b": "seller_exhaustion",
+      "exact_entry_intersection": 2,
+      "exact_entry_jaccard": 0.023255813953488372
+    },
+    {
+      "a": "pullback_hammer",
+      "b": "deep_drawdown_bid",
+      "exact_entry_intersection": 0,
+      "exact_entry_jaccard": 0.0
+    },
+    {
+      "a": "quiet_accumulation",
+      "b": "coiled_spring",
+      "exact_entry_intersection": 4,
+      "exact_entry_jaccard": 0.047058823529411764
+    },
+    {
+      "a": "quiet_accumulation",
+      "b": "seller_exhaustion",
+      "exact_entry_intersection": 1,
+      "exact_entry_jaccard": 0.011235955056179775
+    },
+    {
+      "a": "quiet_accumulation",
+      "b": "deep_drawdown_bid",
+      "exact_entry_intersection": 8,
+      "exact_entry_jaccard": 0.10810810810810811
+    },
+    {
+      "a": "coiled_spring",
+      "b": "seller_exhaustion",
+      "exact_entry_intersection": 5,
+      "exact_entry_jaccard": 0.05102040816326531
+    },
+    {
+      "a": "coiled_spring",
+      "b": "deep_drawdown_bid",
+      "exact_entry_intersection": 4,
+      "exact_entry_jaccard": 0.04395604395604396
+    },
+    {
+      "a": "seller_exhaustion",
+      "b": "deep_drawdown_bid",
+      "exact_entry_intersection": 2,
+      "exact_entry_jaccard": 0.02127659574468085
+    }
+  ],
+  "freeze_sha256": "7d03a313d5b0021f5f7af99bffe8d104ad95f983908907dc37f416d095babf51"
+}

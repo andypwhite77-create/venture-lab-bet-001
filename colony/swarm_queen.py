@@ -20,12 +20,12 @@ def _read_json(path, default=None):
     except Exception:
         return {} if default is None else default
 
-def _reference_baseline_snapshot(finalists):
+def _reference_baseline_snapshot(finalists, experiment="eve_reference"):
     """Research-safe reference landmarks. Never include Spartan or post-freeze proof here."""
     ants=[]; robust_sensors=collections.Counter()
     for x in finalists or []:
         g=x.get('genome',{}); prm=g.get('parameters',{}); folds=list(x.get('folds') or [])
-        fold_n=[m.get('n') for m in folds]; fold_net=[m.get('avg_net_gbp') for m in folds]
+        fold_n=[m.get('n') for m in folds]; fold_net=[m.get('avg_net_gbp') if m.get('avg_net_gbp') is not None else m.get('avg_net_return_pct') for m in folds]
         positive=bool(folds) and all(v is not None and float(v)>0 for v in fold_net)
         sensors=sorted((g.get('predicates') or {}).keys())
         if positive and g.get('species')!='control_buy_all':
@@ -33,7 +33,7 @@ def _reference_baseline_snapshot(finalists):
         ants.append({'species':g.get('species'),'genome_id':x.get('genome_id'),'coverage_class':x.get('coverage_class'),
                      'sensors':sensors,'hold_minutes':prm.get('hold_minutes'),'fold_n':fold_n,
                      'fold_avg_net_gbp':fold_net,'all_folds_positive':positive})
-    return {'experiment':'eve_reference_ants_v2','ants':ants,
+    return {'experiment':experiment,'ants':ants,
             'positive_all_folds':sum(1 for a in ants if a.get('all_folds_positive')),
             'robust_reference_sensors':[k for k,_ in robust_sensors.most_common()],
             'note':'frozen missingness-safe walk-forward landmarks only; no Spartan or prospective answers included'}
@@ -161,11 +161,11 @@ async def evidence(c):
     except Exception:
         strategic_guidance={}
     qrecs=await c.fetch("SELECT finalists,summary,created_at FROM historical_nursery_runs WHERE family='queen_pattern' ORDER BY created_at DESC LIMIT 2")
-    refrec=await c.fetchrow("SELECT finalists FROM historical_nursery_runs WHERE family='eve_reference_v2' ORDER BY created_at DESC LIMIT 1")
+    refrec=await c.fetchrow("SELECT family,finalists FROM historical_nursery_runs WHERE family LIKE 'eve_reference_v%' ORDER BY created_at DESC LIMIT 1")
     reference_baseline={}
     if refrec:
         rf=refrec['finalists']; rf=json.loads(rf) if isinstance(rf,str) else list(rf or [])
-        reference_baseline=_reference_baseline_snapshot(rf)
+        reference_baseline=_reference_baseline_snapshot(rf,refrec['family'])
     queen_research={}
     epoch=float((_read_json('/data/queen_semantic_epoch.json',{}) or {}).get('started_at',0) or 0)
     if qrecs and (not epoch or qrecs[0]['created_at'].timestamp()>=epoch):
