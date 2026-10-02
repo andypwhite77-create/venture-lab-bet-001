@@ -141,7 +141,7 @@ services:
       OPENBLAS_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
-    cpus: "1.0"
+    cpus: "2.0"
     volumes:
       - queen_state:/data:ro
     logging:
@@ -234,7 +234,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
-      QUEEN_EVAL_WORKERS: "1"
+      QUEEN_EVAL_WORKERS: "2"
       SWARM_STRATEGIC_EVERY_CAMPAIGNS: "3"
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"

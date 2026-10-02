@@ -11,7 +11,7 @@ from colony.paper_economics import TARGET_STAKE_GBP,measured_roundtrip_network_f
 from colony.queen_ecology import load as load_ecology, strategy as ecology_strategy
 SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000),'trend_alignment':(-1200,1800),'short_vs_hour':(-30,30),'flow_imbalance_15':(-1,1),'flow_imbalance_30':(-1,1),'flow_shift':(-2,2),'activity_30':(0,1600),'activity_h1':(0,5000),'flow_imbalance_h1':(-1,1),'buy_activity_change':(-1,12),'volume_liquidity_h1':(0,10),'fdv_liquidity_ratio':(0,1000),'marketcap_liquidity_ratio':(0,1000),'pair_age_hours':(0,10000),'advisor_reversal':(0,1),'advisor_momentum':(0,1),'advisor_order_flow':(0,1),'advisor_exhaustion':(0,1),'advisor_mean_reversion':(0,1),'advisor_count':(0,5),'live_signal_reversal':(0,1),'live_signal_exhaustion':(0,1),'live_signal_momentum':(0,1),'live_signal_order_flow':(0,1),'live_signal_wallet_convergence':(0,1),'live_signal_mean_reversion':(0,1),'live_signal_count':(0,6),'live_council_available':(0,1),'hist_context_available':(0,1),'hist_return_24h':(-100,500),'hist_return_7d':(-100,5000),'hist_volatility_24h':(0,300),'hist_volume_ratio_24h':(0,20),'hist_drawdown_7d_pct':(-100,0),'hist_position_7d':(0,1)}
 HOLDS=(5,10,15,30,45,60,240)
-METHODOLOGY_VERSION='queen-v4-exact-horizon-sampled-path-empirical-ranges'
+METHODOLOGY_VERSION='queen-v6-breadth-margin-diversity'
 # Queen may evolve simple risk management; all decisions are fixed before sealed holdout.
 STOP_LOSSES=(None,-5,-8,-12,-18,-25)
 TAKE_PROFITS=(None,5,8,12,20,35,60)
@@ -25,7 +25,7 @@ def _worker_init(splits,cost):
 
 def _worker_score(g):
  parts=[evaluate(g,s,TARGET_STAKE_GBP,_EVAL_COST) for s in _EVAL_SPLITS[:2]]
- return {'genome_id':genome_id(g),'genome':g,'train':parts[0],'validation':parts[1],'selection_score':selection_fitness(parts)}
+ return {'genome_id':genome_id(g),'genome':g,'train':parts[0],'validation':parts[1],'selection_score':selection_fitness(parts,g)}
 
 def _parse_niche(sig):
  try:
@@ -57,7 +57,7 @@ def random_genome(rng,memory=None,eco_plan=None,eco_state=None):
  niches=[_parse_niche(x) for x in eco_plan.get('top_niches',[])]; niches=[(h,[k for k in ks if k in sensor_pool]) for h,ks in niches]; niches=[x for x in niches if x[1]]
  r=rng.random(); wild=float(eco_plan.get('wild_scouts',.20)); adjacent=float(eco_plan.get('adjacent_explore',.25))
  mode='wild' if r<wild else ('adjacent' if r<wild+adjacent else 'exploit')
- hold=None; keys=[]; n=rng.randint(2,6)
+ hold=None; keys=[]; n=rng.randint(1,4)
  if mode in ('exploit','adjacent') and niches:
   hold,base=rng.choice(niches); keys=rng.sample(base,min(len(base),n))
   if mode=='adjacent':
@@ -95,11 +95,11 @@ def mutate(g,rng,allowed_sensors=None,sensor_ranges=None):
  x=copy.deepcopy(g);p=x['predicates']; allowed=list(allowed_sensors or SENSORS); sensor_ranges=sensor_ranges or {}
  def rr(k):
   r=sensor_ranges.get(k); return (float(r[0]),float(r[1])) if isinstance(r,(list,tuple)) and len(r)==2 and float(r[0])<float(r[1]) else SENSORS[k]
- if rng.random()<.15 and len(p)<7:
+ if rng.random()<.05 and len(p)<5:
   avail=[k for k in allowed if k not in p]
   if avail:
    k=rng.choice(avail);lo,hi=rr(k);p[k]={rng.choice(('min','max')):rng.uniform(lo,hi)}
- if rng.random()<.10 and len(p)>2:del p[rng.choice(list(p))]
+ if rng.random()<.30 and len(p)>1:del p[rng.choice(list(p))]
  for k,r in p.items():
   if rng.random()<.6:
    lo,hi=rr(k);op=next(iter(r));r[op]=max(lo,min(hi,r[op]+rng.gauss(0,(hi-lo)*.05)))
@@ -108,15 +108,20 @@ def mutate(g,rng,allowed_sensors=None,sensor_ranges=None):
  if rng.random()<.12:x['parameters']['take_profit_pct']=rng.choice(TAKE_PROFITS)
  return x
 
-def selection_fitness(parts):
+def selection_fitness(parts,genome=None):
  t,v=parts[:2]
- if t.get('n',0)<18 or v.get('n',0)<12:return -999.0
+ # Anti-loophole breadth floor: viable strategies must work across a meaningful
+ # number of independent assets in both breeding-visible partitions.
+ if t.get('n',0)<35 or v.get('n',0)<20:return -999.0
  # Hard economic gate: consistency may reward profitable robustness, but can never
  # rescue a strategy that loses money on either breeding-visible partition.
  if float(t.get('avg_net_gbp',-1e9))<=0 or float(v.get('avg_net_gbp',-1e9))<=0:return -999.0
  # Queen knows the game, not Spartan's hidden cutoffs: reward breadth, survival and distributed contribution.
- breadth=(min(1.0,t['n']/55.0)*min(1.0,v['n']/30.0))**0.5
- coverage=min(1.0,(v['n']/max(1,t['n']))/.45)
+ breadth=(min(1.0,t['n']/90.0)*min(1.0,v['n']/45.0))**0.5
+ # Keep rewarding safety margin well beyond the viability floor; do not let evolution camp on it.
+ breadth_margin=(min(1.0,t['n']/140.0)*min(1.0,v['n']/70.0))**0.5
+ breadth_pressure=breadth**1.35
+ coverage=min(1.0,(v['n']/max(1,t['n']))/.55)
  concentration=max(float(t.get('outlier',1)),float(v.get('outlier',1)))
  if concentration>.50:return -999.0
  consistency=min(float(t.get('win_rate',0)),float(v.get('win_rate',0)))
@@ -126,7 +131,11 @@ def selection_fitness(parts):
  low_age=max(float(t.get('low_age_fraction',0)),float(v.get('low_age_fraction',0)))
  low_liq=max(float(t.get('low_liquidity_fraction',0)),float(v.get('low_liquidity_fraction',0)))
  fragility_penalty=.12*max(0,low_age-.35)+.10*max(0,low_liq-.35)
- return base*breadth*(.65+.35*coverage) + .10*consistency - max(0,concentration-.30)*1.15 - fragility_penalty
+ # Parsimony pressure prevents increasingly specific predicate stacks from winning
+ # merely by shrinking the opportunity set around a few historical winners.
+ predicate_n=len((genome or {}).get('predicates',{}))
+ complexity_penalty=.06*max(0,predicate_n-2)
+ return base*breadth_pressure*(.45+.55*coverage) + .22*breadth_margin + .12*consistency - max(0,concentration-.28)*1.25 - fragility_penalty - complexity_penalty
 
 def select_finalists_breadth(ranked):
  # Breeding-visible handoff only. Cap actual executed behaviour, not cosmetic genotype variation.
@@ -134,7 +143,7 @@ def select_finalists_breadth(ranked):
  picked=[]; counts={}
  for x in eligible[:1000]:
   sig=_behaviour_key(x)
-  if counts.get(sig,0)>=2: continue
+  if counts.get(sig,0)>=1: continue
   counts[sig]=counts.get(sig,0)+1; picked.append(x)
   if len(picked)>=100: break
  return picked
@@ -242,7 +251,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
    ranked=[]
    for g in pop:
     parts=[evaluate(g,s,TARGET_STAKE_GBP,cost) for s in splits[:2]]
-    ranked.append({'genome_id':genome_id(g),'genome':g,'train':parts[0],'validation':parts[1],'selection_score':selection_fitness(parts),'wave':wave})
+    ranked.append({'genome_id':genome_id(g),'genome':g,'train':parts[0],'validation':parts[1],'selection_score':selection_fitness(parts,g),'wave':wave})
   else:
    with ProcessPoolExecutor(max_workers=workers,initializer=_worker_init,initargs=(splits,cost)) as ex:
     ranked=list(ex.map(_worker_score,pop,chunksize=128))
@@ -310,7 +319,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
                         'positive_finalists':sum(v>0 for v in vals),'median_avg_net_gbp':statistics.median(vals) if vals else None}
  weak_counts=collections.Counter(_ecology_signature(x['genome']) for x in last if x.get('selection_score',-999)<=-900)
  weak_niches=[{'signature':sig,'count':cnt} for sig,cnt in weak_counts.most_common(20) if cnt>=5]
- summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'finalist_handoff':'behaviour_capped_from_top1000','historical_holdout_used_for_algorithm_design':True,'prospective_proof_required':True,'min_train_events':18,'min_validation_events':12,'breeding_diversity_cap_per_behaviour':3,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':fresh_rate,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[]),'prospective_preferred_features':memory.get('prospective_preferred_features',[]),'prospective_parent_templates':len(memory.get('prospective_parent_templates',[])),'prospective_mints_forced_train':len(exp_mints),'active_ant_genomes_frozen':True,'experience_breeds_descendants':True,'gene_seed_extra_first_wave':int(os.getenv('QUEEN_GENE_SEED_N','40000')) if memory.get('prospective_parent_templates') else 0,'ecology_plan':eco_plan,'swarm_research_plan':swarm_plan,'behavioral_parent_cap':3,'behavioral_finalist_cap':2,'methodology_version':METHODOLOGY_VERSION,'exam_snapshot_version':2,'exam_snapshot_sha256':exam_hash,'exam_holdout_rows':exam_rows,'sensor_availability':{k:round(v,4) for k,v in sensor_availability.items()},'active_sensor_count':len(active_sensors),'empirical_sensor_range_count':len(sensor_ranges),'breeding_regime_coverage':regime_coverage,'weak_niches':weak_niches}
+ summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'finalist_handoff':'behaviour_capped_from_top1000','historical_holdout_used_for_algorithm_design':True,'prospective_proof_required':True,'min_train_events':35,'min_validation_events':20,'breeding_diversity_cap_per_behaviour':3,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':fresh_rate,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[]),'prospective_preferred_features':memory.get('prospective_preferred_features',[]),'prospective_parent_templates':len(memory.get('prospective_parent_templates',[])),'prospective_mints_forced_train':len(exp_mints),'active_ant_genomes_frozen':True,'experience_breeds_descendants':True,'gene_seed_extra_first_wave':int(os.getenv('QUEEN_GENE_SEED_N','40000')) if memory.get('prospective_parent_templates') else 0,'ecology_plan':eco_plan,'swarm_research_plan':swarm_plan,'behavioral_parent_cap':3,'behavioral_finalist_cap':1,'methodology_version':METHODOLOGY_VERSION,'exam_snapshot_version':2,'exam_snapshot_sha256':exam_hash,'exam_holdout_rows':exam_rows,'sensor_availability':{k:round(v,4) for k,v in sensor_availability.items()},'active_sensor_count':len(active_sensors),'empirical_sensor_range_count':len(sensor_ranges),'breeding_regime_coverage':regime_coverage,'weak_niches':weak_niches}
  if checkpoint and os.path.exists(checkpoint): os.remove(checkpoint)
  await conn.execute("INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary) VALUES('queen_pattern',$1,$2,$3::jsonb,$4::jsonb)",tested,len(rows),json.dumps(finalists,default=str),json.dumps(summary,default=str))
  return summary,finalists
