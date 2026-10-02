@@ -47,10 +47,12 @@ def record_exam_result(result):
     if completed is not None and any(x.get('completed_at')==completed for x in hist):
         return m
     hist.append({'at':time.time(),'completed_at':completed,'campaign':result.get('campaign'),'tested':result.get('tested'),'finalists':result.get('finalists'),
-                 'spartan_survivors':result.get('spartan_survivors',0),'distinct_survivor_behaviours':result.get('distinct_survivor_behaviours',0)})
+                 'spartan_survivors':result.get('spartan_survivors',0),'distinct_survivor_behaviours':result.get('distinct_survivor_behaviours',0),
+                 'spartan_evaluable_behaviours':result.get('spartan_evaluable_behaviours',0),'exam_inconclusive':bool(result.get('exam_inconclusive',False))})
     m['exam_history']=hist[-30:]
     drought=0
     for x in reversed(m['exam_history']):
+        if x.get('exam_inconclusive'):continue
         if int(x.get('spartan_survivors',0) or 0)>0:break
         drought+=1
     m['spartan_drought_campaigns']=drought

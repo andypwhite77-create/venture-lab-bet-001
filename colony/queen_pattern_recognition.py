@@ -12,7 +12,7 @@ from colony.queen_ecology import load as load_ecology, strategy as ecology_strat
 from colony.queen_mutation_credit import load as load_mutation_credit, save as save_mutation_credit, choose as choose_mutation_operator, record as record_mutation_credit, summarise as summarise_mutation_credit
 SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000),'trend_alignment':(-1200,1800),'short_vs_hour':(-30,30),'flow_imbalance_15':(-1,1),'flow_imbalance_30':(-1,1),'flow_shift':(-2,2),'activity_30':(0,1600),'activity_h1':(0,5000),'flow_imbalance_h1':(-1,1),'buy_activity_change':(-1,12),'volume_liquidity_h1':(0,10),'fdv_liquidity_ratio':(0,1000),'marketcap_liquidity_ratio':(0,1000),'pair_age_hours':(0,10000),'advisor_reversal':(0,1),'advisor_momentum':(0,1),'advisor_order_flow':(0,1),'advisor_exhaustion':(0,1),'advisor_mean_reversion':(0,1),'advisor_count':(0,5),'live_signal_reversal':(0,1),'live_signal_exhaustion':(0,1),'live_signal_momentum':(0,1),'live_signal_order_flow':(0,1),'live_signal_wallet_convergence':(0,1),'live_signal_mean_reversion':(0,1),'live_signal_count':(0,6),'live_council_available':(0,1),'hist_context_available':(0,1),'hist_return_24h':(-100,500),'hist_return_7d':(-100,5000),'hist_volatility_24h':(0,300),'hist_volume_ratio_24h':(0,20),'hist_drawdown_7d_pct':(-100,0),'hist_position_7d':(0,1)}
 HOLDS=(5,10,15,30,45,60,240)
-METHODOLOGY_VERSION='queen-v8-directed-mutation-credit'
+METHODOLOGY_VERSION='queen-v10-missingness-safe-cross-wave'
 # Queen may evolve simple risk management; all decisions are fixed before sealed holdout.
 STOP_LOSSES=(None,-5,-8,-12,-18,-25)
 TAKE_PROFITS=(None,5,8,12,20,35,60)
@@ -234,12 +234,12 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
  memory['underexplored_features']=[k for k in memory.get('underexplored_features',[]) if k in active_sensors]
  memory['preferred_features']=[k for k in memory.get('preferred_features',[]) if k in active_sensors]
  fee=await measured_roundtrip_network_fee_sol(conn);rate,_=sol_gbp_rate();cost=fee*rate
- parents=[];last=[];tested=0;start_wave=1;mutation_credit=load_mutation_credit()
+ parents=[];last=[];tested=0;start_wave=1;mutation_credit=load_mutation_credit(); behaviour_archive={}
  if checkpoint and os.path.exists(checkpoint):
   try:
    cp=pickle.load(open(checkpoint,'rb'))
    if cp.get('methodology_version')!=METHODOLOGY_VERSION: raise ValueError('checkpoint_methodology_mismatch')
-   parents=cp['parents'];tested=cp['tested'];start_wave=cp['wave']+1;rng.setstate(cp['rng_state']);fresh_rate=float(cp.get('fresh_rate',fresh_rate))
+   parents=cp['parents'];tested=cp['tested'];start_wave=cp['wave']+1;rng.setstate(cp['rng_state']);fresh_rate=float(cp.get('fresh_rate',fresh_rate));behaviour_archive=cp.get('behaviour_archive',{})
    print(json.dumps({'event':'queen_resumed','from_wave':start_wave,'tested':tested,'urgency':'EXTREME','methodology_version':METHODOLOGY_VERSION}),flush=True)
   except Exception as e: print(json.dumps({'event':'checkpoint_rejected','error':str(e)}),flush=True)
  for wave in range(start_wave,waves+1):
@@ -280,6 +280,14 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
    save_mutation_credit(mutation_credit)
   mutation_summary=summarise_mutation_credit(mutation_credit)
   ranked.sort(key=lambda x:x['selection_score'],reverse=True)
+  # Preserve the best breeding-visible representative of every executed behaviour across waves.
+  # Without this archive the final wave can collapse onto one phenotype, making the sealed
+  # holdout appear artificially uniform even though earlier waves discovered real diversity.
+  for x in ranked:
+   if x['selection_score']<=-900: continue
+   sig=_behaviour_key(x); prev=behaviour_archive.get(sig)
+   if prev is None or x['selection_score']>prev['selection_score']:
+    behaviour_archive[sig]=x
   # Preserve actual behavioural diversity: identical executed opportunity sets + risk
   # controls may contribute only a few parents, regardless of cosmetic genome differences.
   parents=[]; phenos={}
@@ -296,12 +304,14 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
   eligible=sum(x['selection_score']>-900 for x in ranked)
   print(json.dumps({'wave':wave,'tested':tested,'eligible':eligible,'best':ranked[0]['selection_score'],'parent_behaviour_groups':behaviour_groups,'fresh_blood_rate':fresh_rate,'urgency':'EXTREME','directive':'breed faster; kill fragility; earn expansion','mutation_credit':mutation_summary}),flush=True)
   if checkpoint:
-   os.makedirs(os.path.dirname(checkpoint),exist_ok=True);pickle.dump({'methodology_version':METHODOLOGY_VERSION,'wave':wave,'tested':tested,'parents':parents,'rng_state':rng.getstate(),'best':ranked[0]['selection_score'],'eligible':eligible,'fresh_rate':fresh_rate,'saved_at':time.time()},open(checkpoint,'wb'))
- # Only after breeding is completely finished do we open holdout for the fixed top pool.
- diagnostic_pool=[x for x in last if x['selection_score']>-900][:500]
+   os.makedirs(os.path.dirname(checkpoint),exist_ok=True);pickle.dump({'methodology_version':METHODOLOGY_VERSION,'wave':wave,'tested':tested,'parents':parents,'rng_state':rng.getstate(),'best':ranked[0]['selection_score'],'eligible':eligible,'fresh_rate':fresh_rate,'behaviour_archive':behaviour_archive,'saved_at':time.time()},open(checkpoint,'wb'))
+ # Only after breeding is completely finished do we open holdout. The candidate pool is
+ # fixed from breeding-visible evidence and spans behaviours discovered across every wave.
+ archive_ranked=sorted(behaviour_archive.values(),key=lambda x:x['selection_score'],reverse=True)
+ diagnostic_pool=archive_ranked[:500]
  for x in diagnostic_pool:
   x['holdout']=evaluate(x['genome'],splits[2],TARGET_STAKE_GBP,cost)
- finalists=select_finalists_breadth(last)
+ finalists=select_finalists_breadth(archive_ranked)
  finalist_by_id={x['genome_id']:x for x in diagnostic_pool}
  for x in finalists:
   if 'holdout' not in x:
@@ -341,7 +351,7 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
                         'positive_finalists':sum(v>0 for v in vals),'median_avg_net_gbp':statistics.median(vals) if vals else None}
  weak_counts=collections.Counter(_ecology_signature(x['genome']) for x in last if x.get('selection_score',-999)<=-900)
  weak_niches=[{'signature':sig,'count':cnt} for sig,cnt in weak_counts.most_common(20) if cnt>=5]
- summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'finalist_handoff':'behaviour_capped_from_top1000','historical_holdout_used_for_algorithm_design':True,'prospective_proof_required':True,'min_train_events':18,'min_validation_events':12,'breeding_diversity_cap_per_behaviour':3,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':fresh_rate,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[]),'prospective_preferred_features':memory.get('prospective_preferred_features',[]),'prospective_parent_templates':len(memory.get('prospective_parent_templates',[])),'prospective_mints_forced_train':len(exp_mints),'active_ant_genomes_frozen':True,'experience_breeds_descendants':True,'gene_seed_extra_first_wave':int(os.getenv('QUEEN_GENE_SEED_N','40000')) if memory.get('prospective_parent_templates') else 0,'ecology_plan':eco_plan,'swarm_research_plan':swarm_plan,'behavioral_parent_cap':3,'behavioral_finalist_cap':1,'methodology_version':METHODOLOGY_VERSION,'exam_snapshot_version':2,'exam_snapshot_sha256':exam_hash,'exam_holdout_rows':exam_rows,'sensor_availability':{k:round(v,4) for k,v in sensor_availability.items()},'active_sensor_count':len(active_sensors),'empirical_sensor_range_count':len(sensor_ranges),'breeding_regime_coverage':regime_coverage,'weak_niches':weak_niches,'mutation_credit':summarise_mutation_credit(mutation_credit)}
+ summary={'mode':'queen_general_pattern_breadth','tested':tested,'waves':waves,'rows':len(rows),'unique_mints':len({r['mint'] for r in rows}),'finalists':len(finalists),'holdout_positive':sum(x['holdout'].get('avg_net_gbp',-1)>0 for x in finalists),'holdout_not_used_for_selection':True,'finalist_handoff':'behaviour_capped_from_top1000','historical_holdout_used_for_algorithm_design':True,'prospective_proof_required':True,'min_train_events':18,'min_validation_events':12,'breeding_diversity_cap_per_behaviour':3,'validation_coverage_reward':True,'selection_concentration_ceiling':.50,'fresh_blood_rate':fresh_rate,'memory_campaigns':memory.get('campaigns',0),'memory_preferred_features':memory.get('preferred_features',[]),'prospective_preferred_features':memory.get('prospective_preferred_features',[]),'prospective_parent_templates':len(memory.get('prospective_parent_templates',[])),'prospective_mints_forced_train':len(exp_mints),'active_ant_genomes_frozen':True,'experience_breeds_descendants':True,'gene_seed_extra_first_wave':int(os.getenv('QUEEN_GENE_SEED_N','40000')) if memory.get('prospective_parent_templates') else 0,'ecology_plan':eco_plan,'swarm_research_plan':swarm_plan,'behavioral_parent_cap':3,'behavioral_finalist_cap':1,'cross_wave_behaviour_archive':len(behaviour_archive),'methodology_version':METHODOLOGY_VERSION,'exam_snapshot_version':2,'exam_snapshot_sha256':exam_hash,'exam_holdout_rows':exam_rows,'sensor_availability':{k:round(v,4) for k,v in sensor_availability.items()},'active_sensor_count':len(active_sensors),'empirical_sensor_range_count':len(sensor_ranges),'breeding_regime_coverage':regime_coverage,'weak_niches':weak_niches,'mutation_credit':summarise_mutation_credit(mutation_credit)}
  if checkpoint and os.path.exists(checkpoint): os.remove(checkpoint)
  await conn.execute("INSERT INTO historical_nursery_runs(family,tested_genomes,historical_rows,finalists,summary) VALUES('queen_pattern',$1,$2,$3::jsonb,$4::jsonb)",tested,len(rows),json.dumps(finalists,default=str),json.dumps(summary,default=str))
  return summary,finalists

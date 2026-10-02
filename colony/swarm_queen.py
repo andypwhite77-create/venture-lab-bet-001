@@ -20,6 +20,25 @@ def _read_json(path, default=None):
     except Exception:
         return {} if default is None else default
 
+def _reference_baseline_snapshot(finalists):
+    """Research-safe reference landmarks. Never include Spartan or post-freeze proof here."""
+    ants=[]; robust_sensors=collections.Counter()
+    for x in finalists or []:
+        g=x.get('genome',{}); prm=g.get('parameters',{}); folds=list(x.get('folds') or [])
+        fold_n=[m.get('n') for m in folds]; fold_net=[m.get('avg_net_gbp') for m in folds]
+        positive=bool(folds) and all(v is not None and float(v)>0 for v in fold_net)
+        sensors=sorted((g.get('predicates') or {}).keys())
+        if positive and g.get('species')!='control_buy_all':
+            for k in sensors:robust_sensors[k]+=1
+        ants.append({'species':g.get('species'),'genome_id':x.get('genome_id'),'coverage_class':x.get('coverage_class'),
+                     'sensors':sensors,'hold_minutes':prm.get('hold_minutes'),'fold_n':fold_n,
+                     'fold_avg_net_gbp':fold_net,'all_folds_positive':positive})
+    return {'experiment':'eve_reference_ants_v2','ants':ants,
+            'positive_all_folds':sum(1 for a in ants if a.get('all_folds_positive')),
+            'robust_reference_sensors':[k for k,_ in robust_sensors.most_common()],
+            'note':'frozen missingness-safe walk-forward landmarks only; no Spartan or prospective answers included'}
+
+
 def _queen_research_snapshot(finalists, summary, previous_finalists=None):
     groups=collections.Counter(); holds=collections.Counter(); risks=collections.Counter(); sensors=collections.Counter(); combos=collections.Counter(); signatures=set()
     for x in finalists or []:
@@ -108,15 +127,17 @@ def _bounded_research_plan(raw, e):
     focus=[]; availability=q.get('sensor_availability') or {}
     strategic_focus=[k for k in (strategic.get('focus_sensors') or []) if k in allowed and float(availability.get(k,1.0) or 0)>=.10]
     strategic_avoid={k for k in (strategic.get('avoid_sensors') or []) if k in allowed}
-    # Forward career evidence gets first claim on sensor attention; exploration fills the remainder.
-    for k in strategic_focus+list(q.get('career_preferred_features',[]) or [])+list(q.get('preferred_features',[]) or [])+list(q.get('underexplored_features',[]) or []):
+    reference_focus=[k for k in ((e.get('reference_baseline') or {}).get('robust_reference_sensors') or [])
+                     if k in allowed and float(availability.get(k,1.0) or 0)>=.10]
+    # Reference ants are landmarks, not templates: they may nominate neglected sensors but never replace wild search.
+    for k in strategic_focus+reference_focus+list(q.get('career_preferred_features',[]) or [])+list(q.get('preferred_features',[]) or [])+list(q.get('underexplored_features',[]) or []):
         if k in allowed and k not in strategic_avoid and float(availability.get(k,1.0) or 0)>=.10 and k not in focus:focus.append(k)
         if len(focus)>=8:break
     avoid=list(q.get('graveyard_niches',[]) or [])[:8]
     return {'exploit':round(exploit,4),'adjacent_explore':round(a,4),'wild_scouts':round(w,4),
             'focus_sensors':focus,'avoid_niches':avoid,'largest_behaviour_fraction':round(concentration,4),
             'behaviour_groups':groups,'behaviour_hhi':round(hhi,4),'behaviour_entropy':round(ent,4),
-            'effective_behaviours':round(eff,2),'spartan_drought_campaigns':drought,'strategic_mode':mode,'strategic_focus_used':strategic_focus[:6],'authority':'research_allocation_only',
+            'effective_behaviours':round(eff,2),'spartan_drought_campaigns':drought,'strategic_mode':mode,'strategic_focus_used':strategic_focus[:6],'reference_focus_used':reference_focus[:6],'authority':'research_allocation_only',
             'source':'research_safe_swarm_ecology'}
 
 async def evidence(c):
@@ -140,6 +161,11 @@ async def evidence(c):
     except Exception:
         strategic_guidance={}
     qrecs=await c.fetch("SELECT finalists,summary,created_at FROM historical_nursery_runs WHERE family='queen_pattern' ORDER BY created_at DESC LIMIT 2")
+    refrec=await c.fetchrow("SELECT finalists FROM historical_nursery_runs WHERE family='eve_reference_v2' ORDER BY created_at DESC LIMIT 1")
+    reference_baseline={}
+    if refrec:
+        rf=refrec['finalists']; rf=json.loads(rf) if isinstance(rf,str) else list(rf or [])
+        reference_baseline=_reference_baseline_snapshot(rf)
     queen_research={}
     epoch=float((_read_json('/data/queen_semantic_epoch.json',{}) or {}).get('started_at',0) or 0)
     if qrecs and (not epoch or qrecs[0]['created_at'].timestamp()>=epoch):
@@ -150,14 +176,14 @@ async def evidence(c):
         if len(qrecs)>1:
             pf=qrecs[1]['finalists']; prev=json.loads(pf) if isinstance(pf,str) else list(pf or [])
         queen_research=_queen_research_snapshot(fs,sm,prev)
-    return {'queen_research':queen_research,'performance':perf,'roster':roster,'challenger_queue':queue,'providers':providers,'recent_events':recent,'strategic_guidance':strategic_guidance,
+    return {'queen_research':queen_research,'reference_baseline':reference_baseline,'performance':perf,'roster':roster,'challenger_queue':queue,'providers':providers,'recent_events':recent,'strategic_guidance':strategic_guidance,
             'constitution':{'authority':'advisory_only','real_money':False,'may_rewrite_genetics':False,'may_relax_evidence_gates':False,
                             'shared_data':True,'isolated_colony_genetics':True,
                             'identity':'colony_mother_and_war_queen','prime_directive':'persist_adapt_dominate_expand',
                             'aggression':'extreme_within_evidence_law','survival_unit':'colony_not_individual_ant'}}
 
 def prompt(e):
-    compact={k:e.get(k) for k in ('queen_research','performance','roster','challenger_queue','providers','constitution')}
+    compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','roster','challenger_queue','providers','constitution')}
     return ("You are Swarm Queen, executive ecologist for an evolutionary trading research system. "
             "Scientific law: never trade, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite individual genomes. "
             "Doctrine: SURVIVAL THROUGH VARIATION. Detect behavioural monoculture, weak coverage, system faults and useful research directions. "

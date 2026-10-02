@@ -12,3 +12,4 @@ venv/
 secrets/
 gateway-files/
 gateway-certs/
+benchmarks/*_spartan.json

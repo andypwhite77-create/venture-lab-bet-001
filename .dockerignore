@@ -5,3 +5,5 @@ gateway-files
 gateway-certs
 __pycache__
 *.pyc
+
+benchmarks/

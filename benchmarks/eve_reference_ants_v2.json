@@ -1,0 +1,617 @@
+{
+  "experiment": "eve_reference_ants_v2",
+  "status": "frozen_for_prospective_observation",
+  "frozen_at": 1790934876.5867248,
+  "prospective_after": 1790934876.5867248,
+  "design_rule": "missingness-safe; no pre-v10 Spartan/holdout outcomes used; thresholds derived from first chronological fold only; three-fold walk-forward used for benchmark selection",
+  "proof_rule": "future observations after prospective_after are the independent proof set; historical folds are discovery/benchmark only",
+  "network_cost_gbp": 0.00207882324,
+  "core_market_mints": 70,
+  "flow_complete_mints": 247,
+  "core_fold_mints": [
+    28,
+    21,
+    21
+  ],
+  "flow_fold_mints": [
+    98,
+    74,
+    75
+  ],
+  "ants": [
+    {
+      "genome_id": "g_064086949b9e657a",
+      "genome": {
+        "family": "eve_reference_v2",
+        "species": "deep_reversal",
+        "parameters": {
+          "hold_minutes": 60,
+          "stop_loss_pct": null,
+          "take_profit_pct": null
+        },
+        "predicates": {
+          "price_change_h1": {
+            "max": -11.131
+          },
+          "flow_imbalance_15": {
+            "min": 0.0
+          }
+        },
+        "bounds": {}
+      },
+      "coverage_class": "core_market_complete",
+      "folds": [
+        {
+          "n": 23,
+          "expectancy": 0.03099110414148381,
+          "consistency": -0.6159531813772634,
+          "robustness": 0.008446274247459296,
+          "max_drawdown": 0.2669374770651635,
+          "catastrophe_rate": 0.043478260869565216,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.4240242,
+          "avg_return_pct": 3.099110414148381,
+          "median_return_pct": 0.8446274247459297,
+          "outlier": 0.19204242582001296,
+          "nursery_score": -0.5975335600923564,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.7747776035370952,
+          "break_even_stake_gbp": 0.013093668467421344,
+          "low_age_fraction": 0.08695652173913043,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "912147136e2ce0b5"
+        },
+        {
+          "n": 16,
+          "expectancy": 0.029947852284644683,
+          "consistency": -1.726288477736471,
+          "robustness": 0.029947852284644683,
+          "max_drawdown": 0.5488077914297629,
+          "catastrophe_rate": 0.1875,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -1.07357954,
+          "avg_return_pct": 2.9947852284644685,
+          "median_return_pct": 7.13963383008384,
+          "outlier": 0.18807821369893626,
+          "nursery_score": -1.430304604429346,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.748696307116117,
+          "break_even_stake_gbp": 0.0114922967208807,
+          "low_age_fraction": 0.125,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "78be9233ba8b935b"
+        },
+        {
+          "n": 18,
+          "expectancy": 0.06574834597371977,
+          "consistency": -1.827571794712994,
+          "robustness": -0.043960302002928116,
+          "max_drawdown": 0.4424717525113834,
+          "catastrophe_rate": 0.05555555555555555,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.88050965,
+          "avg_return_pct": 6.574834597371977,
+          "median_return_pct": -4.396030200292811,
+          "outlier": 0.25820531895585785,
+          "nursery_score": -1.1681162891323993,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 1.6437086493429942,
+          "break_even_stake_gbp": 0.005949254060046442,
+          "low_age_fraction": 0.16666666666666666,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "a1f8a51ef3ad0879"
+        }
+      ],
+      "fold_avg_net_gbp": [
+        0.7747776035370952,
+        0.748696307116117,
+        1.6437086493429942
+      ],
+      "fold_n": [
+        23,
+        16,
+        18
+      ],
+      "all_folds_positive": true
+    },
+    {
+      "genome_id": "g_f521078dd9b7c21e",
+      "genome": {
+        "family": "eve_reference_v2",
+        "species": "short_momentum",
+        "parameters": {
+          "hold_minutes": 5,
+          "stop_loss_pct": null,
+          "take_profit_pct": null
+        },
+        "predicates": {
+          "price_change_m5": {
+            "min": -9.041
+          },
+          "dex_buy_ratio_m5": {
+            "min": 0.6877
+          }
+        },
+        "bounds": {}
+      },
+      "coverage_class": "core_market_complete",
+      "folds": [
+        {
+          "n": 24,
+          "expectancy": 0.018785109452442227,
+          "consistency": 0.3194449073606356,
+          "robustness": -0.004276430828478239,
+          "max_drawdown": 0.06228612747894298,
+          "catastrophe_rate": 0.0,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": 0.06525385,
+          "avg_return_pct": 1.8785109452442228,
+          "median_return_pct": -0.4276430828478238,
+          "outlier": 0.28977980558788935,
+          "nursery_score": 0.024767867138687068,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.4696277363110557,
+          "break_even_stake_gbp": 0.02867118462146888,
+          "low_age_fraction": 0.0,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "68083b1c6fd0d6fb"
+        },
+        {
+          "n": 17,
+          "expectancy": 0.03575358821609026,
+          "consistency": 0.31448063001257454,
+          "robustness": 0.03158661145475621,
+          "max_drawdown": 0.0555563649597412,
+          "catastrophe_rate": 0.0,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": 0.07602547,
+          "avg_return_pct": 3.575358821609026,
+          "median_return_pct": 3.1586611454756213,
+          "outlier": 0.24734931554115816,
+          "nursery_score": 0.039913832776168216,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.8938397054022567,
+          "break_even_stake_gbp": 0.028587783232487746,
+          "low_age_fraction": 0.058823529411764705,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "7bd4011d0a5d230b"
+        },
+        {
+          "n": 16,
+          "expectancy": 0.025556794990607968,
+          "consistency": -0.037832425026543604,
+          "robustness": -0.004840273553328733,
+          "max_drawdown": 0.0884659598108882,
+          "catastrophe_rate": 0.0,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.06336951,
+          "avg_return_pct": 2.5556794990607967,
+          "median_return_pct": -0.4840273553328733,
+          "outlier": 0.4372180038577953,
+          "nursery_score": -0.12087238387707733,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.6389198747651992,
+          "break_even_stake_gbp": 0.022012120574938645,
+          "low_age_fraction": 0.125,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "a9e5019f4808ca1d"
+        }
+      ],
+      "fold_avg_net_gbp": [
+        0.4696277363110557,
+        0.8938397054022567,
+        0.6389198747651992
+      ],
+      "fold_n": [
+        24,
+        17,
+        16
+      ],
+      "all_folds_positive": true
+    },
+    {
+      "genome_id": "g_d7269d93b43dd64f",
+      "genome": {
+        "family": "eve_reference_v2",
+        "species": "order_flow_tempered",
+        "parameters": {
+          "hold_minutes": 15,
+          "stop_loss_pct": null,
+          "take_profit_pct": null
+        },
+        "predicates": {
+          "buy_activity_change": {
+            "max": 2.0
+          }
+        },
+        "bounds": {}
+      },
+      "coverage_class": "flow_complete",
+      "folds": [
+        {
+          "n": 97,
+          "expectancy": 0.05875459604251055,
+          "consistency": -2,
+          "robustness": -0.0080831529296,
+          "max_drawdown": 0.961114009779783,
+          "catastrophe_rate": 0.15463917525773196,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -1.59934104,
+          "avg_return_pct": 5.875459604251055,
+          "median_return_pct": -0.80831529296,
+          "outlier": 0.22445534461746788,
+          "nursery_score": -2.224065146356859,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 1.4688649010627637,
+          "break_even_stake_gbp": 0.005928606876055872,
+          "low_age_fraction": 0.7422680412371134,
+          "low_liquidity_fraction": 0.422680412371134,
+          "event_signature": "5b6defcac8344776"
+        },
+        {
+          "n": 71,
+          "expectancy": 0.0073455012263189045,
+          "consistency": -2,
+          "robustness": -0.01941541117971286,
+          "max_drawdown": 0.9941611327180623,
+          "catastrophe_rate": 0.2535211267605634,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -1.80094569,
+          "avg_return_pct": 0.7345501226318905,
+          "median_return_pct": -1.941541117971286,
+          "outlier": 0.289781234898189,
+          "nursery_score": -2.4471504262667407,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.18363753065797261,
+          "break_even_stake_gbp": 0.004311812423340977,
+          "low_age_fraction": 0.8450704225352113,
+          "low_liquidity_fraction": 0.4647887323943662,
+          "event_signature": "feca2feffb474225"
+        },
+        {
+          "n": 73,
+          "expectancy": 0.01741885388443902,
+          "consistency": -2,
+          "robustness": -0.053886996576882853,
+          "max_drawdown": 0.9988183766147979,
+          "catastrophe_rate": 0.3013698630136986,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -1.86752883,
+          "avg_return_pct": 1.741885388443902,
+          "median_return_pct": -5.388699657688285,
+          "outlier": 0.3677709720858251,
+          "nursery_score": -2.516760774799619,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.43547134711097546,
+          "break_even_stake_gbp": 0.002426619718896421,
+          "low_age_fraction": 0.8904109589041096,
+          "low_liquidity_fraction": 0.4657534246575342,
+          "event_signature": "8f050b186169296c"
+        }
+      ],
+      "fold_avg_net_gbp": [
+        1.4688649010627637,
+        0.18363753065797261,
+        0.43547134711097546
+      ],
+      "fold_n": [
+        97,
+        71,
+        73
+      ],
+      "all_folds_positive": true
+    },
+    {
+      "genome_id": "g_6a3622a69e247265",
+      "genome": {
+        "family": "eve_reference_v2",
+        "species": "trend_pullback",
+        "parameters": {
+          "hold_minutes": 30,
+          "stop_loss_pct": null,
+          "take_profit_pct": null
+        },
+        "predicates": {
+          "price_change_h1": {
+            "min": 4.255
+          },
+          "price_change_m5": {
+            "max": -6.819
+          }
+        },
+        "bounds": {}
+      },
+      "coverage_class": "core_market_complete",
+      "folds": [
+        {
+          "n": 19,
+          "expectancy": 0.07344051659846901,
+          "consistency": -1.316813061184511,
+          "robustness": 0.07344051659846901,
+          "max_drawdown": 0.2552537382793066,
+          "catastrophe_rate": 0.05263157894736842,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.54939703,
+          "avg_return_pct": 7.344051659846901,
+          "median_return_pct": 7.749413012467315,
+          "outlier": 0.20333828700481413,
+          "nursery_score": -0.7153119598815493,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 1.8360129149617253,
+          "break_even_stake_gbp": 0.007843405101835886,
+          "low_age_fraction": 0.05263157894736842,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "88a39ef69e29281e"
+        },
+        {
+          "n": 15,
+          "expectancy": 0.023274990608498802,
+          "consistency": -0.45399389622971564,
+          "robustness": -0.01288531047949899,
+          "max_drawdown": 0.23073696901709892,
+          "catastrophe_rate": 0.0,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.28458951,
+          "avg_return_pct": 2.3274990608498802,
+          "median_return_pct": -1.288531047949899,
+          "outlier": 0.23102526744339366,
+          "nursery_score": -0.4345685398611143,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.5818747652124701,
+          "break_even_stake_gbp": 0.011539510741814689,
+          "low_age_fraction": 0.13333333333333333,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "18003476c3e6cdc7"
+        },
+        {
+          "n": 17,
+          "expectancy": 0.03160352654903364,
+          "consistency": -1.0884482952451844,
+          "robustness": 0.03160352654903364,
+          "max_drawdown": 0.453143463922133,
+          "catastrophe_rate": 0.058823529411764705,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.68538105,
+          "avg_return_pct": 3.160352654903364,
+          "median_return_pct": 3.749649866143428,
+          "outlier": 0.26455162185217174,
+          "nursery_score": -0.9799243015493866,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.7900881637258411,
+          "break_even_stake_gbp": 0.012677515286211862,
+          "low_age_fraction": 0.17647058823529413,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "d2336af05e25b2c8"
+        }
+      ],
+      "fold_avg_net_gbp": [
+        1.8360129149617253,
+        0.5818747652124701,
+        0.7900881637258411
+      ],
+      "fold_n": [
+        19,
+        15,
+        17
+      ],
+      "all_folds_positive": true
+    },
+    {
+      "genome_id": "g_0515e495a6200985",
+      "genome": {
+        "family": "eve_reference_v2",
+        "species": "low_churn",
+        "parameters": {
+          "hold_minutes": 15,
+          "stop_loss_pct": null,
+          "take_profit_pct": null
+        },
+        "predicates": {
+          "volume_liquidity_m5": {
+            "max": 0.016805
+          }
+        },
+        "bounds": {}
+      },
+      "coverage_class": "core_market_complete",
+      "folds": [
+        {
+          "n": 22,
+          "expectancy": 0.0092705980515097,
+          "consistency": 0.06671098682789245,
+          "robustness": 0.0010369755462974928,
+          "max_drawdown": 0.16616767314200814,
+          "catastrophe_rate": 0.0,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.10460091,
+          "avg_return_pct": 0.9270598051509701,
+          "median_return_pct": 0.10369755462974928,
+          "outlier": 0.2883557992869343,
+          "nursery_score": -0.2126098975423053,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.23176495128774252,
+          "break_even_stake_gbp": 0.028898721834325874,
+          "low_age_fraction": 0.0,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "084ce210a7e4830c"
+        },
+        {
+          "n": 18,
+          "expectancy": 0.03436348606818904,
+          "consistency": -0.20584175543629102,
+          "robustness": 0.02464348017681344,
+          "max_drawdown": 0.18633462293068231,
+          "catastrophe_rate": 0.0,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.16966543,
+          "avg_return_pct": 3.436348606818904,
+          "median_return_pct": 2.464348017681344,
+          "outlier": 0.3414772387027862,
+          "nursery_score": -0.2907829349049435,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 0.859087151704726,
+          "break_even_stake_gbp": 0.019012988237002964,
+          "low_age_fraction": 0.0,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "f3511fba515cb53e"
+        },
+        {
+          "n": 17,
+          "expectancy": 0.04624263773724935,
+          "consistency": -0.4901230170309454,
+          "robustness": 0.04624263773724935,
+          "max_drawdown": 0.21540313339537673,
+          "catastrophe_rate": 0.0,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -0.25098065,
+          "avg_return_pct": 4.624263773724935,
+          "median_return_pct": 4.867960544376853,
+          "outlier": 0.3080892547791697,
+          "nursery_score": -0.39099268670699494,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 1.1560659434312337,
+          "break_even_stake_gbp": 0.013673906619580525,
+          "low_age_fraction": 0.058823529411764705,
+          "low_liquidity_fraction": 0.0,
+          "event_signature": "fb793e37322776cb"
+        }
+      ],
+      "fold_avg_net_gbp": [
+        0.23176495128774252,
+        0.859087151704726,
+        1.1560659434312337
+      ],
+      "fold_n": [
+        22,
+        18,
+        17
+      ],
+      "all_folds_positive": true
+    },
+    {
+      "genome_id": "g_f96d0a2e74cf2838",
+      "genome": {
+        "family": "eve_reference_v2",
+        "species": "control_buy_all",
+        "parameters": {
+          "hold_minutes": 5,
+          "stop_loss_pct": null,
+          "take_profit_pct": null
+        },
+        "predicates": {},
+        "bounds": {}
+      },
+      "coverage_class": "flow_visible",
+      "folds": [
+        {
+          "n": 98,
+          "expectancy": 0.06709887731204627,
+          "consistency": -2,
+          "robustness": -0.00796344650442955,
+          "max_drawdown": 0.7397835596820407,
+          "catastrophe_rate": 0.09183673469387756,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -1.3385156,
+          "avg_return_pct": 6.709887731204626,
+          "median_return_pct": -0.7963446504429549,
+          "outlier": 0.28437031450214445,
+          "nursery_score": -1.8193749137933266,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 1.6774719328011565,
+          "break_even_stake_gbp": 0.006499478949516926,
+          "low_age_fraction": 0.7448979591836735,
+          "low_liquidity_fraction": 0.42857142857142855,
+          "event_signature": "665fcbc62dc91ecf"
+        },
+        {
+          "n": 74,
+          "expectancy": 0.10593767472025993,
+          "consistency": -2,
+          "robustness": -0.006974151404308081,
+          "max_drawdown": 0.994191195698242,
+          "catastrophe_rate": 0.14864864864864866,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -1.57093203,
+          "avg_return_pct": 10.593767472025993,
+          "median_return_pct": -0.6974151404308081,
+          "outlier": 0.2231790019097052,
+          "nursery_score": -2.217156307203857,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": 2.6484418680064983,
+          "break_even_stake_gbp": 0.004431798671625404,
+          "low_age_fraction": 0.8513513513513513,
+          "low_liquidity_fraction": 0.5,
+          "event_signature": "20d99130ccfdd688"
+        },
+        {
+          "n": 75,
+          "expectancy": -0.017705498963952383,
+          "consistency": -2,
+          "robustness": -0.019197840392774012,
+          "max_drawdown": 0.9979065871688215,
+          "catastrophe_rate": 0.2,
+          "novelty": 0.0,
+          "resource_cost": 0.0,
+          "fitness": -1.7646698,
+          "avg_return_pct": -1.7705498963952384,
+          "median_return_pct": -1.9197840392774013,
+          "outlier": 0.37244931109888463,
+          "nursery_score": -2.413309081659734,
+          "paper_stake_gbp": 25.0,
+          "fixed_cost_gbp": 0.00207882324,
+          "avg_net_gbp": -0.44263747409880966,
+          "break_even_stake_gbp": 0.004810362658275423,
+          "low_age_fraction": 0.8933333333333333,
+          "low_liquidity_fraction": 0.48,
+          "event_signature": "d970143ba4707ce6"
+        }
+      ],
+      "fold_avg_net_gbp": [
+        1.6774719328011565,
+        2.6484418680064983,
+        -0.44263747409880966
+      ],
+      "fold_n": [
+        98,
+        74,
+        75
+      ],
+      "all_folds_positive": false
+    }
+  ],
+  "freeze_sha256": "41bbd58fc8d8dbe9018520b702fbdf3aada0a439b6243ca9ad627f02bf3c4117"
+}

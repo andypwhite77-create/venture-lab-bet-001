@@ -35,15 +35,19 @@ async def main():
             print(json.dumps({'event':'spartan_hall_of_fame',**hall}),flush=True)
             passed=[x for x in audit['results'] if x.get('qualification_pass')]
             distinct={x.get('behaviour_id') or str(tuple(x['events'])) for x in passed}
+            evaluable=[x for x in audit['results'] if x.get('evidence_sufficient') and x.get('behavioural_representative')]
             public={'campaign':campaign,'tested':summary['tested'],'finalists':summary['finalists'],
                     'holdout_positive':summary['holdout_positive'],'spartan_survivors':len(passed),
-                    'distinct_survivor_behaviours':len(distinct),'completed_at':time.time()}
+                    'distinct_survivor_behaviours':len(distinct),'spartan_evaluable_behaviours':len(evaluable),
+                    'exam_inconclusive':len(evaluable)==0,'completed_at':time.time()}
             save_state(public);record_exam_result(public);print(json.dumps({'event':'campaign_examined',**public}),flush=True)
             # Queen receives only coarse ecological outcome, never examiner thresholds or answers.
-            if passed and distinct:
+            if public['exam_inconclusive']:
+                print(json.dumps({'event':'spartan_exam_inconclusive','evaluable_behaviours':0,'action':'do not count as drought; gather independent sensor-complete evidence'}),flush=True)
+            elif passed and distinct:
                 print(json.dumps({'event':'soldiers_found','count':len(passed),'distinct':len(distinct),'action':'continue breeding challengers'}),flush=True)
             else:
-                print(json.dumps({'event':'extinction_pressure','action':'new independent campaign; preserve negative knowledge'}),flush=True)
+                print(json.dumps({'event':'extinction_pressure','evaluable_behaviours':len(evaluable),'action':'new independent campaign; preserve negative knowledge'}),flush=True)
         # Every third campaign, pause breeding while the host-network Swarm service runs
         # a larger strategic review. Only the campaign number crosses this boundary;
         # the reviewer fetches its own research-safe inputs and its prose never directly controls breeding.

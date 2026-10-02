@@ -50,11 +50,12 @@ async def audit_family(conn,family='exhaustion',min_events=25):
         rejected=[r for m,r in universe.items() if m not in taken]
         stress=stress_returns(rs,base,500,seed='v2:'+x['genome_id'])
         expectancy=statistics.fmean(rs) if rs else -1.0; opp_eff=opportunity_efficiency(rs,rejected); conc=concentration(rs)
-        passed=bool(len(rs)>=min_events and qualifies(stress,expectancy,opp_eff,conc))
+        evidence_sufficient=bool(len(rs)>=min_events)
+        passed=bool(evidence_sufficient and qualifies(stress,expectancy,opp_eff,conc))
         prm=g.get('parameters',{})
         results.append({'genome_id':x['genome_id'],'events':[i for i,_,_ in obs],'n':len(rs),'mean_raw':expectancy if rs else None,
           'hold_minutes':int(prm.get('hold_minutes',15)),'stop_loss_pct':prm.get('stop_loss_pct'),'take_profit_pct':prm.get('take_profit_pct'),
-          'opportunity_efficiency':opp_eff,'winner_concentration':conc,'stress':stress.__dict__,'stress_pass':passed})
+          'opportunity_efficiency':opp_eff,'winner_concentration':conc,'evidence_sufficient':evidence_sufficient,'stress':stress.__dict__,'stress_pass':passed})
     # Collapse genetically different ants that execute the same opportunity set.
     behavioural_groups={}
     def bkey(a): return (tuple(a['events']),a['hold_minutes'],a.get('stop_loss_pct'),a.get('take_profit_pct'))
@@ -66,4 +67,5 @@ async def audit_family(conn,family='exhaustion',min_events=25):
         a['qualification_pass']=bool(a['stress_pass'] and a['behavioural_representative'])
     for i,a in enumerate(results):
         a['min_behavioural_distance']=min((behavioural_distance(a['events'],b['events']) for j,b in enumerate(results) if i!=j),default=1.0)
-    return {'family':family,'base_friction_return':base,'rows':len(holdout),'exam_snapshot_sha256':summary.get('exam_snapshot_sha256'),'min_independent_events':min_events,'behavioural_groups':len(behavioural_groups),'qualified_unique_behaviours':sum(x['qualification_pass'] for x in results),'results':results}
+    evaluable=sum(1 for x in results if x.get('evidence_sufficient') and x.get('behavioural_representative'))
+    return {'family':family,'base_friction_return':base,'rows':len(holdout),'exam_snapshot_sha256':summary.get('exam_snapshot_sha256'),'min_independent_events':min_events,'behavioural_groups':len(behavioural_groups),'evaluable_unique_behaviours':evaluable,'insufficient_evidence_unique_behaviours':max(0,len(behavioural_groups)-evaluable),'qualified_unique_behaviours':sum(x['qualification_pass'] for x in results),'results':results}

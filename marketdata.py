@@ -6,6 +6,7 @@ import httpx
 
 log = logging.getLogger("signal-engine.marketdata")
 GECKO_MULTI_URL = "https://api.geckoterminal.com/api/v2/networks/solana/tokens/multi/{addresses}"
+GECKO_POOL_MULTI_URL = "https://api.geckoterminal.com/api/v2/networks/solana/pools/multi/{addresses}"
 GECKO_TRENDING_URL = "https://api.geckoterminal.com/api/v2/networks/solana/trending_pools?page=1"
 MAX_MULTI = 30
 _GECKO_BLOCKED_UNTIL = 0.0
@@ -34,28 +35,71 @@ def _rel_id(item, name):
         return ""
 
 
+def _top_pool_id(item):
+    try:
+        rows = item["relationships"]["top_pools"]["data"] or []
+        return (rows[0].get("id") or "").replace("solana_", "") if rows else None
+    except (KeyError, TypeError, IndexError, AttributeError):
+        return None
+
+
 def normalize_token(item: dict) -> dict:
+    """Normalize token-level data without inventing unavailable pool metrics.
+
+    Gecko token/multi exposes price, reserve and FDV, but not m5/h1 pool flow.
+    Those fields must remain UNKNOWN until the top pool is fetched.
+    """
     a = item.get("attributes") or {}
     mint = a.get("address") or (item.get("id") or "").replace("solana_", "")
     return {
         "mint": mint,
         "symbol": a.get("symbol"),
+        "top_pool_address": _top_pool_id(item),
         "pair_address": None,
         "dex_id": None,
         "price_usd": _f(a.get("price_usd")),
-        "liquidity_usd": _f(a.get("total_reserve_in_usd"), 0.0),
+        "liquidity_usd": _f(a.get("total_reserve_in_usd")),
         "fdv": _f(a.get("fdv_usd")),
         "market_cap": _f(a.get("market_cap_usd")),
-        "volume_m5": 0.0,
-        "volume_h1": 0.0,
-        "price_change_m5": 0.0,
-        "price_change_h1": 0.0,
-        "buys_m5": 0,
-        "sells_m5": 0,
-        "buys_h1": 0,
-        "sells_h1": 0,
+        "volume_m5": None,
+        "volume_h1": None,
+        "price_change_m5": None,
+        "price_change_h1": None,
+        "buys_m5": None,
+        "sells_m5": None,
+        "buys_h1": None,
+        "sells_h1": None,
         "pair_created_at": None,
         "source": "geckoterminal_token_multi",
+    }
+
+
+def normalize_pool(pool: dict, mint: str | None = None) -> dict:
+    a = pool.get("attributes") or {}
+    txns = a.get("transactions") or {}
+    m5_txns = txns.get("m5") or {}
+    h1_txns = txns.get("h1") or {}
+    volume = a.get("volume_usd") or {}
+    change = a.get("price_change_percentage") or {}
+    base_id = _rel_id(pool, "base_token")
+    return {
+        "mint": mint or base_id.replace("solana_", ""),
+        "pair_address": a.get("address"),
+        "dex_id": _rel_id(pool, "dex").replace("solana_", ""),
+        "price_usd": _f(a.get("base_token_price_usd")),
+        "liquidity_usd": _f(a.get("reserve_in_usd")),
+        "fdv": _f(a.get("fdv_usd")),
+        "market_cap": _f(a.get("market_cap_usd")),
+        "volume_m5": _f(volume.get("m5")),
+        "volume_h1": _f(volume.get("h1")),
+        "price_change_m5": _f(change.get("m5")),
+        "price_change_h1": _f(change.get("h1")),
+        "buys_m5": _i(m5_txns.get("buys"), None),
+        "sells_m5": _i(m5_txns.get("sells"), None),
+        "buys_h1": _i(h1_txns.get("buys"), None),
+        "sells_h1": _i(h1_txns.get("sells"), None),
+        "pair_created_at": a.get("pool_created_at"),
+        "source": "geckoterminal_top_pool",
     }
 
 
@@ -121,8 +165,30 @@ async def fetch_market_snapshots(mints) -> dict[str, dict]:
         chunk = ids[offset:offset + MAX_MULTI]
         try:
             body = await _get_json(GECKO_MULTI_URL.format(addresses=",".join(chunk)))
-            rows = [normalize_token(item) for item in (body.get("data") or [])]
-            fresh={row["mint"]: row for row in rows if row.get("mint") and row.get("price_usd")}
+            tokens = [normalize_token(item) for item in (body.get("data") or [])]
+            pool_to_mint={row.get("top_pool_address"):row.get("mint") for row in tokens if row.get("top_pool_address") and row.get("mint")}
+            pools={}
+            if pool_to_mint:
+                try:
+                    pbody=await _get_json(GECKO_POOL_MULTI_URL.format(addresses=",".join(pool_to_mint)))
+                    for item in (pbody.get("data") or []):
+                        addr=((item.get("attributes") or {}).get("address"))
+                        mint=pool_to_mint.get(addr)
+                        base=_rel_id(item,"base_token").replace("solana_","")
+                        # Pool price-change fields describe the base token. Never attach
+                        # them to a queried token that happens to be the quote asset.
+                        if addr and mint and base==mint: pools[mint]=normalize_pool(item,mint)
+                except Exception as exc:
+                    if "429" in str(exc): _GECKO_BLOCKED_UNTIL=time.time()+300
+                    log.warning("GeckoTerminal top-pool enrichment degraded: %r", exc)
+            fresh={}
+            for token in tokens:
+                mint=token.get("mint")
+                if not mint or not token.get("price_usd"): continue
+                row=dict(token)
+                if mint in pools:
+                    symbol=row.get("symbol"); row.update(pools[mint]); row["symbol"]=symbol
+                fresh[mint]=row
             result.update(fresh); _GECKO_CACHE.update({m:(time.time(),v) for m,v in fresh.items()})
         except Exception as exc:
             if "429" in str(exc): _GECKO_BLOCKED_UNTIL=time.time()+300

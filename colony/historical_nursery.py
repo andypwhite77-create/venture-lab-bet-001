@@ -137,8 +137,10 @@ def select_finalists(results,n=10,rng_seed=SEED):
 
 
 def regime_name(row):
- try:h1=float(row['flat'].get('price_change_h1',0) or 0); activity=float(row['flat'].get('volume_liquidity_m5',0) or 0)
- except:return 'unknown'
+ f=row.get('flat',{})
+ if f.get('price_change_h1') is None or f.get('volume_liquidity_m5') is None:return 'unknown'
+ try:h1=float(f['price_change_h1']); activity=float(f['volume_liquidity_m5'])
+ except (TypeError,ValueError):return 'unknown'
  if h1<=-8:return 'selloff'
  if h1>=8:return 'surge'
  if activity>=.15:return 'high_activity'
