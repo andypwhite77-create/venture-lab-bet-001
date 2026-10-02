@@ -1,4 +1,8 @@
-"""Swarm Queen orchestration: fast request polling plus low-frequency ecology snapshots."""
+"""Swarm Queen research-director daemon.
+
+Polls strategic requests and publishes research-safe ecology guidance. It has no genome
+creation, promotion, wallet or trading authority.
+"""
 import asyncio, logging, os, time
 from db import init_db
 from colony.swarm_queen import wake

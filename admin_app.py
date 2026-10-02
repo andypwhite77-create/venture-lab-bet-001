@@ -8,6 +8,7 @@ from colony.live_registry import ensure_schema as ensure_live_schema, sync_spart
 from colony.eve_reference_paper import stats as eve_reference_stats
 from colony.champion_league import ensure_schema as ensure_champion_schema
 from colony.qualification_corpus import ensure_schema as ensure_corpus_schema, snapshot as qualification_corpus_snapshot
+from colony.queen_roles import snapshot as queen_role_snapshot
 
 app = FastAPI(title="Venture Lab Control Plane", docs_url=None, redoc_url=None, openapi_url=None)
 USER = os.getenv("ADMIN_USERNAME", "admin")
@@ -170,12 +171,17 @@ async def api_state(request:Request):
         for a in live_ants:a['paper']=paper_stats.get(a['genome_id'])
         treasury=await treasury_snapshot(c)
         audit_rows=[dict(r) for r in await c.fetch('SELECT created_at,action,target,detail FROM admin_audit ORDER BY id DESC LIMIT 25')]
+        swarm=None
+        if await c.fetchval("SELECT to_regclass('public.swarm_queen_journal') IS NOT NULL"):
+            sr=await c.fetchrow("SELECT observed_at,model,status,briefing FROM swarm_queen_journal ORDER BY id DESC LIMIT 1")
+            swarm=dict(sr) if sr else None
     for w in wallets:
         try: w['balance_sol']=await sol_balance(w['address'])
         except Exception: w['balance_sol']=None
     qsurv=read_json(QUEEN_SURVIVAL); qmem=read_json(QUEEN_MEMORY)
-    queen={'campaign':qsurv.get('campaign'),'tested':qsurv.get('tested'),'finalists':qsurv.get('finalists'),'holdout_positive':qsurv.get('holdout_positive'),'spartan_survivors':qsurv.get('spartan_survivors'),'memory_campaigns':qmem.get('campaigns'),'preferred_features':(qmem.get('preferred_features') or [])[:6]}
-    return {'wallets':wallets,'components':components,'control':control,'elite_control':elite_control,'elite_roster':elite_roster,'qualification_top':qualification_top,'qualification_corpus':qualification_corpus,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
+    roles=queen_role_snapshot()
+    queen={'campaign':qsurv.get('campaign'),'tested':qsurv.get('tested'),'finalists':qsurv.get('finalists'),'holdout_positive':qsurv.get('holdout_positive'),'spartan_survivors':qsurv.get('spartan_survivors'),'memory_campaigns':qmem.get('campaigns'),'preferred_features':(qmem.get('preferred_features') or [])[:6],'role':roles['breeding_queen']}
+    return {'wallets':wallets,'components':components,'control':control,'elite_control':elite_control,'elite_roster':elite_roster,'qualification_top':qualification_top,'qualification_corpus':qualification_corpus,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'swarm_queen':swarm,'queen_roles':roles,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
 
 @app.post('/admin/api/wallets')
 async def add_wallet(data:WalletIn,request:Request):

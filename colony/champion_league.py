@@ -12,6 +12,7 @@ from colony.forward import eligible
 from colony.historical_nursery import sampled_path_return_pct
 from colony.qualification_corpus import load_rows, sync as sync_corpus
 from colony.paper_economics import TARGET_STAKE_GBP,adjusted_return_pct,measured_roundtrip_network_fee_sol,sol_gbp_rate
+from colony.queen_roles import BREEDING_QUEEN
 
 FOUNDER_ELITES=(
  'g_1f1774b3212a8863','g_b87af3b86a866981','g_bd729464d0b52699',
@@ -101,7 +102,7 @@ async def enroll_queen_top2(c,finalists,campaign):
     ON CONFLICT(genome_id) DO UPDATE SET notes=champion_league.notes||excluded.notes,updated_at=now()""",
     gid,json.dumps(g),cutoff,json.dumps({'queen_campaign':int(campaign),'queen_selection_score':x.get('selection_score')}))
   added.append(gid)
-  if len(added)>=2:break
+  if len(added)>=int(BREEDING_QUEEN['qualification_handoff']):break
  return {'campaign':campaign,'enrolled':added}
 
 async def paper_run_once(c,limit=1000):

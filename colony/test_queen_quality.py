@@ -41,3 +41,17 @@ class QueenQualityTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class CareerSeedTranslationTests(unittest.TestCase):
+    def test_legacy_reversal_becomes_declarative_pattern(self):
+        from colony.queen_pattern_recognition import _career_pattern_seed
+        g={'family':'reversal','parameters':{'hold_minutes':5,'price_change_m5_max':-9.8,'dex_buy_ratio_m5_min':.65}}
+        x=_career_pattern_seed(g)
+        self.assertEqual(x['family'],'queen_pattern')
+        self.assertEqual(x['species'],'career_descendant')
+        self.assertEqual(x['predicates']['price_change_m5'],{'max':-9.8})
+        self.assertEqual(x['predicates']['dex_buy_ratio_m5'],{'min':.65})
+
+    def test_untranslatable_legacy_seed_is_rejected(self):
+        from colony.queen_pattern_recognition import _career_pattern_seed
+        self.assertIsNone(_career_pattern_seed({'family':'unknown','parameters':{'hold_minutes':5}}))

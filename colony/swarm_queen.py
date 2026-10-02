@@ -1,8 +1,13 @@
-"""Swarm Queen: read-only executive intelligence over isolated strategy colonies.
-She monitors, synthesises and recommends; she never trades or rewrites colony genetics.
+"""Swarm Queen: cross-market research director.
+
+Today she supervises SOL research only. She monitors evidence, diagnoses regimes and blind
+spots, and supplies bounded research priorities to Breeding Queen. She never spawns,
+mutates or promotes genomes and never trades. When a second market is activated she is
+intended to coordinate dedicated market experts rather than become every expert herself.
 """
 import json, os, time, httpx, collections, math
 from db import connection
+from colony.queen_roles import SWARM_QUEEN, BREEDING_QUEEN, ROLE_VERSION
 
 MODEL=os.getenv('SWARM_QUEEN_MODEL','qwen3:1.7b')
 OLLAMA=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
@@ -177,16 +182,17 @@ async def evidence(c):
             pf=qrecs[1]['finalists']; prev=json.loads(pf) if isinstance(pf,str) else list(pf or [])
         queen_research=_queen_research_snapshot(fs,sm,prev)
     return {'queen_research':queen_research,'reference_baseline':reference_baseline,'performance':perf,'roster':roster,'challenger_queue':queue,'providers':providers,'recent_events':recent,'strategic_guidance':strategic_guidance,
-            'constitution':{'authority':'advisory_only','real_money':False,'may_rewrite_genetics':False,'may_relax_evidence_gates':False,
-                            'shared_data':True,'isolated_colony_genetics':True,
-                            'identity':'colony_mother_and_war_queen','prime_directive':'persist_adapt_dominate_expand',
-                            'aggression':'extreme_within_evidence_law','survival_unit':'colony_not_individual_ant'}}
+            'queen_roles':{'version':ROLE_VERSION,'swarm':SWARM_QUEEN,'breeding':BREEDING_QUEEN},
+            'constitution':{'authority':'research_director_only','real_money':False,'may_spawn_genomes':False,'may_rewrite_genetics':False,'may_relax_evidence_gates':False,
+                            'may_promote_challengers':False,'shared_data':True,'isolated_colony_genetics':True,
+                            'identity':'cross_market_research_director','prime_directive':'improve_research_quality_and_market_understanding',
+                            'current_market_scope':SWARM_QUEEN['market_scope'],'future_scope':SWARM_QUEEN['future_scope']}}
 
 def prompt(e):
     compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','roster','challenger_queue','providers','constitution')}
-    return ("You are Swarm Queen, executive ecologist for an evolutionary trading research system. "
-            "Scientific law: never trade, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite individual genomes. "
-            "Doctrine: SURVIVAL THROUGH VARIATION. Detect behavioural monoculture, weak coverage, system faults and useful research directions. "
+    return ("You are Swarm Queen, research director for an evolutionary trading research system. "
+            "Breeding Queen alone creates and mutates genomes. You never spawn ants, trade, promote challengers, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite genomes. "
+            "Your job is market/regime diagnosis, research prioritisation, blind-spot detection and protection against behavioural monoculture. "
             "Return compact JSON with status, summary, material_changes, colony_notes, recommendations. "
             "Do not invent performance from roster counts. Research allocation is handled separately by deterministic research-safe logic. Evidence: "
             +json.dumps(compact,default=str,separators=(',',':'))[:2600])
@@ -195,8 +201,8 @@ async def wake(executive_inference=False):
     async with connection() as c:
         await ensure_schema(c); e=await evidence(c)
     safe_plan=_bounded_research_plan({},e)
-    b={'status':'healthy','summary':'Research-safe Swarm ecology plan ready.',
-       'material_changes':[],'colony_notes':{},'recommendations':[],'research_plan':safe_plan}
+    b={'status':'healthy','summary':'Research-safe Swarm research-director plan ready.',
+       'role_version':ROLE_VERSION,'role':SWARM_QUEEN,'material_changes':[],'colony_notes':{},'recommendations':[],'research_plan':safe_plan}
     # Publish the bounded plan immediately; executive inference must never block breeding support.
     async with connection() as c:
         await ensure_schema(c)

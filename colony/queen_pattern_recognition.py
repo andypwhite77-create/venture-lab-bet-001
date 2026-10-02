@@ -98,6 +98,33 @@ MUTATION_MODES={
  'wide':{'add':.12,'delete':.35,'touch':.82,'sigma':.12,'hold':.35,'risk':.22},
 }
 
+def _career_pattern_seed(g):
+ """Translate a proven career genome into the Queen's declarative pattern language.
+
+ Older strategy families encode entry thresholds directly in parameters; newer general
+ patterns use predicates. Translation preserves the observed mechanism while descendants
+ remain Queen-owned genomes with no inherited evidence or deployment authority.
+ """
+ if not isinstance(g,dict): return None
+ x=copy.deepcopy(g); prm=dict(x.get('parameters') or {}); predicates=dict(x.get('predicates') or {})
+ if not predicates:
+  mappings={
+   'reversal':(('price_change_m5_max','price_change_m5','max'),('dex_buy_ratio_m5_min','dex_buy_ratio_m5','min')),
+   'momentum':(('price_change_m5_min','price_change_m5','min'),('volume_liquidity_m5_min','volume_liquidity_m5','min')),
+   'order_flow':(('dex_buy_ratio_m5_min','dex_buy_ratio_m5','min'),('buy_acceleration_min','buy_acceleration','min')),
+   'wallet_convergence':(('buy_wallets_30_min','buy_wallets_30','min'),('flow_ratio_15_min','flow_ratio_15','min')),
+  }
+  for param,sensor,op in mappings.get(str(x.get('family')),()):
+   if sensor in SENSORS and prm.get(param) is not None:
+    try: predicates[sensor]={op:float(prm[param])}
+    except (TypeError,ValueError): pass
+ predicates={k:v for k,v in predicates.items() if k in SENSORS and isinstance(v,dict)}
+ if not predicates:return None
+ return {'family':'queen_pattern','species':'career_descendant',
+         'parameters':{'hold_minutes':int(prm.get('hold_minutes',15)),
+                       'stop_loss_pct':prm.get('stop_loss_pct'),'take_profit_pct':prm.get('take_profit_pct')},
+         'predicates':predicates,'bounds':{}}
+
 def mutate(g,rng,allowed_sensors=None,sensor_ranges=None,operator='standard'):
  x=copy.deepcopy(g);p=x['predicates']; allowed=list(allowed_sensors or SENSORS); sensor_ranges=sensor_ranges or {}
  cfg=MUTATION_MODES.get(operator,MUTATION_MODES['standard'])
@@ -245,13 +272,13 @@ async def run(conn,wave_size=50000,waves=6,seed=300933,checkpoint='/data/queen_p
  for wave in range(start_wave,waves+1):
   provenance=[]
   if not parents:
-   templates=[x.get('genome') for x in memory.get('prospective_parent_templates',[]) if isinstance(x.get('genome'),dict)]
+   templates=[z for z in (_career_pattern_seed(x.get('genome')) for x in memory.get('prospective_parent_templates',[]) if isinstance(x.get('genome'),dict)) if z]
    pop=[random_genome(rng,memory,eco_plan,eco_state) for _ in range(wave_size)]; provenance=[None]*len(pop)
    # Dedicated gene-seed injection: add a separate 40k descendant cohort without
    # replacing wild exploration. This preserves creativity while exploiting robust careers.
    gene_seed_n=int(os.getenv('QUEEN_GENE_SEED_N','40000')) if templates else 0
    for _ in range(gene_seed_n):
-    base=copy.deepcopy(rng.choice(templates));base['family']='queen_pattern';base['species']='career_descendant';pop.append(mutate(base,rng,active_sensors,sensor_ranges));provenance.append(None)
+    base=copy.deepcopy(rng.choice(templates));pop.append(mutate(base,rng,active_sensors,sensor_ranges));provenance.append(None)
   else:
    pop=[];provenance=[]
    for _ in range(wave_size):
