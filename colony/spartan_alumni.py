@@ -2,36 +2,23 @@
 Exam evidence may nominate ancestry, but never counts as proof. All selection below is prospective-only.
 """
 from __future__ import annotations
-import json, random, statistics
+import copy, json, random, statistics
 from colony.forward import eligible
 from colony.genome import genome_id, mutate, MutationPolicy
 from colony.paper_economics import TARGET_STAKE_GBP, adjusted_return_pct, measured_roundtrip_network_fee_sol, sol_gbp_rate
 from colony.selection import ant_metrics
+from research_db import request_candidate_outcome
 
 MIN_COMPARE_N=12
 TARGET_ACTIVE=24
 BIRTHS_PER_CYCLE=3
-SUPPORTED_OUTCOME_HORIZONS=(3,5,8,10,12,15,20,30,45,60,90,120,240,720,1440)
+HOLD_MINUTES_MIN=3
+HOLD_MINUTES_MAX=240
+HOLD_PROBE_HORIZONS=(3,4,6,8,15,30)
+HOLD_PROBE_TARGET=len(HOLD_PROBE_HORIZONS)
 
-def supported_hold(candidate:int, parent:int|None=None)->int:
-    candidate=int(candidate)
-    if candidate in SUPPORTED_OUTCOME_HORIZONS:
-        return candidate
-    options=list(SUPPORTED_OUTCOME_HORIZONS)
-    if parent in options and candidate != parent and len(options)>1:
-        # Preserve a genuine hold-time mutation instead of snapping straight back to the parent.
-        options=[h for h in options if h != parent]
-    return min(options,key=lambda h:(abs(h-candidate),-h))
-
-def normalize_evidence_horizon(genome:dict, parent_genome:dict|None=None)->dict:
-    params=genome.setdefault('parameters',{})
-    if 'hold_minutes' not in params:
-        return genome
-    parent_hold=None
-    if parent_genome:
-        parent_hold=parent_genome.get('parameters',{}).get('hold_minutes')
-    params['hold_minutes']=supported_hold(int(params['hold_minutes']), int(parent_hold) if parent_hold is not None else None)
-    return genome
+def bound_hold_minutes(value:int)->int:
+    return max(HOLD_MINUTES_MIN,min(HOLD_MINUTES_MAX,int(value)))
 
 async def ensure_schema(conn):
     await conn.execute("""CREATE TABLE IF NOT EXISTS spartan_alumni_pool(
@@ -60,10 +47,13 @@ async def process(conn):
             if r['created_at'] < a['born_at']: continue
             prev=await conn.fetchval("SELECT max(observed_at) FROM spartan_alumni_entries WHERE genome_id=$1 AND mint=$2",a['genome_id'],r['mint'])
             if not eligible(g,r,prev): continue
-            hold=int(g.get('parameters',{}).get('hold_minutes',15))
+            hold=bound_hold_minutes(int(g.get('parameters',{}).get('hold_minutes',15)))
             res=await conn.execute("""INSERT INTO spartan_alumni_entries(genome_id,mint,candidate_id,observed_at,hold_minutes)
               VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING""",a['genome_id'],r['mint'],r['id'],r['created_at'],hold)
-            ins+=int(res.endswith('1'))
+            inserted=int(res.endswith('1'))
+            if inserted:
+                await request_candidate_outcome(conn,r['id'],hold,'spartan_alumni')
+            ins+=inserted
     if rows:
         await conn.execute("INSERT INTO spartan_alumni_state(key,value,updated_at) VALUES('cursor',jsonb_build_object('last_candidate_id',$1::bigint),now()) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=now()",rows[-1]['id'])
     return {'active':len(ants),'candidates':len(rows),'inserted':ins,'last_candidate_id':rows[-1]['id'] if rows else last}
@@ -111,7 +101,7 @@ async def evolve(conn):
         if best_delta<=0 or tail_worse or conc_worse:
             await conn.execute("UPDATE spartan_alumni_pool SET active=false,retired_at=now(),retirement_reason=$2 WHERE genome_id=$1",a['genome_id'],'failed_parent_improvement')
             culled.append(a['genome_id'])
-    ants=await conn.fetch("SELECT genome_id,genome,generation FROM spartan_alumni_pool WHERE active=true")
+    ants=await conn.fetch("SELECT genome_id,genome,generation,role FROM spartan_alumni_pool WHERE active=true")
     active_ids={a['genome_id'] for a in ants}; candidates=[]
     for a in ants:
         r=recs.get(a['genome_id'],{})
@@ -121,11 +111,41 @@ async def evolve(conn):
         if avg>0 and med>0: candidates.append((score,a))
     candidates.sort(reverse=True,key=lambda x:x[0])
     born=[]; rng=random.Random('spartan-alumni:'+str(await conn.fetchval('select coalesce(max(id),0) from spartan_alumni_entries')))
-    slots=max(0,TARGET_ACTIVE-len(ants)); births=min(BIRTHS_PER_CYCLE,slots,len(candidates))
+
+    # Preserve a small controlled lane whose only experimental variable is hold time.
+    slots=max(0,TARGET_ACTIVE-len(ants))
+    active_probe_holds={int((json.loads(a['genome']) if isinstance(a['genome'],str) else a['genome']).get('parameters',{}).get('hold_minutes',15))
+                        for a in ants if a['role']=='hold_probe'}
+    missing_probe_holds=[h for h in HOLD_PROBE_HORIZONS if h not in active_probe_holds]
+    probe_parents=[]
+    for a in ants:
+        if a['role']=='hold_probe': continue
+        r=recs.get(a['genome_id'],{})
+        if r.get('n',0)>=5 and float(r.get('avg_return_pct',-999))>0:
+            probe_parents.append((float(r['avg_return_pct']),int(r['n']),a))
+    probe_parents.sort(reverse=True,key=lambda x:(x[0],x[1]))
+    if slots and missing_probe_holds and probe_parents:
+        _,_,p=probe_parents[0]; g=p['genome']; g=json.loads(g) if isinstance(g,str) else g
+        h=missing_probe_holds[0]; child=copy.deepcopy(g)
+        child.setdefault('parameters',{})['hold_minutes']=h
+        child['parents']=[p['genome_id']]
+        child['mutation']={'parent':p['genome_id'],'seed':None,'changed':['hold_minutes'],'experiment':'hold_time_probe'}
+        child['spartan_alumni']={'ancestry':'exam_contaminated','proof':'prospective_only','experiment':'hold_time_probe',
+                                 'baseline_hold':int(g.get('parameters',{}).get('hold_minutes',15)),'probe_hold':h}
+        cid=genome_id(child)
+        if cid not in active_ids:
+            res=await conn.execute("""INSERT INTO spartan_alumni_pool(genome_id,genome,family,role,generation,parent_ids)
+              VALUES($1,$2::jsonb,'exhaustion','hold_probe',$3,$4::jsonb) ON CONFLICT DO NOTHING""",
+              cid,json.dumps(child),int(p['generation'])+1,json.dumps([p['genome_id']]))
+            if res.endswith('1'):
+                born.append(cid); active_ids.add(cid); slots-=1
+
+    births=min(BIRTHS_PER_CYCLE,slots,len(candidates))
     for _,p in candidates[:births]:
         g=p['genome']; g=json.loads(g) if isinstance(g,str) else g
         child=mutate(g,seed=rng.randrange(2**31),policy=MutationPolicy(numeric_sigma=.10,mutation_rate=.5,min_changes=1,max_changes=2))
-        child=normalize_evidence_horizon(child,g)
+        if 'hold_minutes' in child.get('parameters',{}):
+            child['parameters']['hold_minutes']=bound_hold_minutes(child['parameters']['hold_minutes'])
         child['parents']=[p['genome_id']]; child['spartan_alumni']={'ancestry':'exam_contaminated','proof':'prospective_only'}
         cid=genome_id(child)
         if cid in active_ids: continue

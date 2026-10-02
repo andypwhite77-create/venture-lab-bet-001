@@ -39,6 +39,16 @@ CREATE TABLE IF NOT EXISTS research_outcomes (
 CREATE INDEX IF NOT EXISTS idx_research_outcomes_horizon
     ON research_outcomes(horizon_minutes, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS research_outcome_requests (
+    candidate_id BIGINT NOT NULL REFERENCES research_candidates(id) ON DELETE CASCADE,
+    horizon_minutes INTEGER NOT NULL CHECK(horizon_minutes BETWEEN 1 AND 1440),
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    source TEXT NOT NULL,
+    PRIMARY KEY(candidate_id, horizon_minutes)
+);
+CREATE INDEX IF NOT EXISTS idx_research_outcome_requests_due
+    ON research_outcome_requests(horizon_minutes, requested_at);
+
 CREATE TABLE IF NOT EXISTS research_price_path (
     id BIGSERIAL PRIMARY KEY,
     candidate_id BIGINT NOT NULL REFERENCES research_candidates(id) ON DELETE CASCADE,
@@ -155,14 +165,41 @@ async def recent_candidates(limit: int = 100, shadow_only: bool = False):
     return [dict(r) for r in rows]
 
 
+async def request_candidate_outcome(conn, candidate_id: int, horizon_minutes: int, source: str):
+    horizon = int(horizon_minutes)
+    if not 1 <= horizon <= 1440:
+        raise ValueError('invalid_requested_horizon')
+    # Only prospective requests count: if the target horizon has already passed,
+    # recording a fresh price now would manufacture historical evidence.
+    await conn.execute(
+        """
+        INSERT INTO research_outcome_requests(candidate_id,horizon_minutes,source)
+        SELECT id,$2,$3 FROM research_candidates
+        WHERE id=$1 AND NOW() < created_at + ($2 * INTERVAL '1 minute')
+        ON CONFLICT(candidate_id,horizon_minutes) DO NOTHING
+        """,
+        candidate_id,horizon,source,
+    )
+
+
 async def due_candidate_outcomes(horizons_minutes, limit: int = 200):
     async with connection() as conn:
         rows = await conn.fetch(
             """
+            WITH requested AS (
+              SELECT r.candidate_id,r.horizon_minutes
+              FROM research_outcome_requests r
+            ), horizons AS (
+              SELECT c.id AS candidate_id,h.horizon_minutes
+              FROM research_candidates c
+              CROSS JOIN UNNEST($1::int[]) AS h(horizon_minutes)
+              UNION
+              SELECT candidate_id,horizon_minutes FROM requested
+            )
             SELECT c.id AS candidate_id,c.created_at,c.strategy,c.mint,c.direction,
                    c.entry_price,c.assumed_cost_bps,h.horizon_minutes
-            FROM research_candidates c
-            CROSS JOIN UNNEST($1::int[]) AS h(horizon_minutes)
+            FROM horizons h
+            JOIN research_candidates c ON c.id=h.candidate_id
             LEFT JOIN research_outcomes o
               ON o.candidate_id=c.id AND o.horizon_minutes=h.horizon_minutes
             WHERE c.entry_price IS NOT NULL
