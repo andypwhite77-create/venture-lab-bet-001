@@ -46,8 +46,11 @@ async def enforce_elite_training_only(conn):
     events=[]
     rr=await conn.fetchrow("SELECT * FROM reversal_tournament_runs WHERE status='collecting' ORDER BY created_at DESC LIMIT 1")
     if rr:
+        cfg=rr['config']; cfg=json.loads(cfg) if isinstance(cfg,str) else dict(cfg or {})
         rows=await conn.fetch("SELECT genome_id,baseline,cohort FROM reversal_tournament_ants WHERE run_id=$1 AND active=true",rr['run_id'])
-        drop=[r['genome_id'] for r in rows if not r['baseline'] and r['cohort']!='historical_qualified']
+        allowed={'historical_qualified'}
+        if cfg.get('continuous_reversal_v2'): allowed.add('forward_bred')
+        drop=[r['genome_id'] for r in rows if not r['baseline'] and r['cohort'] not in allowed]
         if drop:
             await conn.execute("""UPDATE reversal_tournament_ants SET active=false,eliminated_at=now(),
               elimination_reason='elite_training_policy' WHERE run_id=$1 AND genome_id=ANY($2::text[])""",rr['run_id'],drop)
