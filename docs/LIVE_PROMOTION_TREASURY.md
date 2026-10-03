@@ -83,3 +83,10 @@ On 2 October 2026, candidate 3112 satisfied the live dry-run requirement with 36
 The first armed Reversal Canary opportunity (candidate 3119, 35/36 consensus) reached Hummingbot Gateway but failed its mandatory pre-send simulation because Jupiter slippage tolerance was exceeded. No transaction landed: SOL balance remained unchanged, no target-token account appeared, and no new wallet signature existed. The attempt is recorded as `gateway_slippage_exceeded`, not as a live fill.
 
 Executor handling now separates definitive pre-broadcast Gateway rejections from ambiguous submission outcomes. A pre-broadcast entry rejection never becomes a fill; an exit rejection preserves the already-open live position. Network/confirmation ambiguity still stops the Canary and requires reconciliation. This keeps the system conservative without treating known simulation failures as unknowable broadcasts.
+
+### Canary safe-reject continuity
+- Live Canary still requires an explicit operator arm after a hard stop or deploy-time stop.
+- Entry-side local quote-validation failures now persist a specific safe reason (for example `quote_raw_price_impact`) and reject only that opportunity; they do not disarm an already-armed Canary.
+- Gateway-proven pre-broadcast entry rejection (simulation/slippage/no-route/invalid params/insufficient balance) also rejects only that opportunity and preserves arming because no transaction reached signing/send.
+- Unknown exceptions, wallet/funding/FX safety failures, ambiguous submission outcomes, landed failures, and any exit-side execution problem remain fail-closed and disarm/stop the Canary.
+- Regression coverage verifies the entry/exit distinction; suite is 96/96 passing at commit `8f46cd7`.
