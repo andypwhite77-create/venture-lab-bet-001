@@ -139,3 +139,13 @@ Do not destabilise the current Reversal Canary while it is proving live behaviou
 The recurring `venture-lab-app-run-*` containers were traced to the five-minute Champion League cron. It used `docker compose run --rm ... app`, which intentionally created a short-lived one-off app container every tick and triggered the orphan-container health warning.
 
 The installed cron now uses `docker compose exec -T -e PYTHONPATH=/app app python scripts/champion_league_tick.py` inside the existing healthy production app container. The 14:55 UTC post-change tick completed and updated `/home/deploy/champion_league.log` without leaving any `app-run-*` container. Production app/admin/PostgreSQL/Canary remained healthy. Preserve this `exec` form when recreating the cron; do not restore the former `compose run` form.
+
+## Bounded live inventory recovery — 2026-10-03
+
+The first genuine live Canary round trips exposed an exit-state bug: a live entry could land, then a later local exit quote validation failure (`quote_price_impact`) incorrectly marked the intent rejected. Two real token positions (intents 102 and 107) remained in the wallet while the executor believed they were rejected. Both entry signatures were independently verified finalized and the exact token balances were verified on-chain.
+
+Commit `29117b6` adds an explicit Recovery state and exit-only recovery mode. At the original strategy horizon the ant's result is frozen separately. A losing or unsafe exit transfers inventory to Recovery; Recovery may only sell, never add/average down, re-quotes every 15 seconds for up to 15 minutes, exits immediately at break-even-or-better, and at the deadline accepts the first otherwise-safe quote. If no safe route exists at the deadline it fail-closes and retains the token for operator review. New entries are impossible in `recovery_only` mode.
+
+Commit `6e17050` separates strategy/recovery basis from treasury plumbing cost. Recovery compares the exit to the actual swap input (`entry_trade_sol` / entry quote amount), not the full wallet SOL delta that may include one-time token-account rent and transaction plumbing. Full wallet-delta treasury P&L and trade P&L are recorded separately on close. Regression suite: 103/103 passing.
+
+The two historical bug exposures were migrated to `status=recovery` only after proving their successful on-chain entries and current token balances. Recovery-only execution was explicitly enabled; normal Canary remained unarmed. Operator stop still means no transactions. `scripts/canary-recover` explicitly enables exits-only recovery and starts the executor.
