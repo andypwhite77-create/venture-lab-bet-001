@@ -393,7 +393,7 @@ async def command(action):
                     if wallet_address()!=EXPECTED: raise ValueError('wallet_mismatch')
                     # Fresh preflight quote, funding and FX must all work before arming.
                     rate,source=await asyncio.to_thread(sol_gbp_rate)
-                    if source!='kraken_public' or (await asyncio.to_thread(wallet_balance_sol)-RESERVE_SOL)*rate<5: raise ValueError('funding_or_fx')
+                    if source!='kraken_public' or (await asyncio.to_thread(wallet_balance_sol)-RESERVE_SOL)*rate<1: raise ValueError('funding_or_fx')
                 await c.execute('UPDATE canary_control SET armed=$1,stopped=false,recovery_only=false,since=now(),problem=null WHERE id=1',action=='arm')
             print('ARMED LIVE' if action=='arm' else 'DRY RUN waiting for a genuine future Reversal intent'); return
     while True:

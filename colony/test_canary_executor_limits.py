@@ -142,4 +142,12 @@ class RecoveryArmingPolicyTests(unittest.TestCase):
         self.assertNotIn('recovery',blocking)
         self.assertIn('uncertain',blocking)
 
+
+class CanaryArmFundingPolicyTests(unittest.TestCase):
+    def test_arm_funding_threshold_matches_one_pound_trade_cap(self):
+        import inspect
+        src=inspect.getsource(ce.command)
+        self.assertIn("(await asyncio.to_thread(wallet_balance_sol)-RESERVE_SOL)*rate<1",src)
+        self.assertNotIn("(await asyncio.to_thread(wallet_balance_sol)-RESERVE_SOL)*rate<5",src)
+
 if __name__=='__main__': unittest.main()
