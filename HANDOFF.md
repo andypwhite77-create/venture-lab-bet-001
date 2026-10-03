@@ -127,3 +127,9 @@ The research dashboard now reads the actual `canary_control` state instead of in
 - The former £4 wallet floor is removed for this deliberately expendable tiny bankroll; 0.003 SOL remains untouchable as the network/exit reserve.
 - Quote validation, wallet identity, fresh Kraken FX, no leverage, ambiguous-submission fail-closed behavior, and exit-side hard stops remain unchanged.
 - Existing pre-change rejected intents remain historical evidence and are not replayed; arming sets a fresh eligibility timestamp.
+
+## Forward development tracks — 2026-10-03
+
+The agreed forward roadmap is now captured in `docs/DEVELOPMENT_ROADMAP.md`. Priority streams are: packageable Spawn Queen / Colony Factory; bounded ant plasticity introduced only in challengers after the Elite pool reaches roughly 50; heritable plasticity envelopes with non-heritable activation state; champion/challenger promotion where new ants must outperform relevant live incumbents on fresh evidence; a stronger multi-feed Swarm Queen; blind adversarial review of Queen proposals by independent major models before operator approval; measured hosting/capacity watch; and eventual permanent live Elite status if Canary remains consistently profitable over a meaningful live sample.
+
+Do not destabilise the current Reversal Canary while it is proving live behaviour. Develop these streams in parallel and promote only through forward evidence, Canary and explicit human approval.
