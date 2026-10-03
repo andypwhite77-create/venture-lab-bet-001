@@ -76,6 +76,24 @@ class CanaryLimitTests(unittest.TestCase):
         with self.assertRaisesRegex(ce.QuoteValidationRejected,'malformed_quote'):
             ce.validate_quote({},ce.SOL,'TokenMint',0.01)
 
+    def test_recovery_waits_for_negative_quote_before_deadline(self):
+        q={'minAmountOut':'0.009'}
+        data={'entry_spent_sol':0.01,'recovery_deadline':200.0}
+        should,why,pnl=ce.recovery_should_exit(q,data,100.0)
+        self.assertFalse(should); self.assertEqual(why,'wait'); self.assertAlmostEqual(pnl,-0.001)
+
+    def test_recovery_exits_at_breakeven(self):
+        q={'minAmountOut':'0.0101'}
+        data={'entry_spent_sol':0.01,'recovery_deadline':200.0}
+        should,why,_=ce.recovery_should_exit(q,data,100.0)
+        self.assertTrue(should); self.assertEqual(why,'break_even_or_better')
+
+    def test_recovery_exits_safe_quote_at_deadline(self):
+        q={'minAmountOut':'0.009'}
+        data={'entry_spent_sol':0.01,'recovery_deadline':100.0}
+        should,why,_=ce.recovery_should_exit(q,data,100.0)
+        self.assertTrue(should); self.assertEqual(why,'deadline')
+
 
 class _FakeConn:
     def __init__(self):
@@ -85,7 +103,7 @@ class _FakeConn:
         yield
     async def fetchrow(self,sql,*args):
         if 'canary_control' in sql:
-            return {'armed':True,'stopped':False}
+            return {'armed':True,'stopped':False,'recovery_only':False}
         raise AssertionError(sql)
     async def execute(self,sql,*args):
         self.executed.append((sql,args))
@@ -101,13 +119,14 @@ class CanarySubmissionPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('UPDATE canary_control SET armed=false',rendered)
         self.assertTrue(any('broadcast=false' in sql for sql,_ in c.executed))
 
-    async def test_exit_prebroadcast_rejection_still_halts_canary(self):
+    async def test_exit_prebroadcast_rejection_enters_recovery_without_halting(self):
         c=_FakeConn(); row={'id':2}; data={}
         q={'quoteId':'q2'}
         with patch.object(ce,'gateway',side_effect=ce.GatewayPreBroadcastRejected('SLIPPAGE_EXCEEDED')):
             ok=await ce.submit(c,row,data,q,'exit')
         self.assertFalse(ok)
         rendered='\n'.join(sql for sql,_ in c.executed)
-        self.assertIn('UPDATE canary_control SET armed=false',rendered)
+        self.assertNotIn('UPDATE canary_control SET armed=false',rendered)
+        self.assertTrue(any(args and args[1]=='recovery' for _,args in c.executed if len(args)>1))
 
 if __name__=='__main__': unittest.main()

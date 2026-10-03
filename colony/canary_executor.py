@@ -17,6 +17,8 @@ EXPECTED='j4nCnM29iyZx9n8oKHXBk8HNJESZb5yaBsA1VkvtkGZ'
 SOL='So11111111111111111111111111111111111111112'
 LOCK=84619320
 RESERVE_SOL=0.003 # rent + bounded network/priority fees, including exit
+RECOVERY_WINDOW_SECONDS=int(os.getenv('CANARY_RECOVERY_WINDOW_SECONDS','900'))
+RECOVERY_RETRY_SECONDS=int(os.getenv('CANARY_RECOVERY_RETRY_SECONDS','15'))
 
 async def schema():
     await controller_schema()
@@ -25,6 +27,7 @@ async def schema():
           id int PRIMARY KEY CHECK(id=1), armed boolean NOT NULL DEFAULT false,
           stopped boolean NOT NULL DEFAULT true, since timestamptz NOT NULL DEFAULT now(),
           heartbeat timestamptz, problem text);
+        ALTER TABLE canary_control ADD COLUMN IF NOT EXISTS recovery_only boolean NOT NULL DEFAULT false;
         INSERT INTO canary_control(id) VALUES(1) ON CONFLICT DO NOTHING;
         ALTER TABLE canary_trade_intents ADD COLUMN IF NOT EXISTS execution jsonb NOT NULL DEFAULT '{}';
         ALTER TABLE canary_trade_intents ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
@@ -106,10 +109,23 @@ def validate_quote(q, token_in, token_out, amount):
     except (KeyError, TypeError, ValueError, OverflowError):
         raise QuoteValidationRejected('malformed_quote') from None
 
-def quote(token_in,token_out,amount):
+def raw_quote(token_in,token_out,amount):
     params=dict(chainNetwork='solana-mainnet-beta',connector='jupiter',baseToken=token_in,
                 quoteToken=token_out,amount=amount,side='SELL',slippagePct=1)
-    return validate_quote(gateway('/trading/router/quote-swap?'+urllib.parse.urlencode(params)),token_in,token_out,amount)
+    return gateway('/trading/router/quote-swap?'+urllib.parse.urlencode(params))
+
+def quote(token_in,token_out,amount):
+    return validate_quote(raw_quote(token_in,token_out,amount),token_in,token_out,amount)
+
+def exit_pnl_sol(q,data):
+    return positive(q['minAmountOut'])-positive(data['entry_spent_sol'])
+
+def recovery_should_exit(q,data,now=None):
+    now=time.time() if now is None else float(now)
+    pnl=exit_pnl_sol(q,data)
+    if pnl>=0: return True,'break_even_or_better',pnl
+    if now>=float(data['recovery_deadline']): return True,'deadline',pnl
+    return False,'wait',pnl
 
 def limits(row,rate,balance):
     if wallet_address()!=EXPECTED: raise ValueError('wallet_mismatch')
@@ -136,7 +152,19 @@ async def save(c,row,status,data,reason=None):
                     row['id'],status,json.dumps(data),reason)
 
 async def halt(c,reason):
-    await c.execute('UPDATE canary_control SET armed=false,stopped=true,problem=$1 WHERE id=1',reason)
+    await c.execute('UPDATE canary_control SET armed=false,stopped=true,recovery_only=false,problem=$1 WHERE id=1',reason)
+
+async def enter_recovery(c,row,data,reason,raw=None):
+    now=time.time()
+    data.setdefault('strategy_exit_at',data.get('exit_at'))
+    data.setdefault('strategy_exit_observed_at',datetime.now(timezone.utc).isoformat())
+    if raw is not None:
+        data['strategy_exit_raw_quote']=raw
+    data.setdefault('recovery_started_at',now)
+    data.setdefault('recovery_deadline',now+RECOVERY_WINDOW_SECONDS)
+    data['recovery_next_at']=now
+    data['recovery_last_reason']=reason
+    await save(c,row,'recovery',data,reason)
 
 async def reconcile(c,row):
     data=json.loads(row['execution']); leg='exit' if row['status']=='submitting_exit' else data.get('pending_leg','entry')
@@ -170,7 +198,8 @@ async def submit(c,row,data,q,leg):
     # Serialize stop/disarm against the commit-before-send boundary.
     async with c.transaction():
         control=await c.fetchrow('SELECT * FROM canary_control WHERE id=1 FOR UPDATE')
-        if not control['armed'] or control['stopped']: return False
+        permitted=(leg=='exit' and control['recovery_only']) or (control['armed'] and not control['recovery_only'])
+        if not permitted or control['stopped']: return False
         data['pending_leg']=leg; data[leg+'_quote']=q; data[leg+'_submitted_at']=time.time()
         await save(c,row,'submitting_'+leg,data)
         await c.execute('UPDATE canary_trade_intents SET broadcast=true,live_enabled=true WHERE id=$1',row['id'])
@@ -184,10 +213,10 @@ async def submit(c,row,data,q,leg):
             # Reject this opportunity but keep a previously armed Canary live.
             await c.execute('UPDATE canary_trade_intents SET broadcast=false WHERE id=$1',row['id'])
             return False
-        # An entry already exists; preserve the open position and stop for an
-        # operator-controlled re-quote/exit rather than pretending it closed.
-        await save(c,row,'open',data,'exit_gateway_'+e.code.lower())
-        await halt(c,'exit_gateway_'+e.code.lower())
+        # The entry is already real. Treat an exit-side pre-broadcast failure as
+        # recoverable inventory: no new entry can be claimed while this row remains
+        # in recovery, and the exit controller will re-quote inside its bounded window.
+        await enter_recovery(c,row,data,'recovery_gateway_'+e.code.lower())
         return False
     if result.get('signature'):
         data[leg+'_signature']=result['signature']; await save(c,row,'submitting_'+leg,data)
@@ -199,12 +228,17 @@ async def tick():
         row=None
         try:
             await c.execute('UPDATE canary_control SET heartbeat=now() WHERE id=1')
-            row=await c.fetchrow("SELECT * FROM canary_trade_intents WHERE status IN ('claimed','open','submitting_entry','submitting_exit','uncertain') LIMIT 1")
+            row=await c.fetchrow("""SELECT * FROM canary_trade_intents
+              WHERE status IN ('claimed','open','recovery','submitting_entry','submitting_exit','uncertain')
+              ORDER BY CASE status WHEN 'submitting_exit' THEN 0 WHEN 'uncertain' THEN 1 WHEN 'recovery' THEN 2 WHEN 'open' THEN 3 ELSE 4 END,id LIMIT 1""")
             if row and row['status'] in ('submitting_entry','submitting_exit','uncertain'):
                 await reconcile(c,row); return
             control=await c.fetchrow('SELECT * FROM canary_control WHERE id=1')
             if control['stopped']: return
             live=control['armed']
+            recovery_only=control['recovery_only']
+            if not row and recovery_only:
+                await halt(c,'recovery_complete'); return
             if not row:
                 async with c.transaction():
                     row=await c.fetchrow("""UPDATE canary_trade_intents SET status='claimed',execution=jsonb_build_object('mode',$2::text,'eligible_since',$1::text),updated_at=now()
@@ -233,12 +267,26 @@ async def tick():
                         if current_control['stopped']: return
                         await save(c,row,'open',data,'simulated_entry')
             elif row['status']=='open' and time.time()>=data['exit_at']:
-                q=await asyncio.to_thread(quote,row['mint'],SOL,data['tokens'])
+                raw=await asyncio.to_thread(raw_quote,row['mint'],SOL,data['tokens'])
+                try:
+                    q=validate_quote(raw,row['mint'],SOL,data['tokens'])
+                except QuoteValidationRejected as e:
+                    if data['mode']=='live':
+                        await enter_recovery(c,row,data,'recovery_quote_'+e.code,raw); return
+                    raise
                 if data['mode']=='live':
-                    if not live: return
-                    balance=await asyncio.to_thread(wallet_balance_sol)
-                    if balance<RESERVE_SOL: raise ValueError('exit_fee_reserve')
-                    await submit(c,row,data,q,'exit')
+                    data['strategy_exit_at']=data.get('exit_at')
+                    data['strategy_exit_observed_at']=datetime.now(timezone.utc).isoformat()
+                    data['strategy_exit_quote']=q
+                    should_exit,why,pnl=recovery_should_exit(q,dict(data,recovery_deadline=time.time()+RECOVERY_WINDOW_SECONDS),time.time())
+                    data['strategy_horizon_pnl_sol']=pnl
+                    if should_exit:
+                        if not (live or recovery_only): return
+                        balance=await asyncio.to_thread(wallet_balance_sol)
+                        if balance<RESERVE_SOL: raise ValueError('exit_fee_reserve')
+                        await submit(c,row,data,q,'exit')
+                    else:
+                        await enter_recovery(c,row,data,'recovery_negative_horizon',raw)
                 else:
                     data.update(exit_quote=q,closed_at=datetime.now(timezone.utc).isoformat(),simulated_pnl_sol=float(q['minAmountOut'])-data['entry_spent_sol'])
                     async with c.transaction():
@@ -246,9 +294,42 @@ async def tick():
                         if current_control['stopped']: return
                         await save(c,row,'closed',data,'simulated_exit')
                         await halt(c,'dry_run_complete')
+            elif row['status']=='recovery':
+                if data.get('mode')!='live': raise ValueError('recovery_non_live')
+                if not recovery_only and not live: return
+                now=time.time()
+                if now<float(data.get('recovery_next_at',0)): return
+                try:
+                    raw=await asyncio.to_thread(raw_quote,row['mint'],SOL,data['tokens'])
+                    q=validate_quote(raw,row['mint'],SOL,data['tokens'])
+                except QuoteValidationRejected as e:
+                    data['recovery_last_reason']='recovery_quote_'+e.code
+                    data['recovery_last_attempt_at']=now
+                    data['recovery_next_at']=now+RECOVERY_RETRY_SECONDS
+                    if now>=float(data['recovery_deadline']):
+                        await save(c,row,'recovery',data,'recovery_deadline_no_safe_quote')
+                        await halt(c,'recovery_deadline_no_safe_quote')
+                    else:
+                        await save(c,row,'recovery',data,data['recovery_last_reason'])
+                    return
+                should_exit,why,pnl=recovery_should_exit(q,data,now)
+                data['recovery_last_quote']=q
+                data['recovery_last_pnl_sol']=pnl
+                data['recovery_last_attempt_at']=now
+                if not should_exit:
+                    data['recovery_next_at']=now+RECOVERY_RETRY_SECONDS
+                    best=data.get('recovery_best_pnl_sol')
+                    if best is None or pnl>best:
+                        data['recovery_best_pnl_sol']=pnl; data['recovery_best_quote']=q
+                    await save(c,row,'recovery',data,'recovery_waiting_for_breakeven')
+                    return
+                data['recovery_exit_reason']=why
+                balance=await asyncio.to_thread(wallet_balance_sol)
+                if balance<RESERVE_SOL: raise ValueError('exit_fee_reserve')
+                await submit(c,row,data,q,'exit')
         except QuoteValidationRejected as e:
-            # Local quote validation happens before submit(), so no transaction can
-            # have reached chain. Reject only this opportunity and preserve arming.
+            # Any live exit quote failure is handled above as inventory recovery.
+            # Reaching here therefore means a pre-entry/local validation failure.
             if row:
                 current=await c.fetchrow('SELECT * FROM canary_trade_intents WHERE id=$1',row['id'])
                 await save(c,current,'rejected',json.loads(current['execution']),'quote_'+e.code)
@@ -279,10 +360,18 @@ async def command(action):
             print(json.dumps(dict(control=control,limits=dict(max_trade_gbp=1,wallet_floor_gbp=0,min_consensus=0,min_votes=1,reserve_sol=RESERVE_SOL,max_positions=1),intents=[dict(r) for r in rows]),default=str)); return
         if action=='stop':
             await halt(c,'operator_stop'); print('DISARMED and STOPPED; positions are retained, no automatic liquidation.'); return
+        if action=='recover':
+            async with c.transaction():
+                await c.execute('SELECT pg_advisory_xact_lock($1)',LOCK)
+                n=await c.fetchval("SELECT count(*) FROM canary_trade_intents WHERE status IN ('open','recovery','submitting_exit') AND execution->>'mode'='live'")
+                if not n: raise ValueError('no_live_inventory_to_recover')
+                if wallet_address()!=EXPECTED: raise ValueError('wallet_mismatch')
+                await c.execute("UPDATE canary_control SET armed=false,stopped=false,recovery_only=true,problem=null WHERE id=1")
+            print('RECOVERY ONLY: exits enabled, new entries disabled'); return
         if action in ('dry-run','arm'):
             async with c.transaction():
                 await c.execute('SELECT pg_advisory_xact_lock($1)',LOCK)
-                if await c.fetchval("SELECT count(*) FROM canary_trade_intents WHERE status IN ('claimed','open','submitting_entry','submitting_exit','uncertain')"):
+                if await c.fetchval("SELECT count(*) FROM canary_trade_intents WHERE status IN ('claimed','open','recovery','submitting_entry','submitting_exit','uncertain')"):
                     raise ValueError('unresolved_position')
                 if action=='arm':
                     if not await c.fetchval("SELECT 1 FROM canary_trade_intents WHERE status='closed' AND execution->>'mode'='dry' AND execution ? 'exit_quote' AND execution ? 'eligible_since' AND observed_at >= (execution->>'eligible_since')::timestamptz AND broadcast=false LIMIT 1"):
@@ -291,7 +380,7 @@ async def command(action):
                     # Fresh preflight quote, funding and FX must all work before arming.
                     rate,source=await asyncio.to_thread(sol_gbp_rate)
                     if source!='kraken_public' or (await asyncio.to_thread(wallet_balance_sol)-RESERVE_SOL)*rate<5: raise ValueError('funding_or_fx')
-                await c.execute('UPDATE canary_control SET armed=$1,stopped=false,since=now(),problem=null WHERE id=1',action=='arm')
+                await c.execute('UPDATE canary_control SET armed=$1,stopped=false,recovery_only=false,since=now(),problem=null WHERE id=1',action=='arm')
             print('ARMED LIVE' if action=='arm' else 'DRY RUN waiting for a genuine future Reversal intent'); return
     while True:
         await tick(); await asyncio.sleep(5)

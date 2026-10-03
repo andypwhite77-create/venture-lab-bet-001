@@ -295,6 +295,8 @@ services:
       HUMMINGBOT_GATEWAY_API_KEY: ${HUMMINGBOT_GATEWAY_API_KEY}
       SOLANA_SECONDARY_RPC_URL: ${SOLANA_SECONDARY_RPC_URL:-https://api.mainnet-beta.solana.com}
       CANARY_ADDRESS_FILE: /run/canary/reversal_canary_address.txt
+      CANARY_RECOVERY_WINDOW_SECONDS: "900"
+      CANARY_RECOVERY_RETRY_SECONDS: "15"
     volumes:
       - ./secrets/reversal_canary_address.txt:/run/canary/reversal_canary_address.txt:ro
     healthcheck:
