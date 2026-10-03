@@ -1,4 +1,5 @@
 import unittest
+from contextlib import asynccontextmanager
 from unittest.mock import patch
 from colony import canary_executor as ce
 
@@ -36,5 +37,57 @@ class CanaryLimitTests(unittest.TestCase):
     def test_landed_failure_is_not_classified_prebroadcast(self):
         body=b'{"statusCode":400,"code":"TRANSACTION_FAILED","message":"landed"}'
         self.assertIsNone(ce.classify_gateway_http_error(400,body))
+
+    def test_quote_validation_failure_has_specific_safe_label(self):
+        q={
+            'quoteId':'q1','tokenIn':ce.SOL,'tokenOut':'TokenMint',
+            'amountIn':'0.01','amountOut':'100','minAmountOut':'99',
+            'maxAmountIn':'0.01','priceImpactPct':'0',
+            'quoteResponse':{
+                'inputMint':ce.SOL,'outputMint':'TokenMint','swapMode':'ExactIn',
+                'routePlan':[], 'slippageBps':100,'outAmount':'100',
+                'inAmount':'10000000','otherAmountThreshold':'99','priceImpactPct':'0'
+            },
+        }
+        with self.assertRaisesRegex(ce.QuoteValidationRejected,'empty_route'):
+            ce.validate_quote(q,ce.SOL,'TokenMint',0.01)
+
+    def test_malformed_quote_has_safe_label(self):
+        with self.assertRaisesRegex(ce.QuoteValidationRejected,'malformed_quote'):
+            ce.validate_quote({},ce.SOL,'TokenMint',0.01)
+
+
+class _FakeConn:
+    def __init__(self):
+        self.executed=[]
+    @asynccontextmanager
+    async def transaction(self):
+        yield
+    async def fetchrow(self,sql,*args):
+        if 'canary_control' in sql:
+            return {'armed':True,'stopped':False}
+        raise AssertionError(sql)
+    async def execute(self,sql,*args):
+        self.executed.append((sql,args))
+
+class CanarySubmissionPolicyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_entry_prebroadcast_rejection_does_not_halt_canary(self):
+        c=_FakeConn(); row={'id':1}; data={}
+        q={'quoteId':'q1'}
+        with patch.object(ce,'gateway',side_effect=ce.GatewayPreBroadcastRejected('SLIPPAGE_EXCEEDED')):
+            ok=await ce.submit(c,row,data,q,'entry')
+        self.assertFalse(ok)
+        rendered='\n'.join(sql for sql,_ in c.executed)
+        self.assertNotIn('UPDATE canary_control SET armed=false',rendered)
+        self.assertTrue(any('broadcast=false' in sql for sql,_ in c.executed))
+
+    async def test_exit_prebroadcast_rejection_still_halts_canary(self):
+        c=_FakeConn(); row={'id':2}; data={}
+        q={'quoteId':'q2'}
+        with patch.object(ce,'gateway',side_effect=ce.GatewayPreBroadcastRejected('SLIPPAGE_EXCEEDED')):
+            ok=await ce.submit(c,row,data,q,'exit')
+        self.assertFalse(ok)
+        rendered='\n'.join(sql for sql,_ in c.executed)
+        self.assertIn('UPDATE canary_control SET armed=false',rendered)
 
 if __name__=='__main__': unittest.main()

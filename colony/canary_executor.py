@@ -31,6 +31,11 @@ async def schema():
         CREATE UNIQUE INDEX IF NOT EXISTS canary_one_position ON canary_trade_intents ((1))
           WHERE status IN ('claimed','open','submitting_entry','submitting_exit','uncertain');''')
 
+class QuoteValidationRejected(Exception):
+    def __init__(self, code):
+        self.code=str(code)
+        super().__init__(self.code)
+
 class GatewayPreBroadcastRejected(Exception):
     def __init__(self, code):
         self.code=str(code)
@@ -75,26 +80,31 @@ def positive(x):
     return x
 
 def validate_quote(q, token_in, token_out, amount):
-    raw=q['quoteResponse']
-    if not q.get('quoteId') or q['tokenIn']!=token_in or q['tokenOut']!=token_out:
-        raise ValueError('quote_pair')
-    if raw['inputMint']!=token_in or raw['outputMint']!=token_out or raw['swapMode']!='ExactIn':
-        raise ValueError('quote_route')
-    if not raw['routePlan'] or not all(x.get('swapInfo',{}).get('ammKey') for x in raw['routePlan']):
-        raise ValueError('empty_route')
-    if int(raw['slippageBps'])>100 or int(raw['slippageBps'])<0: raise ValueError('slippage')
-    impact=float(q['priceImpactPct'])
-    if not math.isfinite(impact) or abs(impact)>1: raise ValueError('price_impact')
-    if abs(positive(q['amountIn'])-amount)>max(1e-9,amount*1e-7): raise ValueError('quote_size')
-    out=positive(q['amountOut']); minimum=positive(q['minAmountOut'])
-    if minimum<out*.989999 or minimum>out: raise ValueError('quote_minimum')
-    if positive(q['maxAmountIn'])>amount*1.0000001: raise ValueError('quote_maximum')
-    raw_out=int(raw['outAmount']); threshold=int(raw['otherAmountThreshold'])
-    if raw_out<=0 or int(raw['inAmount'])<=0 or not max(1,raw_out*99//100)<=threshold<=raw_out:
-        raise ValueError('raw_threshold')
-    raw_impact=float(raw['priceImpactPct'])
-    if not math.isfinite(raw_impact) or abs(raw_impact)>0.01: raise ValueError('raw_price_impact')
-    return q
+    try:
+        raw=q['quoteResponse']
+        if not q.get('quoteId') or q['tokenIn']!=token_in or q['tokenOut']!=token_out:
+            raise QuoteValidationRejected('quote_pair')
+        if raw['inputMint']!=token_in or raw['outputMint']!=token_out or raw['swapMode']!='ExactIn':
+            raise QuoteValidationRejected('quote_route')
+        if not raw['routePlan'] or not all(x.get('swapInfo',{}).get('ammKey') for x in raw['routePlan']):
+            raise QuoteValidationRejected('empty_route')
+        if int(raw['slippageBps'])>100 or int(raw['slippageBps'])<0: raise QuoteValidationRejected('slippage')
+        impact=float(q['priceImpactPct'])
+        if not math.isfinite(impact) or abs(impact)>1: raise QuoteValidationRejected('price_impact')
+        if abs(positive(q['amountIn'])-amount)>max(1e-9,amount*1e-7): raise QuoteValidationRejected('quote_size')
+        out=positive(q['amountOut']); minimum=positive(q['minAmountOut'])
+        if minimum<out*.989999 or minimum>out: raise QuoteValidationRejected('quote_minimum')
+        if positive(q['maxAmountIn'])>amount*1.0000001: raise QuoteValidationRejected('quote_maximum')
+        raw_out=int(raw['outAmount']); threshold=int(raw['otherAmountThreshold'])
+        if raw_out<=0 or int(raw['inAmount'])<=0 or not max(1,raw_out*99//100)<=threshold<=raw_out:
+            raise QuoteValidationRejected('raw_threshold')
+        raw_impact=float(raw['priceImpactPct'])
+        if not math.isfinite(raw_impact) or abs(raw_impact)>0.01: raise QuoteValidationRejected('raw_price_impact')
+        return q
+    except QuoteValidationRejected:
+        raise
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise QuoteValidationRejected('malformed_quote') from None
 
 def quote(token_in,token_out,amount):
     params=dict(chainNetwork='solana-mainnet-beta',connector='jupiter',baseToken=token_in,
@@ -168,12 +178,13 @@ async def submit(c,row,data,q,leg):
         if leg=='entry':
             await save(c,row,'rejected',data,'gateway_'+e.code.lower())
             # Gateway proved the transaction never reached the signing/send stage.
+            # Reject this opportunity but keep a previously armed Canary live.
             await c.execute('UPDATE canary_trade_intents SET broadcast=false WHERE id=$1',row['id'])
-        else:
-            # An entry already exists; preserve the open position and stop for an
-            # operator-controlled re-quote/exit rather than pretending it closed.
-            await save(c,row,'open',data,'exit_gateway_'+e.code.lower())
-        await halt(c,('entry_' if leg=='entry' else 'exit_')+'gateway_'+e.code.lower())
+            return False
+        # An entry already exists; preserve the open position and stop for an
+        # operator-controlled re-quote/exit rather than pretending it closed.
+        await save(c,row,'open',data,'exit_gateway_'+e.code.lower())
+        await halt(c,'exit_gateway_'+e.code.lower())
         return False
     if result.get('signature'):
         data[leg+'_signature']=result['signature']; await save(c,row,'submitting_'+leg,data)
@@ -232,15 +243,23 @@ async def tick():
                         if current_control['stopped']: return
                         await save(c,row,'closed',data,'simulated_exit')
                         await halt(c,'dry_run_complete')
+        except QuoteValidationRejected as e:
+            # Local quote validation happens before submit(), so no transaction can
+            # have reached chain. Reject only this opportunity and preserve arming.
+            if row:
+                current=await c.fetchrow('SELECT * FROM canary_trade_intents WHERE id=$1',row['id'])
+                await save(c,current,'rejected',json.loads(current['execution']),'quote_'+e.code)
         except Exception as e:
-            # Exception bodies can contain credential-bearing URLs. Persist only type.
+            # Exception bodies can contain credential-bearing URLs. Persist a safe
+            # ValueError label when available; otherwise keep only the exception type.
+            safe_reason=(str(e) if isinstance(e,ValueError) and str(e) else type(e).__name__)
             if row:
                 current=await c.fetchrow('SELECT * FROM canary_trade_intents WHERE id=$1',row['id'])
                 if current['status'] in ('ready','claimed'):
-                    await save(c,current,'rejected',json.loads(current['execution']),type(e).__name__)
+                    await save(c,current,'rejected',json.loads(current['execution']),safe_reason)
                 elif current['status'] in ('submitting_entry','submitting_exit') and not json.loads(current['execution']).get(json.loads(current['execution']).get('pending_leg','entry')+'_signature'):
                     await save(c,current,'uncertain',json.loads(current['execution']),'submission_outcome_unknown')
-            await halt(c,type(e).__name__)
+            await halt(c,safe_reason)
         finally:
             await c.execute('SELECT pg_advisory_unlock($1)',LOCK)
 
