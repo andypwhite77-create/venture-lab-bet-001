@@ -94,6 +94,12 @@ class CanaryLimitTests(unittest.TestCase):
         should,why,_=ce.recovery_should_exit(q,data,100.0)
         self.assertTrue(should); self.assertEqual(why,'deadline')
 
+    def test_recovery_basis_uses_swap_input_not_wallet_delta(self):
+        q={'minAmountOut':'0.0111'}
+        data={'entry_spent_sol':0.0139,'entry_quote':{'amountIn':'0.0110'},'recovery_deadline':200.0}
+        should,why,pnl=ce.recovery_should_exit(q,data,100.0)
+        self.assertTrue(should); self.assertEqual(why,'break_even_or_better'); self.assertAlmostEqual(pnl,0.0001)
+
 
 class _FakeConn:
     def __init__(self):

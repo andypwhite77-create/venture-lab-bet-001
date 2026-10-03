@@ -117,8 +117,19 @@ def raw_quote(token_in,token_out,amount):
 def quote(token_in,token_out,amount):
     return validate_quote(raw_quote(token_in,token_out,amount),token_in,token_out,amount)
 
+def entry_trade_basis_sol(data):
+    # Strategy/recovery basis is the actual swap input, not the whole wallet delta.
+    # The latter can include one-time ATA rent and network plumbing that should be
+    # tracked separately as treasury cost rather than demanding a market rebound.
+    if data.get('entry_trade_sol') is not None:
+        return positive(data['entry_trade_sol'])
+    q=data.get('entry_quote') or {}
+    if q.get('amountIn') is not None:
+        return positive(q['amountIn'])
+    return positive(data['entry_spent_sol'])
+
 def exit_pnl_sol(q,data):
-    return positive(q['minAmountOut'])-positive(data['entry_spent_sol'])
+    return positive(q['minAmountOut'])-entry_trade_basis_sol(data)
 
 def recovery_should_exit(q,data,now=None):
     now=time.time() if now is None else float(now)
@@ -192,6 +203,9 @@ async def reconcile(c,row):
     else:
         if delta>=0 or abs(delta+data['tokens'])>max(1e-9,data['tokens']*1e-6): raise ValueError('exit_fill_mismatch')
         data['closed_at']=datetime.now(timezone.utc).isoformat()
+        data['exit_received_sol']=(meta['postBalances'][idx]-meta['preBalances'][idx])/1e9
+        data['realized_treasury_pnl_sol']=data['exit_received_sol']-float(data['entry_spent_sol'])
+        data['realized_trade_pnl_sol']=data['exit_received_sol']-entry_trade_basis_sol(data)
         await save(c,row,'closed',data)
 
 async def submit(c,row,data,q,leg):
@@ -259,7 +273,7 @@ async def tick():
                 balance=await asyncio.to_thread(wallet_balance_sol); limits(row,rate,balance)
                 if data.get('mode')=='live' and not live: return
                 data.setdefault('mode','live' if live else 'dry')
-                data.update(entry_quote=q,rate=rate,entry_spent_sol=amount,tokens=float(q['minAmountOut']),exit_at=time.time()+row['hold_minutes']*60)
+                data.update(entry_quote=q,rate=rate,entry_trade_sol=amount,entry_spent_sol=amount,tokens=float(q['minAmountOut']),exit_at=time.time()+row['hold_minutes']*60)
                 if data['mode']=='live': await submit(c,row,data,q,'entry')
                 else:
                     async with c.transaction():
