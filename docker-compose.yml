@@ -268,8 +268,9 @@ services:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
       CANARY_LIVE_ENABLED: "0"
       CANARY_MAX_TRADE_GBP: "1.00"
-      CANARY_FLOOR_GBP: "4.00"
-      CANARY_MIN_VOTE_FRACTION: "0.80"
+      CANARY_FLOOR_GBP: "0.00"
+      CANARY_MIN_VOTES: "1"
+      CANARY_RESERVE_SOL: "0.003"
       CANARY_START_AFTER_CANDIDATE_ID: "2283"
       CANARY_ADDRESS_FILE: /run/canary/reversal_canary_address.txt
     volumes:

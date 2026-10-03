@@ -120,3 +120,10 @@ The research dashboard now reads the actual `canary_control` state instead of in
 - Gateway-proven pre-broadcast entry rejection (simulation/slippage/no-route/invalid params/insufficient balance) also rejects only that opportunity and preserves arming because no transaction reached signing/send.
 - Unknown exceptions, wallet/funding/FX safety failures, ambiguous submission outcomes, landed failures, and any exit-side execution problem remain fail-closed and disarm/stop the Canary.
 - Regression coverage verifies the entry/exit distinction; suite is 96/96 passing at commit `8f46cd7`.
+
+### Canary reality-test trigger (2026-10-03)
+- Live Reversal trigger now mirrors the paper path: one active Reversal ant is sufficient to create an eligible intent; the former 80% consensus gate is removed.
+- £1 remains the hard per-trade cap and only one live position may exist at a time.
+- The former £4 wallet floor is removed for this deliberately expendable tiny bankroll; 0.003 SOL remains untouchable as the network/exit reserve.
+- Quote validation, wallet identity, fresh Kraken FX, no leverage, ambiguous-submission fail-closed behavior, and exit-side hard stops remain unchanged.
+- Existing pre-change rejected intents remain historical evidence and are not replayed; arming sets a fresh eligibility timestamp.

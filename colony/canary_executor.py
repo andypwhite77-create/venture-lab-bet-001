@@ -114,7 +114,9 @@ def quote(token_in,token_out,amount):
 def limits(row,rate,balance):
     if wallet_address()!=EXPECTED: raise ValueError('wallet_mismatch')
     positive(rate); positive(balance)
-    if row['active_ants']<=0 or not .8<=row['votes']/row['active_ants']<=1 or not .8<=row['vote_fraction']<=1:
+    if row['active_ants']<=0 or row['votes']<1 or row['votes']>row['active_ants']:
+        raise ValueError('consensus')
+    if not 0<row['vote_fraction']<=1:
         raise ValueError('consensus')
     if not row['hold_minutes'] or not 1<=row['hold_minutes']<=1440: raise ValueError('hold')
     if row['mint']==SOL: raise ValueError('native_mint')
@@ -123,9 +125,10 @@ def limits(row,rate,balance):
     if requested_gbp>1.00000001: raise ValueError('trade_cap')
     # Intent sizing is only an upper bound. Reprice at execution-time FX so a
     # harmless SOL/GBP move cannot turn a <=£1 intent into a rejected >£1 trade.
-    amount=positive(min(requested_sol, requested_gbp/rate, 1.0/rate))
+    spendable_sol=max(0.0,balance-RESERVE_SOL)
+    amount=positive(min(requested_sol, requested_gbp/rate, 1.0/rate, spendable_sol))
     if amount*rate>1.00000001: raise ValueError('trade_cap')
-    if (balance-amount-RESERVE_SOL)*rate<4: raise ValueError('wallet_floor')
+    if balance-amount<RESERVE_SOL-1e-12: raise ValueError('network_reserve')
     return amount
 
 async def save(c,row,status,data,reason=None):
@@ -273,7 +276,7 @@ async def command(action):
         if action=='status':
             control=dict(await c.fetchrow('SELECT * FROM canary_control WHERE id=1'))
             rows=await c.fetch("SELECT id,candidate_id,mint,status,reason,broadcast,updated_at,execution->>'mode' mode,execution->>'exit_at' exit_at FROM canary_trade_intents ORDER BY id DESC LIMIT 12")
-            print(json.dumps(dict(control=control,limits=dict(max_trade_gbp=1,wallet_floor_gbp=4,min_consensus=.8,max_positions=1),intents=[dict(r) for r in rows]),default=str)); return
+            print(json.dumps(dict(control=control,limits=dict(max_trade_gbp=1,wallet_floor_gbp=0,min_consensus=0,min_votes=1,reserve_sol=RESERVE_SOL,max_positions=1),intents=[dict(r) for r in rows]),default=str)); return
         if action=='stop':
             await halt(c,'operator_stop'); print('DISARMED and STOPPED; positions are retained, no automatic liquidation.'); return
         if action in ('dry-run','arm'):

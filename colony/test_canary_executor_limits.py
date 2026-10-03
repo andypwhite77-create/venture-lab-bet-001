@@ -26,6 +26,26 @@ class CanaryLimitTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'trade_cap'):
             ce.limits(row,90.0,0.0674)
 
+
+    @patch.object(ce,'wallet_address',return_value=ce.EXPECTED)
+    def test_single_active_ant_matches_paper_trigger(self,_):
+        row=dict(BASE,active_ants=36,votes=1,vote_fraction=1/36)
+        amount=ce.limits(row,90.0,0.0674)
+        self.assertGreater(amount,0)
+
+    @patch.object(ce,'wallet_address',return_value=ce.EXPECTED)
+    def test_zero_votes_rejected(self,_):
+        row=dict(BASE,active_ants=36,votes=0,vote_fraction=0.0)
+        with self.assertRaisesRegex(ValueError,'consensus'):
+            ce.limits(row,90.0,0.0674)
+
+    @patch.object(ce,'wallet_address',return_value=ce.EXPECTED)
+    def test_network_reserve_is_never_spent(self,_):
+        row=dict(BASE,active_ants=36,votes=1,vote_fraction=1/36,requested_sol=0.01,requested_gbp=1.0)
+        amount=ce.limits(row,90.0,0.008)
+        self.assertLessEqual(amount,0.005000000001)
+        self.assertGreaterEqual(0.008-amount,ce.RESERVE_SOL-1e-12)
+
     def test_gateway_slippage_http_error_is_prebroadcast(self):
         body=b'{"statusCode":400,"code":"SLIPPAGE_EXCEEDED","message":"price moved"}'
         self.assertEqual(ce.classify_gateway_http_error(400,body),'SLIPPAGE_EXCEEDED')

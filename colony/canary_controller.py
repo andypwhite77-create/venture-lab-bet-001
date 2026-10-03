@@ -14,8 +14,9 @@ LAMPORTS=1_000_000_000
 ROOT=Path(__file__).resolve().parents[1]
 ADDRESS_FILE=Path(os.getenv('CANARY_ADDRESS_FILE',ROOT/'secrets/reversal_canary_address.txt'))
 MAX_TRADE_GBP=float(os.getenv('CANARY_MAX_TRADE_GBP','1.00'))
-FLOOR_GBP=float(os.getenv('CANARY_FLOOR_GBP','4.00'))
-MIN_VOTE_FRACTION=float(os.getenv('CANARY_MIN_VOTE_FRACTION','0.80'))
+FLOOR_GBP=float(os.getenv('CANARY_FLOOR_GBP','0.00'))
+MIN_VOTES=int(os.getenv('CANARY_MIN_VOTES','1'))
+RESERVE_SOL=float(os.getenv('CANARY_RESERVE_SOL','0.003'))
 START_AFTER=int(os.getenv('CANARY_START_AFTER_CANDIDATE_ID','0'))
 POLL_SECONDS=int(os.getenv('CANARY_POLL_SECONDS','20'))
 RPC=os.getenv('SOLANA_SECONDARY_RPC_URL','https://api.mainnet-beta.solana.com').strip()
@@ -69,7 +70,7 @@ async def already_seen(candidate_id):
         return bool(await c.fetchval('SELECT 1 FROM canary_trade_intents WHERE candidate_id=$1',candidate_id))
 
 async def record_intent(g,rate,balance_sol,status,reason):
-    requested_gbp=min(MAX_TRADE_GBP,max(0.0,balance_sol*rate-FLOOR_GBP))
+    requested_gbp=min(MAX_TRADE_GBP,max(0.0,(balance_sol-RESERVE_SOL)*rate-FLOOR_GBP))
     requested_sol=requested_gbp/rate if rate>0 else 0.0
     frac=(g['votes']/g['active_ants']) if g['active_ants'] else 0.0
     async with connection() as c:
@@ -95,8 +96,8 @@ async def process_once():
         wallet_gbp=balance_sol*rate
         if wallet_gbp<=FLOOR_GBP:
             status,reason='rejected','floor_reached'
-        elif frac<MIN_VOTE_FRACTION:
-            status,reason='rejected','consensus_below_threshold'
+        elif g['votes']<MIN_VOTES:
+            status,reason='rejected','no_active_reversal_vote'
         else:
             status,reason='ready','awaiting_user_controlled_execution_layer'
         await record_intent(g,rate,balance_sol,status,reason)
@@ -104,7 +105,7 @@ async def process_once():
                     'active_ants':g['active_ants'],'vote_fraction':frac,'status':status,'reason':reason})
     return {'ok':True,'wallet':wallet_address(),'balance_sol':balance_sol,'balance_gbp':balance_sol*rate,
             'rate_gbp_per_sol':rate,'live_enabled':LIVE_ENABLED,'broadcast_capability':False,
-            'max_trade_gbp':MAX_TRADE_GBP,'floor_gbp':FLOOR_GBP,'new_intents':out}
+            'max_trade_gbp':MAX_TRADE_GBP,'floor_gbp':FLOOR_GBP,'reserve_sol':RESERVE_SOL,'min_votes':MIN_VOTES,'new_intents':out}
 
 async def main():
     await init_db()
