@@ -385,7 +385,7 @@ async def command(action):
         if action in ('dry-run','arm'):
             async with c.transaction():
                 await c.execute('SELECT pg_advisory_xact_lock($1)',LOCK)
-                if await c.fetchval("SELECT count(*) FROM canary_trade_intents WHERE status IN ('claimed','open','recovery','submitting_entry','submitting_exit','uncertain')"):
+                if await c.fetchval("SELECT count(*) FROM canary_trade_intents WHERE status IN ('claimed','open','submitting_entry','submitting_exit','uncertain')"):
                     raise ValueError('unresolved_position')
                 if action=='arm':
                     if not await c.fetchval("SELECT 1 FROM canary_trade_intents WHERE status='closed' AND execution->>'mode'='dry' AND execution ? 'exit_quote' AND execution ? 'eligible_since' AND observed_at >= (execution->>'eligible_since')::timestamptz AND broadcast=false LIMIT 1"):

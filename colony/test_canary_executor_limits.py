@@ -135,4 +135,11 @@ class CanarySubmissionPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('UPDATE canary_control SET armed=false',rendered)
         self.assertTrue(any(args and args[1]=='recovery' for _,args in c.executed if len(args)>1))
 
+
+class RecoveryArmingPolicyTests(unittest.TestCase):
+    def test_recovery_is_not_an_unresolved_arm_blocker(self):
+        blocking={'claimed','open','submitting_entry','submitting_exit','uncertain'}
+        self.assertNotIn('recovery',blocking)
+        self.assertIn('uncertain',blocking)
+
 if __name__=='__main__': unittest.main()
