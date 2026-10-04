@@ -158,3 +158,14 @@ The two historical bug exposures were migrated to `status=recovery` only after p
 - The first generic sender implementation produced failed compute-budget transactions; all seven accounts remained open. It cost about 0.00002065 SOL total. The route was changed to the signed raw-transaction pattern used by Gateway's existing Solana unwrap path.
 - Automatic rent reclamation is NOT enabled yet. Require one successful live close and on-chain/wallet reconciliation before scheduling it.
 - Git implementation commit: 70ba2ef.
+
+## Swarm strategic-review reliability — 2026-10-04
+- Recurrent 45s ReadTimeout after campaigns 39 and 40 traced to a hard strategic-review HTTP timeout, not host contention.
+- Strategic review is now queued by Breeding Queen and processed asynchronously by Swarm Queen; campaign/cooldown progression never waits for advisory model latency.
+- Strategic-review timeout raised from 45s to 120s only; normal Swarm loop remains unchanged and research-safe.
+- Stale `running` strategic requests older than 10 minutes are recovered to pending after daemon interruption.
+- Validation: an older pending review completed successfully in 66.17s, which would have failed under the old 45s limit. Campaigns 39 and 40 were selectively requeued from saved evidence and both completed successfully without rerunning either campaign.
+- Restart testing exposed a separate cadence bug: restarting `queen-survival` bypassed the 24h campaign cooldown and launched campaign 41 early. Campaign 41 completed and is retained as real history; no records were falsified or deleted.
+- Breeding cooldown is now restart-safe using the persisted `queen_survival_state.json` completion timestamp. Verified live after restart with `breeding_cooldown_resumed` and ~86,259s remaining.
+- Full colony suite passed: 105 tests.
+- Commits: `739c0c6` (non-blocking strategic reviews), `e0f02df` (restart-safe Queen cooldown).
