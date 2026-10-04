@@ -23,6 +23,18 @@ def save_state(x):
 
 async def main():
     await init_db(); campaign=int(load_memory().get('campaigns',0) or 0)
+    # Preserve the campaign cooldown across container/process restarts.
+    cooldown=max(300,int(os.getenv('QUEEN_CAMPAIGN_COOLDOWN_SECONDS','86400')))
+    try:
+        with open(STATE) as f: previous=json.load(f)
+    except Exception:
+        previous={}
+    completed_at=float(previous.get('completed_at',0) or 0)
+    if int(previous.get('campaign',0) or 0) >= campaign and completed_at:
+        remaining=max(0.0,completed_at+cooldown-time.time())
+        if remaining>0:
+            print(json.dumps({'event':'breeding_cooldown_resumed','seconds':round(remaining,1),'campaign':int(previous.get('campaign',campaign) or campaign)}),flush=True)
+            await asyncio.sleep(remaining)
     while True:
         campaign+=1
         async with connection() as c:
