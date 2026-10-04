@@ -193,3 +193,13 @@ The two historical bug exposures were migrated to `status=recovery` only after p
 - Validation: 113/113 tests pass; deployed executor reports target_bps=50, recheck=60s, wait=90s, min_confidence=0.70, and no deadline halt path.
 - Pre-arm verification: Canary remains stopped/disarmed; intent 130 remains recovery with no exit signature; no operational (`shadow=false`) Recovery assessment has fired.
 - Commit: `ca88b6d`.
+
+## Queen recovery cleanup and accounting v2 — 2026-10-04
+- Fixed recovery-assessment audit mode: operational requests now emit `shadow=false` and `mode=operational`; shadow replays emit `mode=shadow`.
+- Superseded look-ahead/parser-development assessment rows remain preserved but are terminal audit records, not unfinished work.
+- #130 closed successfully after Queen classified `GENUINE_SLIDE` at 0.95 confidence; `exit_first_safe` remained sticky through pre-broadcast slippage rejects until a safe exit landed.
+- Canary remained armed throughout the recovery/exit sequence.
+- Canary close accounting now separates trade basis, wallet deltas, network fees, non-trade entry overhead, gross exit, market P&L, market P&L after network fees, and liquid-wallet delta.
+- #130 is reconciled as `canary_execution_v2`: entry fee 0.000010907 SOL, exit fee 0.000009330 SOL, known recoverable rent 0.001488440 SOL, and net economic loss after known rent of about 0.001816235 SOL.
+- Older eight closed live trades are explicitly tagged `legacy_v1`; they were not bulk-rewritten because the historical on-chain reconciliation batch was blocked by a platform safeguard.
+- Full colony suite passed 115/115 after cleanup. Commit: f9db422.
