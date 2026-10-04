@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+MODE="${1:-simulate}"
+if [ "$MODE" = "execute-one" ]; then ARG="--execute-one"; else ARG=""; fi
+docker compose run --rm --no-deps -T -v "$PWD:/app" -e PYTHONPATH=/app canary-executor python -m colony.canary_rent_reclaimer $ARG

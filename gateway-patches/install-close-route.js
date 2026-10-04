@@ -1,0 +1,12 @@
+"use strict";
+const fs=require('fs');
+const p='/home/gateway/dist/chains/chain.routes.js';
+let s=fs.readFileSync(p,'utf8');
+const importMarker='const wrap_2 = require("./solana/routes/wrap");';
+if(!s.includes(importMarker)) throw Error('chain route import marker changed');
+s=s.replace(importMarker, importMarker+'\nconst close_token_account_1 = require("./solana/routes/close-token-account");');
+const registerMarker='    fastify.register(async (evm) => {';
+if(!s.includes(registerMarker)) throw Error('chain route register marker changed');
+const route=`    fastify.post('/solana/close-token-account', async (request) => {\n        return (0, close_token_account_1.closeTokenAccountSolana)(fastify, request.body);\n    });\n`;
+s=s.replace(registerMarker, route+registerMarker);
+fs.writeFileSync(p,s);
