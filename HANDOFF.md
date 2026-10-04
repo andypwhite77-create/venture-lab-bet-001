@@ -169,3 +169,16 @@ The two historical bug exposures were migrated to `status=recovery` only after p
 - Breeding cooldown is now restart-safe using the persisted `queen_survival_state.json` completion timestamp. Verified live after restart with `breeding_cooldown_resumed` and ~86,259s remaining.
 - Full colony suite passed: 105 tests.
 - Commits: `739c0c6` (non-blocking strategic reviews), `e0f02df` (restart-safe Queen cooldown).
+
+## Shadow Swarm Recovery Assessment — 2026-10-04
+- Added `colony/recovery_assessment.py`: auditable Swarm Queen classifier for `NORMAL_FLUCTUATION`, `GENUINE_SLIDE`, or `UNCERTAIN`.
+- Classifier is advisory-only: no Gateway execution, wallet signing, Canary control mutation, risk-limit changes, or trade authority.
+- Full evidence is persisted; model receives a compact bounded snapshot. Malformed/time-out output fails to `UNCERTAIN`.
+- Historical replay is strictly cut off at each Recovery deadline. An initial replay that admitted later same-token observations was marked `superseded_lookahead`; it is retained for audit and must not be treated as valid evidence.
+- Corrected shadow checks: intent 117 (deadline loser) -> `GENUINE_SLIDE`; intents 114/118/119/120 -> `NORMAL_FLUCTUATION`. The latter had already reached break-even/better within Recovery, so they are sanity checks, not independent predictive proof.
+- Intent 130 deadline snapshot: strategy horizon -14.34%; last executable-min Recovery estimate -6.62%; Queen classified `NORMAL_FLUCTUATION` (0.85 confidence).
+- Later read-only live quote for intent 130 deteriorated to roughly -30% to -33% vs trade basis; current reassessment flipped to `GENUINE_SLIDE` (0.95 confidence). No sell was submitted.
+- Qwen3 4B was tested but is too slow for the current host/deadline path (one 60s timeout; one ~49s answer). Fast primary remains qwen3:1.7b; prose is non-authoritative.
+- Swarm daemon processes Recovery assessments in its own async task, separate from normal five-minute Swarm and strategic-review work.
+- Regression suite: 110/110 passing. Git commit `c2a89f5`.
+- Canary executor was not rebuilt or modified by this deployment. Intent 130 remains `recovery`, no exit signature, Canary remains stopped pending explicit next-step decision.
