@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from db import connection, init_db
 from colony.canary_controller import ensure_schema as controller_schema, rpc_call, wallet_address, wallet_balance_sol
 from colony.paper_economics import sol_gbp_rate
+from colony.recovery_assessment import ensure_schema as recovery_assessment_schema, build_snapshot as build_recovery_snapshot
 
 EXPECTED='j4nCnM29iyZx9n8oKHXBk8HNJESZb5yaBsA1VkvtkGZ'
 SOL='So11111111111111111111111111111111111111112'
@@ -19,6 +20,10 @@ LOCK=84619320
 RESERVE_SOL=0.003 # rent + bounded network/priority fees, including exit
 RECOVERY_WINDOW_SECONDS=int(os.getenv('CANARY_RECOVERY_WINDOW_SECONDS','900'))
 RECOVERY_RETRY_SECONDS=int(os.getenv('CANARY_RECOVERY_RETRY_SECONDS','15'))
+RECOVERY_TARGET_BPS=float(os.getenv('CANARY_RECOVERY_TARGET_BPS','50'))
+RECOVERY_ASSESSMENT_RECHECK_SECONDS=int(os.getenv('CANARY_RECOVERY_ASSESSMENT_RECHECK_SECONDS','60'))
+RECOVERY_ASSESSMENT_WAIT_SECONDS=int(os.getenv('CANARY_RECOVERY_ASSESSMENT_WAIT_SECONDS','90'))
+RECOVERY_ASSESSMENT_MIN_CONFIDENCE=float(os.getenv('CANARY_RECOVERY_ASSESSMENT_MIN_CONFIDENCE','0.70'))
 
 async def schema():
     await controller_schema()
@@ -134,9 +139,72 @@ def exit_pnl_sol(q,data):
 def recovery_should_exit(q,data,now=None):
     now=time.time() if now is None else float(now)
     pnl=exit_pnl_sol(q,data)
-    if pnl>=0: return True,'break_even_or_better',pnl
-    if now>=float(data['recovery_deadline']): return True,'deadline',pnl
+    target=entry_trade_basis_sol(data)*(RECOVERY_TARGET_BPS/10000.0)
+    if pnl>=target: return True,'small_profit_or_better',pnl
+    if data.get('recovery_policy')=='exit_first_safe':
+        return True,'exit_first_safe',pnl
     return False,'wait',pnl
+
+async def request_recovery_assessment(c,row,data,q=None,quote_error=None,now=None):
+    now=time.time() if now is None else float(now)
+    await recovery_assessment_schema(c)
+    pending=await c.fetchrow("""SELECT id,status,requested_at FROM recovery_assessment_requests
+      WHERE intent_id=$1 AND shadow=false AND status IN ('pending','running') ORDER BY id DESC LIMIT 1""",row['id'])
+    if pending:
+        data['recovery_assessment_request_id']=int(pending['id'])
+        data['recovery_assessment_requested_at']=pending['requested_at'].timestamp()
+        return int(pending['id'])
+    deadline=float(data.get('recovery_deadline') or now)
+    kind='deadline' if now<=deadline+RECOVERY_ASSESSMENT_RECHECK_SECONDS else 'current'
+    evidence=await build_recovery_snapshot(c,row['id'],kind)
+    if q is not None:
+        pnl=exit_pnl_sol(q,data)
+        evidence['current_quote']={
+          'valid':True,'validation_reason':None,'amount_out_sol':float(q['amountOut']),
+          'min_out_sol':float(q['minAmountOut']),'pnl_pct':100.0*pnl/entry_trade_basis_sol(data),
+          'price_impact_pct':float(q['priceImpactPct'])}
+    else:
+        evidence['current_quote']={'valid':False,'validation_reason':str(quote_error or 'unavailable')}
+    req_id=await c.fetchval("""INSERT INTO recovery_assessment_requests(intent_id,shadow,assessment_kind,evidence)
+      VALUES($1,false,$2,$3::jsonb) RETURNING id""",row['id'],kind,json.dumps(evidence,default=str))
+    data['recovery_assessment_request_id']=int(req_id)
+    data['recovery_assessment_requested_at']=now
+    data['recovery_assessment_kind']=kind
+    data['recovery_assessment_count']=int(data.get('recovery_assessment_count') or 0)+1
+    return int(req_id)
+
+async def consume_recovery_assessment(c,row,data,now=None):
+    now=time.time() if now is None else float(now)
+    req_id=data.get('recovery_assessment_request_id')
+    if not req_id:return None
+    r=await c.fetchrow("SELECT status,result,requested_at FROM recovery_assessment_requests WHERE id=$1 AND intent_id=$2 AND shadow=false",int(req_id),row['id'])
+    if not r:return None
+    age=max(0.0,now-r['requested_at'].timestamp())
+    if r['status']!='complete':
+        if age<RECOVERY_ASSESSMENT_WAIT_SECONDS:return None
+        result={'classification':'UNCERTAIN','confidence':0.0,'reason':'assessment_timeout'}
+    else:
+        result=r['result'] if isinstance(r['result'],dict) else json.loads(r['result'] or '{}')
+    cls=str(result.get('classification') or 'UNCERTAIN')
+    try:confidence=float(result.get('confidence') or 0.0)
+    except Exception:confidence=0.0
+    if cls not in ('NORMAL_FLUCTUATION','GENUINE_SLIDE','UNCERTAIN'):
+        cls='UNCERTAIN';confidence=0.0
+    effective=cls if confidence>=RECOVERY_ASSESSMENT_MIN_CONFIDENCE else 'UNCERTAIN'
+    data['recovery_assessment_last_id']=int(req_id)
+    data['recovery_assessment_last_classification']=cls
+    data['recovery_assessment_last_confidence']=confidence
+    data['recovery_assessment_last_effective']=effective
+    data['recovery_assessment_last_reason']=str(result.get('reason') or '')[:180]
+    data.pop('recovery_assessment_request_id',None)
+    data.pop('recovery_assessment_requested_at',None)
+    if effective=='NORMAL_FLUCTUATION':
+        data['recovery_policy']='hold_for_small_profit'
+        data['recovery_assessment_next_at']=now+RECOVERY_ASSESSMENT_RECHECK_SECONDS
+        return 'hold'
+    data['recovery_policy']='exit_first_safe'
+    data['recovery_assessment_next_at']=now
+    return 'exit'
 
 def limits(row,rate,balance):
     if wallet_address()!=EXPECTED: raise ValueError('wallet_mismatch')
@@ -321,8 +389,16 @@ async def tick():
                     data['recovery_last_attempt_at']=now
                     data['recovery_next_at']=now+RECOVERY_RETRY_SECONDS
                     if now>=float(data['recovery_deadline']):
-                        await save(c,row,'recovery',data,'recovery_deadline_no_safe_quote')
-                        await halt(c,'recovery_deadline_no_safe_quote')
+                        if data.get('recovery_policy')=='exit_first_safe':
+                            await save(c,row,'recovery',data,'recovery_exit_waiting_for_safe_quote')
+                            return
+                        decision=await consume_recovery_assessment(c,row,data,now)
+                        if decision is None and now>=float(data.get('recovery_assessment_next_at',0)):
+                            await save(c,row,'recovery',data,'recovery_awaiting_queen')
+                            await request_recovery_assessment(c,row,data,None,e.code,now)
+                        elif decision=='hold':
+                            data['recovery_next_at']=now+RECOVERY_RETRY_SECONDS
+                        await save(c,row,'recovery',data,'recovery_exit_waiting_for_safe_quote' if data.get('recovery_policy')=='exit_first_safe' else 'recovery_awaiting_queen')
                     else:
                         await save(c,row,'recovery',data,data['recovery_last_reason'])
                     return
@@ -330,12 +406,23 @@ async def tick():
                 data['recovery_last_quote']=q
                 data['recovery_last_pnl_sol']=pnl
                 data['recovery_last_attempt_at']=now
+                best=data.get('recovery_best_pnl_sol')
+                if best is None or pnl>best:
+                    data['recovery_best_pnl_sol']=pnl; data['recovery_best_quote']=q
+                if not should_exit and now>=float(data['recovery_deadline']):
+                    decision=await consume_recovery_assessment(c,row,data,now)
+                    if decision=='exit':
+                        should_exit,why,pnl=recovery_should_exit(q,data,now)
+                    elif decision is None and now>=float(data.get('recovery_assessment_next_at',0)):
+                        await save(c,row,'recovery',data,'recovery_awaiting_queen')
+                        await request_recovery_assessment(c,row,data,q,None,now)
+                    if not should_exit:
+                        data['recovery_next_at']=now+RECOVERY_RETRY_SECONDS
+                        await save(c,row,'recovery',data,'recovery_queen_hold' if data.get('recovery_policy')=='hold_for_small_profit' else 'recovery_awaiting_queen')
+                        return
                 if not should_exit:
                     data['recovery_next_at']=now+RECOVERY_RETRY_SECONDS
-                    best=data.get('recovery_best_pnl_sol')
-                    if best is None or pnl>best:
-                        data['recovery_best_pnl_sol']=pnl; data['recovery_best_quote']=q
-                    await save(c,row,'recovery',data,'recovery_waiting_for_breakeven')
+                    await save(c,row,'recovery',data,'recovery_waiting_for_small_profit')
                     return
                 data['recovery_exit_reason']=why
                 balance=await asyncio.to_thread(wallet_balance_sol)

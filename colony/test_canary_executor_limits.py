@@ -82,24 +82,43 @@ class CanaryLimitTests(unittest.TestCase):
         should,why,pnl=ce.recovery_should_exit(q,data,100.0)
         self.assertFalse(should); self.assertEqual(why,'wait'); self.assertAlmostEqual(pnl,-0.001)
 
-    def test_recovery_exits_at_breakeven(self):
+    def test_recovery_exits_at_small_profit_target(self):
         q={'minAmountOut':'0.0101'}
         data={'entry_spent_sol':0.01,'recovery_deadline':200.0}
         should,why,_=ce.recovery_should_exit(q,data,100.0)
-        self.assertTrue(should); self.assertEqual(why,'break_even_or_better')
+        self.assertTrue(should); self.assertEqual(why,'small_profit_or_better')
 
-    def test_recovery_exits_safe_quote_at_deadline(self):
+    def test_recovery_does_not_force_loss_only_because_deadline_passed(self):
         q={'minAmountOut':'0.009'}
         data={'entry_spent_sol':0.01,'recovery_deadline':100.0}
         should,why,_=ce.recovery_should_exit(q,data,100.0)
-        self.assertTrue(should); self.assertEqual(why,'deadline')
+        self.assertFalse(should); self.assertEqual(why,'wait')
+
+    def test_recovery_exit_first_safe_is_sticky_loss_exit(self):
+        q={'minAmountOut':'0.009'}
+        data={'entry_spent_sol':0.01,'recovery_deadline':100.0,'recovery_policy':'exit_first_safe'}
+        should,why,pnl=ce.recovery_should_exit(q,data,200.0)
+        self.assertTrue(should); self.assertEqual(why,'exit_first_safe'); self.assertAlmostEqual(pnl,-0.001)
+
+    def test_recovery_waits_for_nominal_breakeven_below_fee_buffer(self):
+        q={'minAmountOut':'0.01001'}
+        data={'entry_spent_sol':0.01,'recovery_deadline':100.0}
+        should,why,_=ce.recovery_should_exit(q,data,200.0)
+        self.assertFalse(should); self.assertEqual(why,'wait')
 
     def test_recovery_basis_uses_swap_input_not_wallet_delta(self):
         q={'minAmountOut':'0.0111'}
         data={'entry_spent_sol':0.0139,'entry_quote':{'amountIn':'0.0110'},'recovery_deadline':200.0}
         should,why,pnl=ce.recovery_should_exit(q,data,100.0)
-        self.assertTrue(should); self.assertEqual(why,'break_even_or_better'); self.assertAlmostEqual(pnl,0.0001)
+        self.assertTrue(should); self.assertEqual(why,'small_profit_or_better'); self.assertAlmostEqual(pnl,0.0001)
 
+
+
+    def test_recovery_deadline_path_no_longer_halts_on_safe_quote_problem(self):
+        import inspect
+        src=inspect.getsource(ce.tick)
+        self.assertNotIn("halt(c,'recovery_deadline_no_safe_quote')",src)
+        self.assertIn("recovery_exit_waiting_for_safe_quote",src)
 
 class _FakeConn:
     def __init__(self):
