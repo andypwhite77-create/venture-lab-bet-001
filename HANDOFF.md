@@ -182,3 +182,14 @@ The two historical bug exposures were migrated to `status=recovery` only after p
 - Swarm daemon processes Recovery assessments in its own async task, separate from normal five-minute Swarm and strategic-review work.
 - Regression suite: 110/110 passing. Git commit `c2a89f5`.
 - Canary executor was not rebuilt or modified by this deployment. Intent 130 remains `recovery`, no exit signature, Canary remains stopped pending explicit next-step decision.
+
+## Queen-guided live Recovery — 2026-10-04
+- Canary Recovery now consumes bounded Swarm Queen assessments after the original 15-minute recovery window; Queen remains advisory and has no wallet/signing authority.
+- Recovery target is +0.50% on the safe executable minimum versus trade basis, providing a small buffer over recent ~0.32% round-trip chain fees.
+- At/after deadline: NORMAL_FLUCTUATION >=0.70 confidence keeps holding for the small-profit target and triggers reassessment every 60s; GENUINE_SLIDE >=0.70 becomes sticky `exit_first_safe`; UNCERTAIN/low confidence/malformed/90s timeout also becomes `exit_first_safe`.
+- `exit_first_safe` never relaxes quote/slippage/price-impact validation; if a quote is unsafe or Gateway rejects pre-broadcast, Recovery keeps inventory and retries rather than disarming Canary.
+- Routine recovery deadline/quote events no longer call `halt()`. One-position discipline still prevents fresh entries while a recovery row is active.
+- Existing safety halts remain for genuinely ambiguous/failed transaction states and unexpected executor faults.
+- Validation: 113/113 tests pass; deployed executor reports target_bps=50, recheck=60s, wait=90s, min_confidence=0.70, and no deadline halt path.
+- Pre-arm verification: Canary remains stopped/disarmed; intent 130 remains recovery with no exit signature; no operational (`shadow=false`) Recovery assessment has fired.
+- Commit: `ca88b6d`.
