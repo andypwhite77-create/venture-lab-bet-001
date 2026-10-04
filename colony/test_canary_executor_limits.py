@@ -133,6 +133,16 @@ class _FakeConn:
     async def execute(self,sql,*args):
         self.executed.append((sql,args))
 
+class CanaryAccountingPolicyTests(unittest.TestCase):
+    def test_reconcile_records_separate_accounting_layers(self):
+        import inspect
+        src=inspect.getsource(ce.reconcile)
+        for field in ("entry_network_fee_sol","entry_non_trade_overhead_sol","exit_network_fee_sol",
+                      "exit_gross_sol","realized_market_pnl_sol","realized_network_fees_sol",
+                      "realized_market_pnl_after_network_fees_sol","realized_liquid_wallet_delta_sol"):
+            self.assertIn(field,src)
+
+
 class CanarySubmissionPolicyTests(unittest.IsolatedAsyncioTestCase):
     async def test_entry_prebroadcast_rejection_does_not_halt_canary(self):
         c=_FakeConn(); row={'id':1}; data={}

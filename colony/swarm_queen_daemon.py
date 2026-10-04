@@ -25,7 +25,7 @@ async def main(interval=None):
                     except Exception:
                         logging.exception('swarm_strategic_error')
                 strategic_task=asyncio.create_task(process_pending())
-            # Recovery assessment is advisory-only and must never block Swarm or strategic review.
+            # Recovery assessment is advisory and must never block Swarm or strategic review.
             if recovery_task is None or recovery_task.done():
                 if recovery_task is not None:
                     try:

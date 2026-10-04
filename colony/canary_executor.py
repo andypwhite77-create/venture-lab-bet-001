@@ -266,14 +266,35 @@ async def reconcile(c,row):
     if leg=='entry':
         if delta<=0: raise ValueError('missing_fill')
         data['tokens']=delta; data['exit_at']=time.time()+row['hold_minutes']*60
-        data['entry_spent_sol']=(meta['preBalances'][idx]-meta['postBalances'][idx])/1e9
+        entry_wallet_delta=(meta['preBalances'][idx]-meta['postBalances'][idx])/1e9
+        entry_fee=float(meta.get('fee') or 0)/1e9
+        basis=entry_trade_basis_sol(data)
+        data['entry_spent_sol']=entry_wallet_delta  # legacy alias: full liquid-wallet decrease
+        data['entry_wallet_delta_sol']=entry_wallet_delta
+        data['entry_network_fee_sol']=entry_fee
+        data['entry_non_trade_overhead_sol']=max(0.0,entry_wallet_delta-basis-entry_fee)
         await save(c,row,'open',data)
     else:
         if delta>=0 or abs(delta+data['tokens'])>max(1e-9,data['tokens']*1e-6): raise ValueError('exit_fill_mismatch')
         data['closed_at']=datetime.now(timezone.utc).isoformat()
-        data['exit_received_sol']=(meta['postBalances'][idx]-meta['preBalances'][idx])/1e9
-        data['realized_treasury_pnl_sol']=data['exit_received_sol']-float(data['entry_spent_sol'])
-        data['realized_trade_pnl_sol']=data['exit_received_sol']-entry_trade_basis_sol(data)
+        exit_wallet_delta=(meta['postBalances'][idx]-meta['preBalances'][idx])/1e9
+        exit_fee=float(meta.get('fee') or 0)/1e9
+        exit_gross=exit_wallet_delta+exit_fee
+        basis=entry_trade_basis_sol(data)
+        entry_fee=float(data.get('entry_network_fee_sol') or 0.0)
+        market_pnl=exit_gross-basis
+        network_fees=entry_fee+exit_fee
+        liquid_delta=exit_wallet_delta-float(data.get('entry_wallet_delta_sol',data['entry_spent_sol']))
+        data['exit_received_sol']=exit_wallet_delta  # legacy alias: net liquid-wallet increase
+        data['exit_wallet_delta_sol']=exit_wallet_delta
+        data['exit_network_fee_sol']=exit_fee
+        data['exit_gross_sol']=exit_gross
+        data['realized_market_pnl_sol']=market_pnl
+        data['realized_network_fees_sol']=network_fees
+        data['realized_market_pnl_after_network_fees_sol']=market_pnl-network_fees
+        data['realized_liquid_wallet_delta_sol']=liquid_delta
+        data['realized_trade_pnl_sol']=market_pnl  # normalized legacy alias
+        data['realized_treasury_pnl_sol']=liquid_delta  # legacy alias; may include locked recoverable rent
         await save(c,row,'closed',data)
 
 async def submit(c,row,data,q,leg):

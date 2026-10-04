@@ -1,7 +1,8 @@
-"""Shadow-only Swarm Queen recovery classifier.
+"""Advisory Swarm Queen recovery classifier.
 
 Produces auditable market-regime advice for live inventory recovery. It has no
-wallet, Gateway, signing, Canary-control or execution authority.
+wallet, Gateway, signing, Canary-control or execution authority. Shadow and
+operational requests use the same classifier; only the executor may act on advice.
 """
 import json, os, time
 from datetime import datetime, timezone
@@ -155,8 +156,9 @@ async def enqueue(intent_id:int,assessment_kind:str='deadline'):
         if existing:return int(existing)
         return int(await c.fetchval("INSERT INTO recovery_assessment_requests(intent_id,assessment_kind,evidence) VALUES($1,$2,$3::jsonb) RETURNING id",intent_id,assessment_kind,json.dumps(evidence,default=str)))
 
-async def review(evidence):
-    started=time.time(); out={'classification':'UNCERTAIN','confidence':0.0,'reason':'classifier_unavailable','evidence_keys':[],'model':MODEL,'shadow':True}
+async def review(evidence,shadow=True):
+    shadow=bool(shadow)
+    started=time.time(); out={'classification':'UNCERTAIN','confidence':0.0,'reason':'classifier_unavailable','evidence_keys':[],'model':MODEL,'shadow':shadow,'mode':'shadow' if shadow else 'operational'}
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as h:
             r=await h.post(OLLAMA,json={'model':MODEL,'prompt':_prompt(evidence),'stream':False,'format':RESULT_SCHEMA,'think':False,
@@ -177,10 +179,10 @@ async def process_pending():
         await c.execute("UPDATE recovery_assessment_requests SET status='pending',started_at=NULL WHERE status='running' AND started_at < now()-interval '10 minutes'")
         req=await c.fetchrow("""UPDATE recovery_assessment_requests SET status='running',started_at=now()
           WHERE id=(SELECT id FROM recovery_assessment_requests WHERE status='pending' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED)
-          RETURNING id,intent_id,assessment_kind,evidence""")
+          RETURNING id,intent_id,shadow,assessment_kind,evidence""")
     if not req:return None
     evidence=_obj(req['evidence'])
-    out=await review(evidence)
+    out=await review(evidence,bool(req['shadow']))
     async with connection() as c:
         await c.execute("UPDATE recovery_assessment_requests SET status='complete',result=$2::jsonb,completed_at=now() WHERE id=$1",req['id'],json.dumps(out))
     return {'request_id':int(req['id']),'intent_id':int(req['intent_id']),'assessment_kind':req['assessment_kind'],**out}

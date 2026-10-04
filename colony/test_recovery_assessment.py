@@ -36,3 +36,21 @@ class RecoveryAssessmentParserTests(unittest.TestCase):
           'current_quote':{'pnl_pct':-20},'danger_flags':['x']})
         self.assertNotIn('market_path',x)
         self.assertEqual(x['current_quote']['pnl_pct'],-20)
+
+
+class RecoveryAssessmentModeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_operational_result_is_not_labeled_shadow(self):
+        from colony import recovery_assessment as ra
+        from unittest.mock import patch
+        class Resp:
+            def raise_for_status(self): pass
+            def json(self):
+                return {'response':'{"classification":"UNCERTAIN","confidence":0.5,"reason":"insufficient evidence","evidence_keys":[]}'}
+        class Client:
+            async def __aenter__(self): return self
+            async def __aexit__(self,*args): pass
+            async def post(self,*args,**kwargs): return Resp()
+        with patch.object(ra.httpx,'AsyncClient',return_value=Client()):
+            out=await ra.review({},shadow=False)
+        self.assertFalse(out['shadow'])
+        self.assertEqual(out['mode'],'operational')
