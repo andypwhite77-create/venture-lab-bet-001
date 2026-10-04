@@ -149,3 +149,12 @@ Commit `29117b6` adds an explicit Recovery state and exit-only recovery mode. At
 Commit `6e17050` separates strategy/recovery basis from treasury plumbing cost. Recovery compares the exit to the actual swap input (`entry_trade_sol` / entry quote amount), not the full wallet SOL delta that may include one-time token-account rent and transaction plumbing. Full wallet-delta treasury P&L and trade P&L are recorded separately on close. Regression suite: 103/103 passing.
 
 The two historical bug exposures were migrated to `status=recovery` only after proving their successful on-chain entries and current token balances. Recovery-only execution was explicitly enabled; normal Canary remained unarmed. Operator stop still means no transactions. `scripts/canary-recover` explicitly enables exits-only recovery and starts the executor.
+
+## Canary rent reclamation — 2026-10-04
+- Seven empty speculative Token-2022 accounts currently hold 0.01059688 SOL of reclaimable rent; USDC is deliberately excluded.
+- Gateway now has a narrowly scoped close-token-account route: destination is always the same Canary wallet, token owner/mint/program/zero balance are revalidated on-chain, and the wallet key remains inside Gateway.
+- `./scripts/canary-rent-reclaim simulate` discovers eligible closed-live Canary mints and simulates closures; all seven current accounts pass.
+- `./scripts/canary-rent-reclaim execute-one` is intentionally limited to exactly one live account and never retries an ambiguous submission.
+- The first generic sender implementation produced failed compute-budget transactions; all seven accounts remained open. It cost about 0.00002065 SOL total. The route was changed to the signed raw-transaction pattern used by Gateway's existing Solana unwrap path.
+- Automatic rent reclamation is NOT enabled yet. Require one successful live close and on-chain/wallet reconciliation before scheduling it.
+- Git implementation commit: 70ba2ef.
