@@ -63,17 +63,8 @@ async def main():
                 async with connection() as sc:
                     await sc.execute("CREATE TABLE IF NOT EXISTS swarm_strategy_requests(id BIGSERIAL PRIMARY KEY,campaign INTEGER NOT NULL UNIQUE,requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),started_at TIMESTAMPTZ,completed_at TIMESTAMPTZ,status TEXT NOT NULL DEFAULT 'pending',result JSONB)")
                     await sc.execute("INSERT INTO swarm_strategy_requests(campaign) VALUES($1) ON CONFLICT(campaign) DO NOTHING",persistent_campaign)
-                deadline=time.time()+180; result=None
-                while time.time()<deadline:
-                    async with connection() as sc:
-                        row=await sc.fetchrow("SELECT status,result FROM swarm_strategy_requests WHERE campaign=$1",persistent_campaign)
-                    if row and row['status'] in ('complete','error'):
-                        result=row['result']; result=json.loads(result) if isinstance(result,str) else dict(result or {})
-                        print(json.dumps({'event':'swarm_strategic_review','campaign':persistent_campaign,'status':row['status'],'model':result.get('model'),'seconds':result.get('seconds'),'priorities':result.get('priorities',[])[:3]}),flush=True)
-                        break
-                    await asyncio.sleep(2)
-                if result is None:
-                    print(json.dumps({'event':'swarm_strategic_review_timeout','campaign':persistent_campaign}),flush=True)
+                # Advisory review is queued only. Breeding/cooldown never waits for model latency.
+                print(json.dumps({'event':'swarm_strategic_review_queued','campaign':persistent_campaign}),flush=True)
             except Exception as ex:
                 print(json.dumps({'event':'swarm_strategic_review_error','campaign':persistent_campaign,'error':repr(ex)[:180]}),flush=True)
         cooldown=max(300,int(os.getenv('QUEEN_CAMPAIGN_COOLDOWN_SECONDS','86400')))

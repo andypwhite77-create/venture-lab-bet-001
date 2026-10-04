@@ -9,6 +9,7 @@ from colony.queen_roles import SWARM_QUEEN, ROLE_VERSION
 
 MODEL=os.getenv('SWARM_STRATEGIC_MODEL','qwen3:1.7b')
 OLLAMA=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
+STRATEGIC_TIMEOUT_SECONDS=max(60,int(os.getenv('SWARM_STRATEGIC_TIMEOUT_SECONDS','120')))
 
 async def ensure_request_schema(c):
     await c.execute('''CREATE TABLE IF NOT EXISTS swarm_strategy_requests(
@@ -61,7 +62,7 @@ async def review(campaign:int):
     out={'campaign':campaign,'model':MODEL,'role_version':ROLE_VERSION,'role':SWARM_QUEEN,'status':'unavailable','diagnosis':'','priorities':[],'experiments':[],'warnings':[],
          'research_adjustments':{'mode':'balanced','focus_sensors':[],'avoid_sensors':[]}}
     try:
-        async with httpx.AsyncClient(timeout=45) as h:
+        async with httpx.AsyncClient(timeout=STRATEGIC_TIMEOUT_SECONDS) as h:
             r=await h.post(OLLAMA,json={'model':MODEL,'prompt':_prompt(safe),'stream':False,'format':STRATEGY_SCHEMA,'think':False,
                                        'keep_alive':'30m','options':{'num_ctx':1024,'num_predict':180,'temperature':0.0}})
             r.raise_for_status(); x=json.loads(r.json()['response'])
@@ -85,6 +86,8 @@ async def review(campaign:int):
 async def process_pending():
     async with connection() as c:
         await ensure_request_schema(c)
+        # Recover only genuinely stale work after a daemon/container interruption.
+        await c.execute("UPDATE swarm_strategy_requests SET status='pending',started_at=NULL WHERE status='running' AND started_at < now()-interval '10 minutes'")
         req=await c.fetchrow("""UPDATE swarm_strategy_requests SET status='running',started_at=now()
           WHERE id=(SELECT id FROM swarm_strategy_requests WHERE status='pending' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED)
           RETURNING id,campaign""")

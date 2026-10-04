@@ -12,13 +12,20 @@ logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(messa
 async def main(interval=None):
     wake_interval=int(interval or os.getenv('SWARM_QUEEN_INTERVAL_SECONDS','300'))
     poll_interval=max(2,int(os.getenv('SWARM_STRATEGIC_POLL_SECONDS','5')))
-    await init_db(); last_wake=0.0
+    await init_db(); last_wake=0.0; strategic_task=None
     while True:
         try:
-            strategic=await process_pending()
-            if strategic: logging.info('swarm_strategic %s',strategic)
+            # Strategic review is advisory and may be slow. Never let it block the normal Swarm loop.
+            if strategic_task is None or strategic_task.done():
+                if strategic_task is not None:
+                    try:
+                        strategic=strategic_task.result()
+                        if strategic: logging.info('swarm_strategic %s',strategic)
+                    except Exception:
+                        logging.exception('swarm_strategic_error')
+                strategic_task=asyncio.create_task(process_pending())
             now=time.time()
-            if strategic or now-last_wake>=wake_interval:
+            if now-last_wake>=wake_interval:
                 logging.info('swarm_queen %s',await wake(executive_inference=False));last_wake=time.time()
         except Exception:
             logging.exception('swarm_queen_error')
