@@ -165,6 +165,13 @@ class CanarySubmissionPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(args and args[1]=='recovery' for _,args in c.executed if len(args)>1))
 
 
+
+    def test_recovery_loop_handles_gateway_prebroadcast_as_recoverable(self):
+        import inspect
+        src=inspect.getsource(ce.tick)
+        self.assertGreaterEqual(src.count('(QuoteValidationRejected, GatewayPreBroadcastRejected)'),2)
+        self.assertIn("prefix='recovery_gateway_'",src)
+
 class RecoveryArmingPolicyTests(unittest.TestCase):
     def test_recovery_is_not_an_unresolved_arm_blocker(self):
         blocking={'claimed','open','submitting_entry','submitting_exit','uncertain'}

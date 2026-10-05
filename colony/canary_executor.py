@@ -370,12 +370,15 @@ async def tick():
                         if current_control['stopped']: return
                         await save(c,row,'open',data,'simulated_entry')
             elif row['status']=='open' and time.time()>=data['exit_at']:
-                raw=await asyncio.to_thread(raw_quote,row['mint'],SOL,data['tokens'])
+                raw=None
                 try:
+                    raw=await asyncio.to_thread(raw_quote,row['mint'],SOL,data['tokens'])
                     q=validate_quote(raw,row['mint'],SOL,data['tokens'])
-                except QuoteValidationRejected as e:
+                except (QuoteValidationRejected, GatewayPreBroadcastRejected) as e:
                     if data['mode']=='live':
-                        await enter_recovery(c,row,data,'recovery_quote_'+e.code,raw); return
+                        code=e.code if hasattr(e,'code') else type(e).__name__
+                        prefix='recovery_gateway_' if isinstance(e,GatewayPreBroadcastRejected) else 'recovery_quote_'
+                        await enter_recovery(c,row,data,prefix+str(code).lower(),raw); return
                     raise
                 if data['mode']=='live':
                     data['strategy_exit_at']=data.get('exit_at')
@@ -405,8 +408,10 @@ async def tick():
                 try:
                     raw=await asyncio.to_thread(raw_quote,row['mint'],SOL,data['tokens'])
                     q=validate_quote(raw,row['mint'],SOL,data['tokens'])
-                except QuoteValidationRejected as e:
-                    data['recovery_last_reason']='recovery_quote_'+e.code
+                except (QuoteValidationRejected, GatewayPreBroadcastRejected) as e:
+                    code=e.code if hasattr(e,'code') else type(e).__name__
+                    prefix='recovery_gateway_' if isinstance(e,GatewayPreBroadcastRejected) else 'recovery_quote_'
+                    data['recovery_last_reason']=prefix+str(code).lower()
                     data['recovery_last_attempt_at']=now
                     data['recovery_next_at']=now+RECOVERY_RETRY_SECONDS
                     if now>=float(data['recovery_deadline']):
@@ -416,7 +421,7 @@ async def tick():
                         decision=await consume_recovery_assessment(c,row,data,now)
                         if decision is None and now>=float(data.get('recovery_assessment_next_at',0)):
                             await save(c,row,'recovery',data,'recovery_awaiting_queen')
-                            await request_recovery_assessment(c,row,data,None,e.code,now)
+                            await request_recovery_assessment(c,row,data,None,code,now)
                         elif decision=='hold':
                             data['recovery_next_at']=now+RECOVERY_RETRY_SECONDS
                         await save(c,row,'recovery',data,'recovery_exit_waiting_for_safe_quote' if data.get('recovery_policy')=='exit_first_safe' else 'recovery_awaiting_queen')
