@@ -9,8 +9,9 @@ from db import init_db, connection
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 BASE='https://api.geckoterminal.com/api/v2/networks/solana/pools'
-RATE_SLEEP=7.0
+RATE_SLEEP=12.0
 MAX_RETRIES=5
+TRANSIENT_HTTP={401,403,429}
 SIX_MONTHS=int((datetime.now(timezone.utc)-timedelta(days=183)).timestamp())
 
 async def schema(c):
@@ -37,12 +38,20 @@ async def backfill_pair(c,pair):
             try:
                 data=await asyncio.to_thread(fetch,pair,before); break
             except urllib.error.HTTPError as e:
-                if e.code != 429:
-                    logging.warning('backfill_fetch_failed pair=%s err=%s',pair,e); break
+                if e.code not in TRANSIENT_HTTP:
+                    logging.warning('backfill_fetch_failed pair=%s http=%s err=%s',pair,e.code,e); break
                 retry_after=e.headers.get('Retry-After') if e.headers else None
-                delay=float(retry_after) if retry_after and retry_after.isdigit() else min(120.0, 8.0*(2**attempt))
-                delay+=random.uniform(0,2.0)
-                logging.warning('backfill_rate_limited pair=%s attempt=%s sleep=%.1fs',pair,attempt+1,delay)
+                if retry_after and retry_after.isdigit():
+                    delay=float(retry_after)
+                elif e.code in (401,403):
+                    # GeckoTerminal is credential-free here; intermittent 401/403s
+                    # observed during throttle bursts are edge/WAF responses. Back off
+                    # much harder instead of retrying as if credentials were wrong.
+                    delay=min(180.0, 30.0*(attempt+1))
+                else:
+                    delay=min(120.0, 8.0*(2**attempt))
+                delay+=random.uniform(0,3.0)
+                logging.warning('backfill_transient_http pair=%s http=%s attempt=%s sleep=%.1fs',pair,e.code,attempt+1,delay)
                 await asyncio.sleep(delay)
             except Exception as e:
                 logging.warning('backfill_fetch_failed pair=%s err=%s',pair,e); break
