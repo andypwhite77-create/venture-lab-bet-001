@@ -11,7 +11,8 @@ from db import connection
 
 MODEL=os.getenv('SWARM_RECOVERY_MODEL',os.getenv('SWARM_STRATEGIC_MODEL','qwen3:1.7b'))
 OLLAMA=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
-TIMEOUT=max(20,int(os.getenv('SWARM_RECOVERY_TIMEOUT_SECONDS','60')))
+TIMEOUT=max(5,int(os.getenv('SWARM_RECOVERY_TIMEOUT_SECONDS','10')))
+HTTP_TIMEOUT=httpx.Timeout(TIMEOUT,connect=min(3.0,TIMEOUT),read=TIMEOUT,write=min(5.0,TIMEOUT),pool=min(3.0,TIMEOUT))
 
 RESULT_SCHEMA={
   'type':'object',
@@ -160,7 +161,7 @@ async def review(evidence,shadow=True):
     shadow=bool(shadow)
     started=time.time(); out={'classification':'UNCERTAIN','confidence':0.0,'reason':'classifier_unavailable','evidence_keys':[],'model':MODEL,'shadow':shadow,'mode':'shadow' if shadow else 'operational'}
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as h:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as h:
             r=await h.post(OLLAMA,json={'model':MODEL,'prompt':_prompt(evidence),'stream':False,'format':RESULT_SCHEMA,'think':False,
               'keep_alive':'30m','options':{'num_ctx':2048,'num_predict':220,'temperature':0.0}})
             r.raise_for_status(); x=_parse_model_json(r.json().get('response'))
