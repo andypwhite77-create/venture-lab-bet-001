@@ -8,6 +8,7 @@ from db import (
 )
 from marketdata import fetch_prices
 from research_db import due_candidate_outcomes, record_candidate_outcome
+from colony.live_friction import calibration as live_friction_calibration
 
 log = logging.getLogger("signal-engine.evaluator")
 SIGNAL_HORIZONS_MINUTES = (5, 15, 60, 360, 1440)
@@ -50,6 +51,9 @@ async def evaluate_due_research():
     if not rows:
         return {"checked": 0, "recorded": 0}
     prices = await fetch_prices([r["mint"] for r in rows])
+    from db import connection
+    async with connection() as conn:
+        live_friction = await live_friction_calibration(conn)
     recorded = 0
     now = datetime.now(timezone.utc)
     for row in rows:
@@ -61,7 +65,8 @@ async def evaluate_due_research():
         raw = ((price / float(entry)) - 1.0) * 100.0
         if direction == "short":
             raw = -raw
-        cost_bps = float(row.get("assumed_cost_bps") or 80.0)
+        baseline_bps = float(row.get("assumed_cost_bps") or 80.0)
+        cost_bps = max(baseline_bps, float(live_friction["effective_bps"]))
         net = raw - (cost_bps / 100.0)
         await record_candidate_outcome(
             candidate_id=row["candidate_id"],
@@ -73,7 +78,7 @@ async def evaluate_due_research():
             net_return_pct=net,
         )
         recorded += 1
-    return {"checked": len(rows), "recorded": recorded}
+    return {"checked": len(rows), "recorded": recorded, "friction_bps": live_friction["effective_bps"], "friction_source": live_friction["source"], "live_samples": live_friction["sample_count"]}
 
 
 async def evaluator_loop(state):
