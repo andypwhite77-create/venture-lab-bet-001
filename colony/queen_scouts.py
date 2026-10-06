@@ -23,6 +23,7 @@ BLOODLINE_QUALIFY_N=20
 ELITE_PARENT_FRACTION=0.10
 ELITE_PARITY_TOLERANCE_PCT=0.50
 BLOODLINE_IMPROVEMENT_MARGIN_PCT=0.0
+MAX_TRAINING_DAYS=21
 
 MUTATION_CLASSES=(
     ('local', MutationPolicy(numeric_sigma=0.08, mutation_rate=0.20, min_changes=1, max_changes=2)),
@@ -280,9 +281,13 @@ async def advance_lifecycle():
             ref=ref_cache[ref_key]
             inheritance=_inheritance_decision(m,ref)
             to_state=reason=None
+            # Hard research budget: an ungraduated scout does not consume forward evidence forever.
+            # After three weeks, archive it regardless of whether the failure is catastrophic.
+            if age_h>=MAX_TRAINING_DAYS*24:
+                to_state,reason='research_archive','training_budget_expired'
             # Conservative negative-knowledge gate: only archive after enough independent
             # evidence, negative absolute expectancy, and material underperformance vs parent window.
-            if (m['evidence_n']>=GRAVEYARD_MIN_EVIDENCE and m['parent_window_n']>=GRAVEYARD_MIN_PARENT_WINDOW
+            elif (m['evidence_n']>=GRAVEYARD_MIN_EVIDENCE and m['parent_window_n']>=GRAVEYARD_MIN_PARENT_WINDOW
                 and m['mean_return_pct'] is not None and m['mean_return_pct']<GRAVEYARD_BAD_ABSOLUTE_PCT
                 and m['window_edge_vs_parent_pct'] is not None and m['window_edge_vs_parent_pct']<=GRAVEYARD_BAD_EDGE_PCT):
                 to_state,reason='graveyard','evidence_backed_failure'

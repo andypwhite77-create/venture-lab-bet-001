@@ -21,11 +21,31 @@ FOUNDER_ELITES=(
 MIN_FORWARD_EVENTS=25
 MIN_FORWARD_DAYS=3
 PROMOTION_COOLDOWN_SECONDS=int(os.getenv('CHAMPION_PROMOTION_COOLDOWN_SECONDS','259200'))
+MAX_QUALIFICATION_DAYS=int(os.getenv('CHAMPION_MAX_QUALIFICATION_DAYS','21'))
+MAX_QUALIFIERS_PER_BEHAVIOUR=int(os.getenv('CHAMPION_MAX_QUALIFIERS_PER_BEHAVIOUR','2'))
 
 def _cooldown_remaining(last_promotion,now=None,cooldown_seconds=PROMOTION_COOLDOWN_SECONDS):
  if not last_promotion:return 0
  now=now or datetime.now(timezone.utc)
  return max(0,int(cooldown_seconds-(now-last_promotion).total_seconds()))
+
+def _retirement_reason(age_days,forward_n,total_score,worst_incumbent_total):
+ if float(age_days)<MAX_QUALIFICATION_DAYS:return None
+ if int(forward_n)<MIN_FORWARD_EVENTS:return 'training_budget_expired_insufficient_forward_evidence'
+ if worst_incumbent_total is not None and (total_score is None or float(total_score)<=float(worst_incumbent_total)):
+  return 'training_budget_expired_below_incumbent'
+ return None
+
+def _cap_qualification_behaviours(quals,cap=MAX_QUALIFIERS_PER_BEHAVIOUR):
+ counts={};keep=[];retire=[]
+ for q in quals:
+  sig=q.get('sig')
+  n=counts.get(sig,0)
+  if n<int(cap):
+   counts[sig]=n+1;keep.append(q)
+  else:
+   retire.append(q)
+ return keep,retire
 
 async def ensure_schema(c):
  await c.execute("""CREATE TABLE IF NOT EXISTS champion_league(
@@ -34,9 +54,13 @@ async def ensure_schema(c):
    enrolled_at TIMESTAMPTZ NOT NULL DEFAULT now(),promoted_at TIMESTAMPTZ,
    prospective_after_candidate BIGINT NOT NULL DEFAULT 0,behaviour_signature TEXT,
    arena_score DOUBLE PRECISION,forward_score DOUBLE PRECISION,total_score DOUBLE PRECISION,
-   qualification_rank INT,arena_stats JSONB NOT NULL DEFAULT '{}'::jsonb,
+   qualification_rank INT,active BOOLEAN NOT NULL DEFAULT true,retired_at TIMESTAMPTZ,retirement_reason TEXT,
+   arena_stats JSONB NOT NULL DEFAULT '{}'::jsonb,
    forward_stats JSONB NOT NULL DEFAULT '{}'::jsonb,notes JSONB NOT NULL DEFAULT '{}'::jsonb,
    updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+ ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+ ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS retired_at TIMESTAMPTZ;
+ ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS retirement_reason TEXT;
  CREATE UNIQUE INDEX IF NOT EXISTS champion_elite_slot ON champion_league(elite_slot) WHERE pool='elite';
  CREATE TABLE IF NOT EXISTS champion_paper_progress(
    id INT PRIMARY KEY CHECK(id=1),last_candidate_id BIGINT NOT NULL DEFAULT 0,
@@ -119,7 +143,7 @@ async def paper_run_once(c,limit=1000):
   last=int(await c.fetchval('SELECT coalesce(max(id),0) FROM research_candidates') or 0)
   await c.execute('UPDATE champion_paper_progress SET last_candidate_id=$1,initialized_at=now(),updated_at=now() WHERE id=1',last)
  rows=await c.fetch("SELECT id,created_at,mint,features,market FROM research_candidates WHERE id>$1 ORDER BY id LIMIT $2",last,int(limit))
- ants=await c.fetch("SELECT genome_id,genome,prospective_after_candidate FROM champion_league ORDER BY genome_id")
+ ants=await c.fetch("SELECT genome_id,genome,prospective_after_candidate FROM champion_league WHERE active=true ORDER BY genome_id")
  inserted=0
  for rr0 in rows:
   rr=dict(rr0)
@@ -159,7 +183,7 @@ async def _forward_for(c,gid,fixed_gbp):
 
 async def refresh_rankings(c,allow_promotion=True):
  await ensure_schema(c);await sync_corpus(c);rows=await load_rows(c);fee=await measured_roundtrip_network_fee_sol(c);rate,_=sol_gbp_rate();fixed=fee*rate
- ants=await c.fetch('SELECT * FROM champion_league ORDER BY genome_id');computed=[]
+ ants=await c.fetch('SELECT * FROM champion_league WHERE active=true ORDER BY genome_id');computed=[]
  for a in ants:
   g=_json(a['genome']);vals=[];events=[];seen=set()
   for r in rows:
@@ -177,10 +201,28 @@ async def refresh_rankings(c,allow_promotion=True):
   await c.execute("""UPDATE champion_league SET arena_score=$2,forward_score=$3,total_score=$4,behaviour_signature=$5,
     arena_stats=$6::jsonb,forward_stats=$7::jsonb,updated_at=now() WHERE genome_id=$1""",x['genome_id'],x['arena']['score'],x['forward']['score'],x['total'],x['sig'],json.dumps(x['arena']),json.dumps(x['forward']))
  quals=sorted([x for x in computed if x['pool']=='qualification'],key=lambda x:(x['total'] is not None,x['total'] or -1e9),reverse=True)
- for i,x in enumerate(quals,1):await c.execute('UPDATE champion_league SET qualification_rank=$2 WHERE genome_id=$1',x['genome_id'],i)
+ quals,duplicate_retire=_cap_qualification_behaviours(quals)
+ for q in duplicate_retire:
+  await c.execute("UPDATE champion_league SET active=false,retired_at=now(),retirement_reason='duplicate_behaviour_cap',qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",q['genome_id'])
  elites=[x for x in computed if x['pool']=='elite'];promotion=None
  last_promotion=await c.fetchval("SELECT max(promoted_at) FROM champion_league WHERE source<>'reversal_founder' AND promoted_at IS NOT NULL")
  promotion_cooldown_remaining=_cooldown_remaining(last_promotion)
+ # Expire challengers that have consumed three weeks of research budget without
+ # establishing a credible incumbent-beating record. Evidence is retained in-place.
+ worst_total=min((x['total'] for x in elites if x['total'] is not None),default=None)
+ retired=[{'genome_id':q['genome_id'],'reason':'duplicate_behaviour_cap','age_days':None,'forward_n':q['forward'].get('n',0),'total_score':q['total']} for q in duplicate_retire]
+ now=datetime.now(timezone.utc)
+ for q in quals:
+  row=next((a for a in ants if a['genome_id']==q['genome_id']),None)
+  if not row: continue
+  age_days=max(0.0,(now-row['enrolled_at']).total_seconds()/86400.0)
+  if age_days < MAX_QUALIFICATION_DAYS: continue
+  f=q['forward']; reason=_retirement_reason(age_days,f.get('n',0),q['total'],worst_total)
+  if reason:
+   await c.execute("UPDATE champion_league SET active=false,retired_at=now(),retirement_reason=$2,qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",q['genome_id'],reason)
+   retired.append({'genome_id':q['genome_id'],'reason':reason,'age_days':round(age_days,2),'forward_n':f.get('n',0),'total_score':q['total']})
+ quals=[q for q in quals if q['genome_id'] not in {x['genome_id'] for x in retired}]
+ for i,x in enumerate(quals,1):await c.execute('UPDATE champion_league SET qualification_rank=$2 WHERE genome_id=$1',x['genome_id'],i)
  if allow_promotion and len(elites)>=1 and promotion_cooldown_remaining==0:
   worst=min(elites,key=lambda x:x['total'] if x['total'] is not None else -1e9);elite_sigs={x['sig'] for x in elites}
   for q in quals:
@@ -194,4 +236,4 @@ async def refresh_rankings(c,allow_promotion=True):
     await c.execute("UPDATE champion_league SET pool='qualification',elite_slot=NULL,qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",worst['genome_id'])
     await c.execute("UPDATE champion_league SET pool='elite',elite_slot=$2,promoted_at=now(),qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",q['genome_id'],slot)
    promotion={'in':q['genome_id'],'out':worst['genome_id'],'slot':slot,'challenger_total':q['total'],'incumbent_total':worst['total']};break
- return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'promotion':promotion,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}
+ return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'promotion':promotion,'retired':retired,'max_qualification_days':MAX_QUALIFICATION_DAYS,'max_qualifiers_per_behaviour':MAX_QUALIFIERS_PER_BEHAVIOUR,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}

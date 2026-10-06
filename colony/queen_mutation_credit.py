@@ -6,7 +6,8 @@ import json, math, os, time
 
 PATH='/data/queen_mutation_credit.json'
 OPERATORS=('local','standard','wide')
-FLOOR=0.15
+FLOOR=0.10
+RECENT_BLEND=0.65
 
 def _blank():
     return {'version':1,'updated_at':None,'operators':{
@@ -30,13 +31,23 @@ def save(state):
     with open(tmp,'w') as f: json.dump(state,f,indent=2)
     os.replace(tmp,PATH)
 
+def _quality(win_rate,mean_delta):
+    return max(0.05,0.70*float(win_rate)+0.30*(0.5+0.5*math.tanh(float(mean_delta)*4)))
+
 def weights(state=None):
     state=state or load(); raw={}
     for k in OPERATORS:
         z=state['operators'][k]; n=max(0,int(z.get('trials',0)))
         wins=max(0,int(z.get('wins',0))); mean=float(z.get('delta_sum',0.0))/max(1,n)
-        win_rate=(wins+2.0)/(n+4.0)
-        raw[k]=max(0.05,0.70*win_rate+0.30*(0.5+0.5*math.tanh(mean*4)))
+        lifetime=_quality((wins+2.0)/(n+4.0),mean)
+        recent=list(z.get('recent',[]))[-200:]
+        if recent:
+            rn=len(recent); rw=sum(1 for x in recent if x.get('win'))
+            rd=sum(float(x.get('delta',0.0)) for x in recent)/rn
+            recent_quality=_quality((rw+2.0)/(rn+4.0),rd)
+            raw[k]=(1.0-RECENT_BLEND)*lifetime+RECENT_BLEND*recent_quality
+        else:
+            raw[k]=lifetime
     total=sum(raw.values()) or 1.0
     norm={k:raw[k]/total for k in OPERATORS}
     free=max(0.0,1.0-FLOOR*len(OPERATORS))

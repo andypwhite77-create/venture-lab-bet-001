@@ -16,6 +16,18 @@ class MutationCreditTests(unittest.TestCase):
         self.assertGreater(w['local'],w['standard'])
         self.assertGreater(w['standard'],w['wide'])
 
+
+    def test_recent_results_can_override_stale_lifetime_history(self):
+        state=q._blank()
+        for k in q.OPERATORS:
+            state['operators'][k].update(trials=1000000,wins=100000,delta_sum=-250000.0)
+        state['operators']['local']['recent']=[{'delta':0.15,'win':True} for _ in range(200)]
+        state['operators']['wide']['recent']=[{'delta':-1.0,'win':False} for _ in range(200)]
+        w=q.weights(state)
+        self.assertGreater(w['local'],w['standard'])
+        self.assertGreater(w['standard'],w['wide'])
+        self.assertGreaterEqual(w['wide'],q.FLOOR)
+
     def test_bad_child_is_negative_credit(self):
         state=q.record('standard',-.4,-999,q._blank())
         z=state['operators']['standard']

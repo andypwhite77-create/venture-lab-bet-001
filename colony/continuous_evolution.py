@@ -172,9 +172,12 @@ async def cull_obvious_failures(conn):
     if rr:
         recs=await reversal_metrics(conn,rr['run_id'])
         ants=await conn.fetch('SELECT genome_id,baseline FROM reversal_tournament_ants WHERE run_id=$1 AND active=true',rr['run_id'])
+        expired={r['genome_id'] for r in await conn.fetch("SELECT genome_id FROM champion_league WHERE active=false")}
         losers=[]
         for a in ants:
             if a['baseline']:continue
+            if a['genome_id'] in expired:
+                losers.append(a['genome_id']);continue
             r=recs.get(a['genome_id'],{})
             bad=r.get('n',0)>=12 and (r.get('catastrophe_rate',0)>=.20 or (r.get('avg_return_pct',0)<=-10 and r.get('median_return_pct',0)<0) or (r.get('worst_return_pct') is not None and r['worst_return_pct']<=-50))
             if bad:losers.append(a['genome_id'])
