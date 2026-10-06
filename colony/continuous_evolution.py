@@ -299,7 +299,20 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=5
         if all(len(r['mints'] & pr['mints'])/max(1,len(r['mints'] | pr['mints'])) < .92 for _,pr in parents):
             parents.append((gid,r))
         if len(parents)>=8:break
-    if not parents: parents=ranked[:4]
+    # Reserve-repair fallback: if strict qualification temporarily drops to zero,
+    # keep evolution alive from protected incumbent elites with substantial evidence.
+    # They are explicitly NOT counted as reliable parents and get broader repair mutations.
+    protected_elites={r['genome_id'] for r in await conn.fetch(
+        "SELECT genome_id FROM champion_league WHERE active=true AND pool='elite'")}
+    if not parents:
+        reserve={}
+        for a in ants:
+            if a['genome_id'] not in protected_elites: continue
+            r=recs.get(a['genome_id'],{})
+            if r.get('n',0)<20 or catastrophic(r): continue
+            rr=dict(r); rr['parent_class']='reserve_repair'
+            reserve[a['genome_id']]=rr
+        parents=rank_with_correlation(reserve)[:2]
     # Bounded rolling turnover: a full population must not freeze evolution forever.
     # At most one mature non-parent is replaced per cadence, preserving the survivor floor.
     last=await conn.fetchval("SELECT max(observed_at) FROM reversal_evolution_log WHERE run_id=$1 AND born>0",run['run_id'])
@@ -308,7 +321,7 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=5
         parent_ids={gid for gid,_ in parents}
         mature_replaceable={}
         for a in ants:
-            if a['baseline'] or a['genome_id'] in parent_ids: continue
+            if a['baseline'] or a['genome_id'] in parent_ids or a['genome_id'] in protected_elites: continue
             r=recs.get(a['genome_id'],{})
             if r.get('n',0)<25 or catastrophic(r): continue
             mature_replaceable[a['genome_id']]=r
@@ -337,11 +350,17 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=5
             child.setdefault('plasticity',{})['mode']='crossover_balanced'
         else:
             parent_class=parents[i%len(parents)][1].get('parent_class','relative_tail_repair')
-            policy=(MutationPolicy(numeric_sigma=.05,mutation_rate=.25,min_changes=1,max_changes=2)
-                    if parent_class=='reliable'
-                    else MutationPolicy(numeric_sigma=.10,mutation_rate=.45,min_changes=1,max_changes=2))
+            if parent_class=='reliable':
+                policy=MutationPolicy(numeric_sigma=.05,mutation_rate=.25,min_changes=1,max_changes=2)
+                mode='local_exploit'
+            elif parent_class=='reserve_repair':
+                policy=MutationPolicy(numeric_sigma=.12,mutation_rate=.50,min_changes=1,max_changes=2)
+                mode='reserve_repair_explore'
+            else:
+                policy=MutationPolicy(numeric_sigma=.10,mutation_rate=.45,min_changes=1,max_changes=2)
+                mode='tail_repair_explore'
             child=mutate(g1,seed=rng.randrange(1,10**9),policy=policy);pids=[p1]
-            child.setdefault('plasticity',{})['mode']='local_exploit' if parent_class=='reliable' else 'tail_repair_explore'
+            child.setdefault('plasticity',{})['mode']=mode
         child['parents']=pids;child['generation']=generation;child['evolution']='reversal_continuous_v2'
         gid=genome_id(child)
         if gid in active_ids:continue
