@@ -23,6 +23,10 @@ MIN_FORWARD_DAYS=3
 PROMOTION_COOLDOWN_SECONDS=int(os.getenv('CHAMPION_PROMOTION_COOLDOWN_SECONDS','259200'))
 MAX_QUALIFICATION_DAYS=int(os.getenv('CHAMPION_MAX_QUALIFICATION_DAYS','21'))
 MAX_QUALIFIERS_PER_BEHAVIOUR=int(os.getenv('CHAMPION_MAX_QUALIFIERS_PER_BEHAVIOUR','2'))
+MIN_PROMOTION_WIN_RATE=float(os.getenv('CHAMPION_MIN_PROMOTION_WIN_RATE','0.55'))
+MAX_PROMOTION_SINGLE_LOSS_PCT=float(os.getenv('CHAMPION_MAX_PROMOTION_SINGLE_LOSS_PCT','-25'))
+MIN_PROMOTION_MEDIAN_PCT=float(os.getenv('CHAMPION_MIN_PROMOTION_MEDIAN_PCT','0.25'))
+MIN_PROMOTION_POSITIVE_DAY_RATE=float(os.getenv('CHAMPION_MIN_PROMOTION_POSITIVE_DAY_RATE','0.60'))
 
 def _cooldown_remaining(last_promotion,now=None,cooldown_seconds=PROMOTION_COOLDOWN_SECONDS):
  if not last_promotion:return 0
@@ -163,7 +167,7 @@ def _behaviour_signature(events,g):
  return hashlib.sha1(raw.encode()).hexdigest()[:20]
 
 async def _forward_for(c,gid,fixed_gbp):
- vals=[];days=set();seen=set()
+ vals=[];days=set();seen=set();by_day={}
  # Existing Reversal tournament evidence is genuine forward paper and remains valuable.
  rows=await c.fetch("""SELECT e.candidate_id,e.observed_at,e.hold_minutes,o.net_return_pct
    FROM reversal_tournament_entries e JOIN research_outcomes o ON o.candidate_id=e.candidate_id AND o.horizon_minutes=e.hold_minutes
@@ -171,15 +175,19 @@ async def _forward_for(c,gid,fixed_gbp):
  for r in rows:
   key=('r',r['candidate_id'])
   if key in seen:continue
-  seen.add(key);vals.append(float(r['net_return_pct']));days.add(r['observed_at'].date())
+  seen.add(key);v=float(r['net_return_pct']);vals.append(v);d=r['observed_at'].date();days.add(d);by_day.setdefault(d,[]).append(v)
  rows=await c.fetch("""SELECT e.candidate_id,e.observed_at,e.stake_gbp,o.net_return_pct
    FROM champion_paper_entries e JOIN research_outcomes o ON o.candidate_id=e.candidate_id AND o.horizon_minutes=e.hold_minutes
    WHERE e.genome_id=$1 AND o.measured_at>=e.observed_at ORDER BY e.observed_at""",gid)
  for r in rows:
   key=('c',r['candidate_id'])
   if key in seen:continue
-  seen.add(key);vals.append(adjusted_return_pct(float(r['net_return_pct']),float(r['stake_gbp']),fixed_gbp));days.add(r['observed_at'].date())
- s=_score(vals);s['days']=len(days);return s
+  seen.add(key);v=adjusted_return_pct(float(r['net_return_pct']),float(r['stake_gbp']),fixed_gbp);vals.append(v);d=r['observed_at'].date();days.add(d);by_day.setdefault(d,[]).append(v)
+ s=_score(vals);s['days']=len(days)
+ day_means=[statistics.fmean(v) for v in by_day.values() if v]
+ s['positive_day_rate']=(sum(x>0 for x in day_means)/len(day_means)) if day_means else None
+ s['worst_day_mean']=min(day_means) if day_means else None
+ return s
 
 async def refresh_rankings(c,allow_promotion=True):
  await ensure_schema(c);await sync_corpus(c);rows=await load_rows(c);fee=await measured_roundtrip_network_fee_sol(c);rate,_=sol_gbp_rate();fixed=fee*rate
@@ -231,9 +239,13 @@ async def refresh_rankings(c,allow_promotion=True):
    if q['total'] is None or worst['total'] is None:continue
    if a['score'] is None or worst['arena']['score'] is None or a['score']<=worst['arena']['score']:continue
    if f['score'] is None or worst['forward']['score'] is None or f['score']<=worst['forward']['score']:continue
+   if (f.get('win_rate') is None or f['win_rate']<MIN_PROMOTION_WIN_RATE
+       or f.get('worst') is None or f['worst']<MAX_PROMOTION_SINGLE_LOSS_PCT
+       or f.get('median') is None or f['median']<MIN_PROMOTION_MEDIAN_PCT
+       or f.get('positive_day_rate') is None or f['positive_day_rate']<MIN_PROMOTION_POSITIVE_DAY_RATE):continue
    slot=worst['elite_slot']
    async with c.transaction():
     await c.execute("UPDATE champion_league SET pool='qualification',elite_slot=NULL,qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",worst['genome_id'])
     await c.execute("UPDATE champion_league SET pool='elite',elite_slot=$2,promoted_at=now(),qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",q['genome_id'],slot)
    promotion={'in':q['genome_id'],'out':worst['genome_id'],'slot':slot,'challenger_total':q['total'],'incumbent_total':worst['total']};break
- return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'promotion':promotion,'retired':retired,'max_qualification_days':MAX_QUALIFICATION_DAYS,'max_qualifiers_per_behaviour':MAX_QUALIFIERS_PER_BEHAVIOUR,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}
+ return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'promotion':promotion,'retired':retired,'max_qualification_days':MAX_QUALIFICATION_DAYS,'max_qualifiers_per_behaviour':MAX_QUALIFIERS_PER_BEHAVIOUR,'min_promotion_win_rate':MIN_PROMOTION_WIN_RATE,'max_promotion_single_loss_pct':MAX_PROMOTION_SINGLE_LOSS_PCT,'min_promotion_median_pct':MIN_PROMOTION_MEDIAN_PCT,'min_promotion_positive_day_rate':MIN_PROMOTION_POSITIVE_DAY_RATE,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}

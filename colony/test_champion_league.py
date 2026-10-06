@@ -26,6 +26,15 @@ class ChampionLeagueTests(unittest.TestCase):
   self.assertEqual([x['genome_id'] for x in keep],['a','b','d'])
   self.assertEqual([x['genome_id'] for x in retire],['c'])
 
+
+ def test_promotion_has_reliability_gates(self):
+  import inspect,colony.champion_league as cl
+  src=inspect.getsource(cl.refresh_rankings)
+  self.assertIn('MIN_PROMOTION_WIN_RATE',src)
+  self.assertIn('MAX_PROMOTION_SINGLE_LOSS_PCT',src)
+  self.assertIn('MIN_PROMOTION_MEDIAN_PCT',src)
+  self.assertIn('MIN_PROMOTION_POSITIVE_DAY_RATE',src)
+
  def test_training_budget_retirement(self):
   self.assertIsNone(_retirement_reason(MAX_QUALIFICATION_DAYS-1,0,-99,-1))
   self.assertEqual(_retirement_reason(MAX_QUALIFICATION_DAYS,MIN_FORWARD_EVENTS-1,5,-1),'training_budget_expired_insufficient_forward_evidence')
