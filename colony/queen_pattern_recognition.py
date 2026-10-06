@@ -160,6 +160,10 @@ def selection_fitness(parts,genome=None):
  concentration=max(float(t.get('outlier',1)),float(v.get('outlier',1)))
  if concentration>.50:return -999.0
  consistency=min(float(t.get('win_rate',0)),float(v.get('win_rate',0)))
+ median_floor=min(float(t.get('median_return_pct',0)),float(v.get('median_return_pct',0)))
+ worst_tail=min(float(t.get('worst_return_pct',0)),float(v.get('worst_return_pct',0)))
+ reliability_bonus=.12*max(-1.0,min(1.0,median_floor/5.0))+.12*(consistency-.5)
+ tail_penalty=max(0.0,abs(min(0.0,worst_tail))-12.0)/60.0
  base=.35*t['nursery_score']+.65*v['nursery_score']+.45*min(t['nursery_score'],v['nursery_score'])
  # Soft fragility pressure: very young or thin-liquidity concentration is allowed only
  # when the economic edge is strong enough to pay for the extra risk.
@@ -170,7 +174,9 @@ def selection_fitness(parts,genome=None):
  # merely by shrinking the opportunity set around a few historical winners.
  predicate_n=len((genome or {}).get('predicates',{}))
  complexity_penalty=.06*max(0,predicate_n-2)
- return base*breadth_pressure*(.45+.55*coverage) + .22*breadth_margin + .12*consistency - max(0,concentration-.28)*1.25 - fragility_penalty - complexity_penalty
+ return (base*breadth_pressure*(.45+.55*coverage) + .22*breadth_margin + .12*consistency
+         + reliability_bonus - tail_penalty - max(0,concentration-.28)*1.25
+         - fragility_penalty - complexity_penalty)
 
 def select_finalists_breadth(ranked):
  # Breeding-visible handoff only. Cap actual executed behaviour, not cosmetic genotype variation.

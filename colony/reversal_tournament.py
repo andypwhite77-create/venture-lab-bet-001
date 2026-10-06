@@ -97,7 +97,7 @@ def outlier_dependence(vals: list[float]) -> float:
     return max(pos) / total if total else 1.0
 
 
-def score_record(returns: list[tuple[str,float]], baseline_map: dict[str,float], stake_gbp=TARGET_STAKE_GBP, fixed_cost_gbp=0.0) -> dict:
+def score_record(returns: list[tuple[str,float]], baseline_map: dict[str,float], stake_gbp=TARGET_STAKE_GBP, fixed_cost_gbp=0.0, hold_minutes=15) -> dict:
     raw_first = {}
     for mint, ret in returns: raw_first.setdefault(mint, float(ret))
     first={m:adjusted_return_pct(r,stake_gbp,fixed_cost_gbp) for m,r in raw_first.items()}
@@ -108,16 +108,27 @@ def score_record(returns: list[tuple[str,float]], baseline_map: dict[str,float],
     edge = statistics.fmean(r-b for r,b in shared) if shared else 0.0
     tail = abs(min(0.0, min(vals))) if vals else 100.0
     outlier = outlier_dependence(vals)
-    # Fitness is already expectancy/robustness/consistency aware. Add explicit control edge,
-    # and punish tails / single-moonshot dependence hard enough to stop lucky idiots breeding.
-    tournament_score = float(m.get("fitness", -999.0)) + edge/100.0 - tail/200.0 - max(0.0, outlier-.45)
+    # Optimise for boring profitability: short left tails and positive central tendency dominate.
+    # Capital-hour efficiency is deliberately capped as a small tie-breaker so 5-minute ants
+    # cannot win merely by annualising noise.
+    win_rate=(sum(v>0 for v in vals)/len(vals)) if vals else 0.0
+    median_ret=statistics.median(vals) if vals else -100.0
+    hold_hours=max(1.0/60.0,float(hold_minutes or 15)/60.0)
+    capital_hour_yield=(statistics.fmean(vals)/hold_hours) if vals else -100.0
+    reliability_bonus=.10*max(-1.0,min(1.0,median_ret/5.0)) + .10*(win_rate-.5)
+    efficiency_bonus=.04*math.tanh(capital_hour_yield/20.0)
+    tournament_score = (float(m.get("fitness", -999.0)) + edge/100.0
+                        - tail/120.0 - max(0.0, outlier-.45)
+                        + reliability_bonus + efficiency_bonus)
     avg_net_gbp=(statistics.fmean(vals)*stake_gbp/100.0) if vals else None
     positive_raw=[r for r in raw_first.values() if r>0]
     mean_positive=statistics.fmean(positive_raw) if positive_raw else 0.0
     break_even=(fixed_cost_gbp/(mean_positive/100.0)) if fixed_cost_gbp>0 and mean_positive>0 else (0.0 if mean_positive>0 else None)
     return {**m, "baseline_edge_pct": edge, "baseline_overlap_n": len(shared),
-            "win_rate": (sum(v>0 for v in vals)/len(vals) if vals else 0.0),
+            "win_rate": win_rate, "median_return_pct": median_ret,
             "worst_return_pct": min(vals) if vals else None, "outlier_dependence": outlier,
+            "capital_hour_yield_pct": capital_hour_yield,
+            "reliability_bonus": reliability_bonus,"efficiency_bonus":efficiency_bonus,
             "tournament_score": tournament_score, "mints": set(first),"paper_stake_gbp":stake_gbp,
             "fixed_cost_gbp":fixed_cost_gbp,"avg_net_gbp":avg_net_gbp,"break_even_stake_gbp":break_even}
 
@@ -173,19 +184,21 @@ async def process(conn) -> dict:
 async def metrics(conn, run_id: str, since=None) -> dict[str,dict]:
     clause=" AND e.observed_at >= $2" if since else ""
     args=[run_id] + ([since] if since else [])
-    rows=await conn.fetch(f"""SELECT e.genome_id,e.mint,o.net_return_pct
+    rows=await conn.fetch(f"""SELECT e.genome_id,e.mint,e.hold_minutes,o.net_return_pct
       FROM reversal_tournament_entries e
       JOIN research_outcomes o ON o.candidate_id=e.candidate_id
       WHERE e.run_id=$1 {clause} AND o.horizon_minutes=(SELECT horizon_minutes FROM research_outcomes
         WHERE candidate_id=e.candidate_id AND horizon_minutes=e.hold_minutes LIMIT 1)
       ORDER BY e.genome_id,e.observed_at""",*args)
-    grouped={}
-    for r in rows: grouped.setdefault(r["genome_id"],[]).append((r["mint"],float(r["net_return_pct"])))
+    grouped={}; holds={}
+    for r in rows:
+        grouped.setdefault(r["genome_id"],[]).append((r["mint"],float(r["net_return_pct"])))
+        holds.setdefault(r["genome_id"],int(r["hold_minutes"]))
     baseline_gid=await conn.fetchval("SELECT genome_id FROM reversal_tournament_ants WHERE run_id=$1 AND baseline=true",run_id)
     base_first={}
     for mint,ret in grouped.get(baseline_gid,[]): base_first.setdefault(mint,ret)
     fee_sol=await measured_roundtrip_network_fee_sol(conn); rate,_=sol_gbp_rate(); fixed_gbp=fee_sol*rate
-    return {gid:score_record(vals,base_first,TARGET_STAKE_GBP,fixed_gbp) for gid,vals in grouped.items()}
+    return {gid:score_record(vals,base_first,TARGET_STAKE_GBP,fixed_gbp,holds.get(gid,15)) for gid,vals in grouped.items()}
 
 
 async def maybe_cull(conn) -> dict:

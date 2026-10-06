@@ -230,7 +230,7 @@ async def promote_reversal_elite_to_production_pool(conn, minimum_mints=20, keep
         promoted.append({'genome_id':gid,'n':r.get('n'),'score':r.get('adjusted_score',r.get('tournament_score'))})
     return promoted
 
-async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=3, minimum_parent_mints=20):
+async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=5, minimum_parent_mints=20):
     """Bounded forward-only breeding for the profitable Reversal lineage.
 
     Parents are selected only from prospective results. Children inherit genomes, never
@@ -255,13 +255,19 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=3
         await conn.execute(ddl)
     ants=await conn.fetch("SELECT genome_id,genome,baseline,cohort,generation,born_at FROM reversal_tournament_ants WHERE run_id=$1 AND active=true",run['run_id'])
     recs=await reversal_metrics(conn,run['run_id'])
-    # Cull only after enough fresh proof, and only obvious laggards. Never kill baseline here.
+    # Faster turnover after meaningful forward proof. Never kill baseline here.
+    # Mature mediocrity consumes scarce evidence budget just as surely as catastrophe.
     losers=[]
     for a in ants:
         if a['baseline']:continue
         r=recs.get(a['genome_id'],{})
-        if r.get('n',0)<20:continue
-        if catastrophic(r) or (r.get('avg_return_pct',0)<0 and r.get('median_return_pct',0)<0 and r.get('baseline_edge_pct',0)<=0):
+        n=int(r.get('n',0))
+        if n<20:continue
+        mature_weak=(n>=25 and (
+            r.get('avg_return_pct',0)<=0
+            or r.get('median_return_pct',0)<=0
+            or r.get('win_rate',0)<.45))
+        if catastrophic(r) or mature_weak:
             losers.append(a['genome_id'])
     # Avoid population collapse: at least 20 non-baseline ants survive every maintenance pass.
     max_cull=max(0,len([a for a in ants if not a['baseline']])-20)
@@ -276,12 +282,15 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=3
         if a['baseline']:continue
         r=recs.get(a['genome_id'],{})
         if r.get('n',0)<minimum_parent_mints or catastrophic(r):continue
-        # Two parent classes: proven-positive, or exploratory relative improvers whose
-        # typical trade is positive and which beat the baseline but still have tail damage.
-        proven = r.get('avg_return_pct',-999)>0 and r.get('median_return_pct',-999)>=0
-        relative = r.get('median_return_pct',-999)>0 and r.get('baseline_edge_pct',-999)>0 and r.get('catastrophe_rate',1)<.20
+        # Reproductive privilege now targets boring winners. A second, bounded repair
+        # class preserves useful edge while allowing plasticity to fix a damaged tail.
+        proven = (r.get('avg_return_pct',-999)>0 and r.get('median_return_pct',-999)>=.25
+                  and r.get('win_rate',0)>=.55 and r.get('worst_return_pct',-999)>=-25)
+        relative = (r.get('avg_return_pct',-999)>0 and r.get('median_return_pct',-999)>0
+                    and r.get('baseline_edge_pct',-999)>0 and r.get('catastrophe_rate',1)<.10
+                    and r.get('worst_return_pct',-999)>=-40)
         if not (proven or relative):continue
-        rr=dict(r); rr['parent_class']='proven' if proven else 'relative_tail_repair'
+        rr=dict(r); rr['parent_class']='reliable' if proven else 'relative_tail_repair'
         eligible[a['genome_id']]=rr
     ranked=rank_with_correlation(eligible)
     # Behavioural diversity: keep parents whose opportunity sets aren't near-identical.
@@ -291,12 +300,30 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=3
             parents.append((gid,r))
         if len(parents)>=8:break
     if not parents: parents=ranked[:4]
-    active_ids={a['genome_id'] for a in ants}; room=max(0,target_population-len(ants)); want=min(births_per_cycle,room)
-    # Rate limit births to once per ~20 minutes, unless population needs emergency refill.
+    # Bounded rolling turnover: a full population must not freeze evolution forever.
+    # At most one mature non-parent is replaced per cadence, preserving the survivor floor.
     last=await conn.fetchval("SELECT max(observed_at) FROM reversal_evolution_log WHERE run_id=$1 AND born>0",run['run_id'])
-    if last and room < 8:
-        age=(time.time()-last.timestamp())/60
-        if age<20:want=0
+    birth_age_minutes=(time.time()-last.timestamp())/60 if last else 1e9
+    if parents and len(ants)>=target_population and birth_age_minutes>=10:
+        parent_ids={gid for gid,_ in parents}
+        mature_replaceable={}
+        for a in ants:
+            if a['baseline'] or a['genome_id'] in parent_ids: continue
+            r=recs.get(a['genome_id'],{})
+            if r.get('n',0)<25 or catastrophic(r): continue
+            mature_replaceable[a['genome_id']]=r
+        ranked_replaceable=rank_with_correlation(mature_replaceable)
+        nonbaseline_n=sum(1 for a in ants if not a['baseline'])
+        if ranked_replaceable and nonbaseline_n>20:
+            turnover_gid=min(ranked_replaceable,key=lambda x:x[1].get('adjusted_score',-999))[0]
+            await conn.execute("UPDATE reversal_tournament_ants SET active=false,eliminated_at=now(), elimination_reason='bounded_research_turnover' WHERE run_id=$1 AND genome_id=$2",run['run_id'],turnover_gid)
+            losers.append(turnover_gid)
+            ants=[a for a in ants if a['genome_id']!=turnover_gid]
+            amap.pop(turnover_gid,None)
+    active_ids={a['genome_id'] for a in ants}; room=max(0,target_population-len(ants)); want=min(births_per_cycle,room)
+    # Rate limit births to once per ~10 minutes, unless population needs emergency refill.
+    if last and room < 8 and birth_age_minutes<10:
+        want=0
     born=[]; parent_used=[]
     generation=max([int(a['generation'] or 0) for a in ants] or [0])+1
     rng=random.Random(int(time.time()//1200)+generation)
@@ -306,9 +333,15 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=3
         if len(parents)>1 and i%3==2:
             p2=parents[(i+1)%len(parents)][0]; g2=amap[p2]['genome']; g2=json.loads(g2) if isinstance(g2,str) else dict(g2)
             child=crossover(g1,g2,seed=rng.randrange(1,10**9)); pids=[p1,p2]
-            child=mutate(child,seed=rng.randrange(1,10**9),policy=MutationPolicy(numeric_sigma=.08,mutation_rate=.35,min_changes=1,max_changes=2))
+            child=mutate(child,seed=rng.randrange(1,10**9),policy=MutationPolicy(numeric_sigma=.06,mutation_rate=.30,min_changes=1,max_changes=2))
+            child.setdefault('plasticity',{})['mode']='crossover_balanced'
         else:
-            child=mutate(g1,seed=rng.randrange(1,10**9),policy=MutationPolicy(numeric_sigma=.08,mutation_rate=.35,min_changes=1,max_changes=2));pids=[p1]
+            parent_class=parents[i%len(parents)][1].get('parent_class','relative_tail_repair')
+            policy=(MutationPolicy(numeric_sigma=.05,mutation_rate=.25,min_changes=1,max_changes=2)
+                    if parent_class=='reliable'
+                    else MutationPolicy(numeric_sigma=.10,mutation_rate=.45,min_changes=1,max_changes=2))
+            child=mutate(g1,seed=rng.randrange(1,10**9),policy=policy);pids=[p1]
+            child.setdefault('plasticity',{})['mode']='local_exploit' if parent_class=='reliable' else 'tail_repair_explore'
         child['parents']=pids;child['generation']=generation;child['evolution']='reversal_continuous_v2'
         gid=genome_id(child)
         if gid in active_ids:continue
@@ -323,7 +356,7 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=3
         r=recs.get(a['genome_id'],{})
         if not r.get('n'):continue
         vals.append(float(r.get('avg_return_pct',0)));win_rates.append(float(r.get('win_rate',0)));ns.append(int(r.get('n',0)));scores.append(float(r.get('tournament_score',-999)))
-    proven_parents=sum(1 for _,r in parents if r.get('parent_class')=='proven')
+    proven_parents=sum(1 for _,r in parents if r.get('parent_class')=='reliable')
     relative_parents=sum(1 for _,r in parents if r.get('parent_class')=='relative_tail_repair')
     snap={'evidence_ants':len(vals),'median_n':statistics.median(ns) if ns else 0,'mean_avg_return_pct':statistics.fmean(vals) if vals else 0,
           'median_avg_return_pct':statistics.median(vals) if vals else 0,'mean_win_rate':statistics.fmean(win_rates) if win_rates else 0,
