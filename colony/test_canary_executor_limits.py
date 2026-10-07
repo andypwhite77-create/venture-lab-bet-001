@@ -172,6 +172,15 @@ class CanarySubmissionPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(src.count('(QuoteValidationRejected, GatewayPreBroadcastRejected)'),2)
         self.assertIn("prefix='recovery_gateway_'",src)
 
+    def test_top_level_preentry_gateway_rejection_does_not_use_generic_halt(self):
+        import inspect
+        src=inspect.getsource(ce.tick)
+        self.assertIn('except GatewayPreBroadcastRejected as e:',src)
+        self.assertIn("current['status'] in ('ready','claimed')",src)
+        self.assertIn("'gateway_'+e.code.lower()",src)
+        self.assertIn("halt(c,'unexpected_gateway_prebroadcast_state')",src)
+
+
 class RecoveryArmingPolicyTests(unittest.TestCase):
     def test_recovery_is_not_an_unresolved_arm_blocker(self):
         blocking={'claimed','open','submitting_entry','submitting_exit','uncertain'}

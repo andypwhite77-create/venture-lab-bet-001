@@ -460,6 +460,19 @@ async def tick():
             if row:
                 current=await c.fetchrow('SELECT * FROM canary_trade_intents WHERE id=$1',row['id'])
                 await save(c,current,'rejected',json.loads(current['execution']),'quote_'+e.code)
+        except GatewayPreBroadcastRejected as e:
+            # A gateway can reject a pre-entry quote before submit() is reached
+            # (for example no executable route / slippage changed). With no
+            # signature and no inventory this is a normal rejected opportunity,
+            # not a reason to stop an otherwise armed Canary.
+            if row:
+                current=await c.fetchrow('SELECT * FROM canary_trade_intents WHERE id=$1',row['id'])
+                if current['status'] in ('ready','claimed'):
+                    await save(c,current,'rejected',json.loads(current['execution']),'gateway_'+e.code.lower())
+                    return
+            # If this ever escapes from an inventory-bearing or submission state,
+            # retain fail-closed behaviour rather than guessing about chain state.
+            await halt(c,'unexpected_gateway_prebroadcast_state')
         except Exception as e:
             # Exception bodies can contain credential-bearing URLs. Persist a safe
             # ValueError label when available; otherwise keep only the exception type.
