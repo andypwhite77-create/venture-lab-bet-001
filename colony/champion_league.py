@@ -92,6 +92,25 @@ def _score(vals):
  score=lcb+.25*med+1.5*(win-.5)
  return {'n':n,'mean':mean,'median':med,'win_rate':win,'worst':min(vals),'best':max(vals),'lcb':lcb,'score':score}
 
+
+def _historical_priority(arena):
+ """Research-priority tier from breeding-visible historical robustness only.
+
+ This affects evidence-service order, never promotion eligibility or Spartan.
+ """
+ if not arena or arena.get('n',0)<20:return None
+ mean=arena.get('mean'); med=arena.get('median'); win=arena.get('win_rate')
+ worst=arena.get('worst'); lcb=arena.get('lcb')
+ if None in (mean,med,win,worst,lcb) or lcb<=0:return None
+ if mean>=4 and med>=2 and win>=.70 and worst>=-15:return 'A+'
+ if mean>=2 and med>=.5 and win>=.60 and worst>=-30:return 'A'
+ return None
+
+def _priority_sort_key(row):
+ notes=_json(row.get('notes'))
+ tier=notes.get('historical_priority_tier')
+ return (0 if tier=='A+' else 1 if tier=='A' else 2, row.get('genome_id',''))
+
 async def seed_founders(c):
  await ensure_schema(c); cutoff=int(await c.fetchval('SELECT coalesce(max(id),0) FROM research_candidates') or 0)
  seeded=[]; existing_elites=int(await c.fetchval("SELECT count(*) FROM champion_league WHERE pool='elite'") or 0)
@@ -147,7 +166,8 @@ async def paper_run_once(c,limit=1000):
   last=int(await c.fetchval('SELECT coalesce(max(id),0) FROM research_candidates') or 0)
   await c.execute('UPDATE champion_paper_progress SET last_candidate_id=$1,initialized_at=now(),updated_at=now() WHERE id=1',last)
  rows=await c.fetch("SELECT id,created_at,mint,features,market FROM research_candidates WHERE id>$1 ORDER BY id LIMIT $2",last,int(limit))
- ants=await c.fetch("SELECT genome_id,genome,prospective_after_candidate FROM champion_league WHERE active=true ORDER BY genome_id")
+ ants=[dict(a) for a in await c.fetch("SELECT genome_id,genome,prospective_after_candidate,notes FROM champion_league WHERE active=true ORDER BY genome_id")]
+ ants.sort(key=_priority_sort_key)
  inserted=0
  for rr0 in rows:
   rr=dict(rr0)
@@ -159,7 +179,11 @@ async def paper_run_once(c,limit=1000):
      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING""",a['genome_id'],rr['id'],rr['mint'],rr['created_at'],hold,TARGET_STAKE_GBP)
    inserted+=int(res.endswith('1'))
  if rows:await c.execute('UPDATE champion_paper_progress SET last_candidate_id=$1,updated_at=now() WHERE id=1',rows[-1]['id'])
- return {'ants':len(ants),'candidates':len(rows),'entries':inserted,'last_candidate_id':rows[-1]['id'] if rows else last}
+ priority_counts={'A+':0,'A':0}
+ for a in ants:
+  tier=_json(a.get('notes')).get('historical_priority_tier')
+  if tier in priority_counts:priority_counts[tier]+=1
+ return {'ants':len(ants),'candidates':len(rows),'entries':inserted,'last_candidate_id':rows[-1]['id'] if rows else last,'priority_ants':priority_counts}
 
 def _behaviour_signature(events,g):
  prm=g.get('parameters',{})
@@ -204,10 +228,12 @@ async def refresh_rankings(c,allow_promotion=True):
   if arena['score'] is not None:
    total=arena['score'] if forward['score'] is None else .55*arena['score']+.45*forward['score']
   sig=_behaviour_signature(events,g)
-  computed.append({'genome_id':a['genome_id'],'pool':a['pool'],'elite_slot':a['elite_slot'],'arena':arena,'forward':forward,'total':total,'sig':sig})
+  priority=_historical_priority(arena)
+  computed.append({'genome_id':a['genome_id'],'pool':a['pool'],'elite_slot':a['elite_slot'],'arena':arena,'forward':forward,'total':total,'sig':sig,'historical_priority':priority})
  for x in computed:
+  priority_note={'historical_priority_tier':x['historical_priority'],'historical_priority_basis':'breeding_visible_arena_v1'} if x['historical_priority'] else {'historical_priority_tier':None,'historical_priority_basis':'breeding_visible_arena_v1'}
   await c.execute("""UPDATE champion_league SET arena_score=$2,forward_score=$3,total_score=$4,behaviour_signature=$5,
-    arena_stats=$6::jsonb,forward_stats=$7::jsonb,updated_at=now() WHERE genome_id=$1""",x['genome_id'],x['arena']['score'],x['forward']['score'],x['total'],x['sig'],json.dumps(x['arena']),json.dumps(x['forward']))
+    arena_stats=$6::jsonb,forward_stats=$7::jsonb,notes=notes||$8::jsonb,updated_at=now() WHERE genome_id=$1""",x['genome_id'],x['arena']['score'],x['forward']['score'],x['total'],x['sig'],json.dumps(x['arena']),json.dumps(x['forward']),json.dumps(priority_note))
  quals=sorted([x for x in computed if x['pool']=='qualification'],key=lambda x:(x['total'] is not None,x['total'] or -1e9),reverse=True)
  quals,duplicate_retire=_cap_qualification_behaviours(quals)
  for q in duplicate_retire:
@@ -248,4 +274,4 @@ async def refresh_rankings(c,allow_promotion=True):
     await c.execute("UPDATE champion_league SET pool='qualification',elite_slot=NULL,qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",worst['genome_id'])
     await c.execute("UPDATE champion_league SET pool='elite',elite_slot=$2,promoted_at=now(),qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",q['genome_id'],slot)
    promotion={'in':q['genome_id'],'out':worst['genome_id'],'slot':slot,'challenger_total':q['total'],'incumbent_total':worst['total']};break
- return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'promotion':promotion,'retired':retired,'max_qualification_days':MAX_QUALIFICATION_DAYS,'max_qualifiers_per_behaviour':MAX_QUALIFIERS_PER_BEHAVIOUR,'min_promotion_win_rate':MIN_PROMOTION_WIN_RATE,'max_promotion_single_loss_pct':MAX_PROMOTION_SINGLE_LOSS_PCT,'min_promotion_median_pct':MIN_PROMOTION_MEDIAN_PCT,'min_promotion_positive_day_rate':MIN_PROMOTION_POSITIVE_DAY_RATE,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}
+ return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'historical_priority':[{'genome_id':x['genome_id'],'tier':x['historical_priority'],'arena_n':x['arena']['n'],'arena_mean':x['arena']['mean'],'arena_median':x['arena']['median'],'arena_win_rate':x['arena']['win_rate'],'arena_worst':x['arena']['worst']} for x in computed if x['historical_priority']], 'promotion':promotion,'retired':retired,'max_qualification_days':MAX_QUALIFICATION_DAYS,'max_qualifiers_per_behaviour':MAX_QUALIFIERS_PER_BEHAVIOUR,'min_promotion_win_rate':MIN_PROMOTION_WIN_RATE,'max_promotion_single_loss_pct':MAX_PROMOTION_SINGLE_LOSS_PCT,'min_promotion_median_pct':MIN_PROMOTION_MEDIAN_PCT,'min_promotion_positive_day_rate':MIN_PROMOTION_POSITIVE_DAY_RATE,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}

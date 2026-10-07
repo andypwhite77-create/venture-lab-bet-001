@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime,timezone,timedelta
-from colony.champion_league import _score,_behaviour_signature,_cooldown_remaining,_retirement_reason,_cap_qualification_behaviours,MAX_QUALIFICATION_DAYS,MIN_FORWARD_EVENTS
+from colony.champion_league import _score,_behaviour_signature,_cooldown_remaining,_retirement_reason,_cap_qualification_behaviours,_historical_priority,_priority_sort_key,MAX_QUALIFICATION_DAYS,MIN_FORWARD_EVENTS
 
 class ChampionLeagueTests(unittest.TestCase):
  def test_score_rewards_consistent_positive_returns(self):
@@ -34,6 +34,21 @@ class ChampionLeagueTests(unittest.TestCase):
   self.assertIn('MAX_PROMOTION_SINGLE_LOSS_PCT',src)
   self.assertIn('MIN_PROMOTION_MEDIAN_PCT',src)
   self.assertIn('MIN_PROMOTION_POSITIVE_DAY_RATE',src)
+
+
+ def test_historical_priority_rewards_robust_history_without_changing_promotion(self):
+  self.assertEqual(_historical_priority({'n':33,'mean':5.18,'median':2.69,'win_rate':.788,'worst':-9.57,'lcb':2.92}),'A+')
+  self.assertEqual(_historical_priority({'n':53,'mean':5.92,'median':3.91,'win_rate':.642,'worst':-28.8,'lcb':2.67}),'A')
+  self.assertIsNone(_historical_priority({'n':64,'mean':4.36,'median':6.5,'win_rate':.578,'worst':-88.5,'lcb':.27}))
+  self.assertIsNone(_historical_priority({'n':10,'mean':16,'median':6,'win_rate':.8,'worst':-2.8,'lcb':3}))
+
+ def test_priority_order_services_a_plus_then_a_then_normal(self):
+  rows=[
+   {'genome_id':'z','notes':{}},
+   {'genome_id':'b','notes':{'historical_priority_tier':'A'}},
+   {'genome_id':'a','notes':{'historical_priority_tier':'A+'}},
+  ]
+  self.assertEqual([r['genome_id'] for r in sorted(rows,key=_priority_sort_key)],['a','b','z'])
 
  def test_training_budget_retirement(self):
   self.assertIsNone(_retirement_reason(MAX_QUALIFICATION_DAYS-1,0,-99,-1))
