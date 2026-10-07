@@ -20,6 +20,7 @@ FOUNDER_ELITES=(
  'g_d20b45ea6d9be79a','g_b14e95af529a77d9')
 MIN_FORWARD_EVENTS=25
 MIN_FORWARD_DAYS=3
+CANARY_ROSTER_SIZE=max(1,int(os.getenv('CHAMPION_CANARY_ROSTER_SIZE','5')))
 PROMOTION_COOLDOWN_SECONDS=int(os.getenv('CHAMPION_PROMOTION_COOLDOWN_SECONDS','259200'))
 MAX_QUALIFICATION_DAYS=int(os.getenv('CHAMPION_MAX_QUALIFICATION_DAYS','21'))
 MAX_QUALIFIERS_PER_BEHAVIOUR=int(os.getenv('CHAMPION_MAX_QUALIFIERS_PER_BEHAVIOUR','2'))
@@ -65,7 +66,11 @@ async def ensure_schema(c):
  ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
  ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS retired_at TIMESTAMPTZ;
  ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS retirement_reason TEXT;
+ ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS canary_slot INT;
+ ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS canary_since TIMESTAMPTZ;
+ ALTER TABLE champion_league ADD COLUMN IF NOT EXISTS canary_demoted_at TIMESTAMPTZ;
  CREATE UNIQUE INDEX IF NOT EXISTS champion_elite_slot ON champion_league(elite_slot) WHERE pool='elite';
+ CREATE UNIQUE INDEX IF NOT EXISTS champion_canary_slot ON champion_league(canary_slot) WHERE canary_slot IS NOT NULL;
  CREATE TABLE IF NOT EXISTS champion_paper_progress(
    id INT PRIMARY KEY CHECK(id=1),last_candidate_id BIGINT NOT NULL DEFAULT 0,
    initialized_at TIMESTAMPTZ,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
@@ -110,6 +115,85 @@ def _priority_sort_key(row):
  notes=_json(row.get('notes'))
  tier=notes.get('historical_priority_tier')
  return (0 if tier=='A+' else 1 if tier=='A' else 2, row.get('genome_id',''))
+
+
+def _passes_canary_paper_gate(x):
+ f=x.get('forward') or {}
+ return (int(f.get('n') or 0)>=MIN_FORWARD_EVENTS
+         and int(f.get('days') or 0)>=MIN_FORWARD_DAYS
+         and f.get('win_rate') is not None and float(f['win_rate'])>=MIN_PROMOTION_WIN_RATE
+         and f.get('worst') is not None and float(f['worst'])>=MAX_PROMOTION_SINGLE_LOSS_PCT
+         and f.get('median') is not None and float(f['median'])>=MIN_PROMOTION_MEDIAN_PCT
+         and f.get('positive_day_rate') is not None and float(f['positive_day_rate'])>=MIN_PROMOTION_POSITIVE_DAY_RATE
+         and f.get('score') is not None and x.get('arena',{}).get('score') is not None
+         and x.get('total') is not None)
+
+def _canary_strength(x):
+ f=x.get('forward') or {}
+ return (float(f.get('score') if f.get('score') is not None else -1e99),
+         float(x.get('total') if x.get('total') is not None else -1e99),
+         float(x.get('arena',{}).get('score') if x.get('arena',{}).get('score') is not None else -1e99))
+
+def _challenger_beats_canary(challenger,incumbent):
+ if not _passes_canary_paper_gate(challenger): return False
+ cf=challenger.get('forward') or {}; wf=incumbent.get('forward') or {}
+ if cf.get('score') is None or challenger.get('total') is None or challenger.get('arena',{}).get('score') is None:return False
+ if wf.get('score') is not None and float(cf['score'])<=float(wf['score']):return False
+ if incumbent.get('total') is not None and float(challenger['total'])<=float(incumbent['total']):return False
+ if incumbent.get('arena',{}).get('score') is not None and float(challenger['arena']['score'])<=float(incumbent['arena']['score']):return False
+ return True
+
+async def sync_canary_roster(c,computed,allow_rotation=True):
+ """Maintain a fixed-size merit roster for real-money Canary signalling.
+
+ Bootstrap uses incumbent research elites. Thereafter a challenger needs 25+ fresh
+ paper trades, reliability gates and superior historical+forward evidence to evict
+ the weakest Canary. At most one slot changes per maintenance tick.
+ """
+ byid={x['genome_id']:x for x in computed}
+ rows=await c.fetch("SELECT genome_id,canary_slot,pool,elite_slot FROM champion_league WHERE active=true AND canary_slot IS NOT NULL ORDER BY canary_slot")
+ # Remove slots outside a reduced configured roster.
+ for r in rows:
+  if int(r['canary_slot'])>CANARY_ROSTER_SIZE:
+   await c.execute("UPDATE champion_league SET canary_slot=NULL,canary_demoted_at=now(),updated_at=now(),notes=notes||$2::jsonb WHERE genome_id=$1",
+                   r['genome_id'],json.dumps({'canary_last_event':'configured_roster_shrink'}))
+ rows=await c.fetch("SELECT genome_id,canary_slot,pool,elite_slot FROM champion_league WHERE active=true AND canary_slot IS NOT NULL ORDER BY canary_slot")
+ occupied={int(r['canary_slot']) for r in rows}
+ current_ids={r['genome_id'] for r in rows}
+ # First deployment and later roster expansion: seed missing slots from existing elites,
+ # then from the strongest paper-qualified challengers.
+ missing=[i for i in range(1,CANARY_ROSTER_SIZE+1) if i not in occupied]
+ if missing:
+  seeds=sorted([x for x in computed if x['genome_id'] not in current_ids and x.get('pool')=='elite'],
+               key=lambda x:(x.get('elite_slot') or 999))
+  seeds += sorted([x for x in computed if x['genome_id'] not in current_ids and x.get('pool')!='elite' and _passes_canary_paper_gate(x)],
+                  key=_canary_strength,reverse=True)
+  for slot,x in zip(missing,seeds):
+   await c.execute("UPDATE champion_league SET canary_slot=$2,canary_since=now(),canary_demoted_at=NULL,updated_at=now(),notes=notes||$3::jsonb WHERE genome_id=$1",
+                   x['genome_id'],slot,json.dumps({'canary_last_event':'bootstrap_or_expand'}))
+   current_ids.add(x['genome_id'])
+ rows=await c.fetch("SELECT genome_id,canary_slot FROM champion_league WHERE active=true AND canary_slot IS NOT NULL ORDER BY canary_slot")
+ roster=[byid[r['genome_id']] for r in rows if r['genome_id'] in byid]
+ rotation=None
+ if allow_rotation and len(roster)>=CANARY_ROSTER_SIZE:
+  worst=min(roster,key=_canary_strength)
+  other_sigs={x.get('sig') for x in roster if x['genome_id']!=worst['genome_id']}
+  challengers=[x for x in computed if x['genome_id'] not in {r['genome_id'] for r in roster}
+               and x.get('sig') not in other_sigs and _challenger_beats_canary(x,worst)]
+  if challengers:
+   challenger=max(challengers,key=_canary_strength)
+   slot=int(await c.fetchval("SELECT canary_slot FROM champion_league WHERE genome_id=$1",worst['genome_id']))
+   async with c.transaction():
+    await c.execute("UPDATE champion_league SET canary_slot=NULL,canary_demoted_at=now(),updated_at=now(),notes=notes||$2::jsonb WHERE genome_id=$1",
+                    worst['genome_id'],json.dumps({'canary_last_event':'demoted_by_upstart','canary_replaced_by':challenger['genome_id']}))
+    await c.execute("UPDATE champion_league SET canary_slot=$2,canary_since=now(),canary_demoted_at=NULL,updated_at=now(),notes=notes||$3::jsonb WHERE genome_id=$1",
+                    challenger['genome_id'],slot,json.dumps({'canary_last_event':'promoted_from_paper','canary_replaced':worst['genome_id']}))
+   rotation={'in':challenger['genome_id'],'out':worst['genome_id'],'slot':slot,
+             'challenger_forward_n':challenger['forward']['n'],
+             'challenger_forward_score':challenger['forward']['score'],
+             'incumbent_forward_score':worst['forward'].get('score')}
+   rows=await c.fetch("SELECT genome_id,canary_slot FROM champion_league WHERE active=true AND canary_slot IS NOT NULL ORDER BY canary_slot")
+ return {'size':CANARY_ROSTER_SIZE,'roster':[{'slot':int(r['canary_slot']),'genome_id':r['genome_id']} for r in rows],'rotation':rotation}
 
 async def seed_founders(c):
  await ensure_schema(c); cutoff=int(await c.fetchval('SELECT coalesce(max(id),0) FROM research_candidates') or 0)
@@ -234,8 +318,13 @@ async def refresh_rankings(c,allow_promotion=True):
   priority_note={'historical_priority_tier':x['historical_priority'],'historical_priority_basis':'breeding_visible_arena_v1'} if x['historical_priority'] else {'historical_priority_tier':None,'historical_priority_basis':'breeding_visible_arena_v1'}
   await c.execute("""UPDATE champion_league SET arena_score=$2,forward_score=$3,total_score=$4,behaviour_signature=$5,
     arena_stats=$6::jsonb,forward_stats=$7::jsonb,notes=notes||$8::jsonb,updated_at=now() WHERE genome_id=$1""",x['genome_id'],x['arena']['score'],x['forward']['score'],x['total'],x['sig'],json.dumps(x['arena']),json.dumps(x['forward']),json.dumps(priority_note))
- quals=sorted([x for x in computed if x['pool']=='qualification'],key=lambda x:(x['total'] is not None,x['total'] or -1e9),reverse=True)
- quals,duplicate_retire=_cap_qualification_behaviours(quals)
+ canary=await sync_canary_roster(c,computed,allow_rotation=allow_promotion)
+ canary_ids={x['genome_id'] for x in canary['roster']}
+ all_quals=sorted([x for x in computed if x['pool']=='qualification'],key=lambda x:(x['total'] is not None,x['total'] or -1e9),reverse=True)
+ quals,duplicate_retire=_cap_qualification_behaviours(all_quals)
+ protected_dupes=[q for q in duplicate_retire if q['genome_id'] in canary_ids]
+ duplicate_retire=[q for q in duplicate_retire if q['genome_id'] not in canary_ids]
+ quals=sorted(quals+protected_dupes,key=lambda x:(x['total'] is not None,x['total'] or -1e9),reverse=True)
  for q in duplicate_retire:
   await c.execute("UPDATE champion_league SET active=false,retired_at=now(),retirement_reason='duplicate_behaviour_cap',qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",q['genome_id'])
  elites=[x for x in computed if x['pool']=='elite'];promotion=None
@@ -247,6 +336,7 @@ async def refresh_rankings(c,allow_promotion=True):
  retired=[{'genome_id':q['genome_id'],'reason':'duplicate_behaviour_cap','age_days':None,'forward_n':q['forward'].get('n',0),'total_score':q['total']} for q in duplicate_retire]
  now=datetime.now(timezone.utc)
  for q in quals:
+  if q['genome_id'] in canary_ids: continue
   row=next((a for a in ants if a['genome_id']==q['genome_id']),None)
   if not row: continue
   age_days=max(0.0,(now-row['enrolled_at']).total_seconds()/86400.0)
@@ -274,4 +364,4 @@ async def refresh_rankings(c,allow_promotion=True):
     await c.execute("UPDATE champion_league SET pool='qualification',elite_slot=NULL,qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",worst['genome_id'])
     await c.execute("UPDATE champion_league SET pool='elite',elite_slot=$2,promoted_at=now(),qualification_rank=NULL,updated_at=now() WHERE genome_id=$1",q['genome_id'],slot)
    promotion={'in':q['genome_id'],'out':worst['genome_id'],'slot':slot,'challenger_total':q['total'],'incumbent_total':worst['total']};break
- return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'historical_priority':[{'genome_id':x['genome_id'],'tier':x['historical_priority'],'arena_n':x['arena']['n'],'arena_mean':x['arena']['mean'],'arena_median':x['arena']['median'],'arena_win_rate':x['arena']['win_rate'],'arena_worst':x['arena']['worst']} for x in computed if x['historical_priority']], 'promotion':promotion,'retired':retired,'max_qualification_days':MAX_QUALIFICATION_DAYS,'max_qualifiers_per_behaviour':MAX_QUALIFIERS_PER_BEHAVIOUR,'min_promotion_win_rate':MIN_PROMOTION_WIN_RATE,'max_promotion_single_loss_pct':MAX_PROMOTION_SINGLE_LOSS_PCT,'min_promotion_median_pct':MIN_PROMOTION_MEDIAN_PCT,'min_promotion_positive_day_rate':MIN_PROMOTION_POSITIVE_DAY_RATE,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}
+ return {'elite':[x['genome_id'] for x in sorted(elites,key=lambda z:z['elite_slot'] or 99)],'canary':canary,'qualification_count':len(quals),'top_qualification':[{'genome_id':x['genome_id'],'total_score':x['total'],'arena_score':x['arena']['score'],'forward_score':x['forward']['score'],'forward_n':x['forward']['n'],'forward_days':x['forward'].get('days',0)} for x in quals[:10]],'historical_priority':[{'genome_id':x['genome_id'],'tier':x['historical_priority'],'arena_n':x['arena']['n'],'arena_mean':x['arena']['mean'],'arena_median':x['arena']['median'],'arena_win_rate':x['arena']['win_rate'],'arena_worst':x['arena']['worst']} for x in computed if x['historical_priority']], 'promotion':promotion,'retired':retired,'max_qualification_days':MAX_QUALIFICATION_DAYS,'max_qualifiers_per_behaviour':MAX_QUALIFIERS_PER_BEHAVIOUR,'min_promotion_win_rate':MIN_PROMOTION_WIN_RATE,'max_promotion_single_loss_pct':MAX_PROMOTION_SINGLE_LOSS_PCT,'min_promotion_median_pct':MIN_PROMOTION_MEDIAN_PCT,'min_promotion_positive_day_rate':MIN_PROMOTION_POSITIVE_DAY_RATE,'promotion_cooldown_seconds':PROMOTION_COOLDOWN_SECONDS,'promotion_cooldown_remaining':promotion_cooldown_remaining}

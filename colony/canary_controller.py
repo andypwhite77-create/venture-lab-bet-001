@@ -1,8 +1,8 @@
-"""Reversal canary controller.
+"""Champion-roster canary controller.
 
-Owns no trading authority. It observes the dedicated wallet, converts high-consensus
-Reversal events into bounded trade intents, and refuses to arm if hard safety checks fail.
-A separate user-controlled signer/execution layer is required to broadcast transactions.
+Owns no trading authority. It observes the dedicated wallet and converts signals from
+the fixed Champion Canary roster into bounded trade intents. Research ants outside the
+roster cannot trigger real-money Canary execution.
 """
 from __future__ import annotations
 import asyncio,json,os,time,urllib.request
@@ -48,19 +48,27 @@ async def ensure_schema():
           live_enabled BOOLEAN NOT NULL DEFAULT false,broadcast BOOLEAN NOT NULL DEFAULT false,
           hold_minutes INT,created_at TIMESTAMPTZ NOT NULL DEFAULT now())''')
         await c.execute('ALTER TABLE canary_trade_intents ADD COLUMN IF NOT EXISTS hold_minutes INT')
-async def latest_reversal_groups(limit=50):
+        await c.execute('''CREATE TABLE IF NOT EXISTS canary_intent_votes(
+          intent_id BIGINT NOT NULL REFERENCES canary_trade_intents(id) ON DELETE CASCADE,
+          candidate_id BIGINT NOT NULL,genome_id TEXT NOT NULL,canary_slot INT,
+          intended_hold_minutes INT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          PRIMARY KEY(intent_id,genome_id))''')
+        await c.execute('CREATE INDEX IF NOT EXISTS canary_intent_votes_genome ON canary_intent_votes(genome_id,candidate_id)')
+
+async def latest_canary_groups(limit=50):
     async with connection() as c:
-        rows=await c.fetch('''WITH latest_run AS (
-          SELECT run_id,last_candidate_id FROM reversal_tournament_runs ORDER BY created_at DESC LIMIT 1),
-        aa AS (SELECT count(*)::int n FROM reversal_tournament_ants a JOIN latest_run r USING(run_id) WHERE a.active=true),
+        rows=await c.fetch('''WITH aa AS (
+          SELECT count(*)::int n FROM champion_league WHERE active=true AND canary_slot IS NOT NULL),
         x AS (SELECT e.candidate_id,e.mint,min(e.observed_at) observed_at,
           count(DISTINCT e.genome_id)::int votes,
-          percentile_cont(0.5) within group(order by e.hold_minutes)::int hold_minutes
-          FROM reversal_tournament_entries e JOIN latest_run r USING(run_id)
-          JOIN reversal_tournament_ants a ON a.run_id=e.run_id AND a.genome_id=e.genome_id AND a.active=true
-          WHERE e.candidate_id>$1 AND e.candidate_id <= r.last_candidate_id GROUP BY e.candidate_id,e.mint)
+          percentile_cont(0.5) within group(order by e.hold_minutes)::int hold_minutes,
+          json_agg(json_build_object('genome_id',e.genome_id,'canary_slot',a.canary_slot,
+                                     'hold_minutes',e.hold_minutes) ORDER BY a.canary_slot) voters
+          FROM champion_paper_entries e
+          JOIN champion_league a ON a.genome_id=e.genome_id AND a.active=true AND a.canary_slot IS NOT NULL
+          WHERE e.candidate_id>$1 AND e.observed_at > now()-interval '3 minutes' GROUP BY e.candidate_id,e.mint)
         SELECT x.*,aa.n active_ants FROM x CROSS JOIN aa
-        WHERE NOT EXISTS (
+        WHERE aa.n>0 AND NOT EXISTS (
           SELECT 1 FROM canary_trade_intents i WHERE i.candidate_id=x.candidate_id)
         ORDER BY x.candidate_id ASC LIMIT $2''',START_AFTER,limit)
     return [dict(r) for r in rows]
@@ -74,11 +82,18 @@ async def record_intent(g,rate,balance_sol,status,reason):
     requested_sol=requested_gbp/rate if rate>0 else 0.0
     frac=(g['votes']/g['active_ants']) if g['active_ants'] else 0.0
     async with connection() as c:
-        await c.execute('''INSERT INTO canary_trade_intents(candidate_id,mint,observed_at,votes,active_ants,
+        inserted=await c.fetchrow('''INSERT INTO canary_trade_intents(candidate_id,mint,observed_at,votes,active_ants,
           vote_fraction,requested_gbp,requested_sol,wallet_sol,wallet_gbp,status,reason,live_enabled,broadcast,hold_minutes)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false,$14) ON CONFLICT(candidate_id) DO NOTHING''',
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false,$14)
+          ON CONFLICT(candidate_id) DO NOTHING RETURNING id''',
           g['candidate_id'],g['mint'],g['observed_at'],g['votes'],g['active_ants'],frac,
           requested_gbp,requested_sol,balance_sol,balance_sol*rate,status,reason,LIVE_ENABLED,g.get('hold_minutes'))
+        if inserted:
+            voters=g.get('voters') or []
+            if isinstance(voters,str): voters=json.loads(voters)
+            await c.executemany('''INSERT INTO canary_intent_votes(intent_id,candidate_id,genome_id,canary_slot,intended_hold_minutes)
+              VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING''',
+              [(inserted['id'],g['candidate_id'],v['genome_id'],v.get('canary_slot'),int(v['hold_minutes'])) for v in voters])
 async def process_once():
     await ensure_schema()
     rate,_=sol_gbp_rate()
@@ -89,7 +104,7 @@ async def process_once():
     except Exception as e:
         return {'ok':False,'reason':'wallet_rpc_failed','error':type(e).__name__}
     out=[]
-    for g in await latest_reversal_groups():
+    for g in await latest_canary_groups():
         if await already_seen(g['candidate_id']):
             continue
         frac=(g['votes']/g['active_ants']) if g['active_ants'] else 0.0
@@ -97,7 +112,7 @@ async def process_once():
         if wallet_gbp<=FLOOR_GBP:
             status,reason='rejected','floor_reached'
         elif g['votes']<MIN_VOTES:
-            status,reason='rejected','no_active_reversal_vote'
+            status,reason='rejected','no_canary_roster_vote'
         else:
             status,reason='ready','awaiting_user_controlled_execution_layer'
         await record_intent(g,rate,balance_sol,status,reason)

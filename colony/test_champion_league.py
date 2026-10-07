@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime,timezone,timedelta
-from colony.champion_league import _score,_behaviour_signature,_cooldown_remaining,_retirement_reason,_cap_qualification_behaviours,_historical_priority,_priority_sort_key,MAX_QUALIFICATION_DAYS,MIN_FORWARD_EVENTS
+from colony.champion_league import _score,_behaviour_signature,_cooldown_remaining,_retirement_reason,_cap_qualification_behaviours,_historical_priority,_priority_sort_key,_passes_canary_paper_gate,_challenger_beats_canary,MAX_QUALIFICATION_DAYS,MIN_FORWARD_EVENTS
 
 class ChampionLeagueTests(unittest.TestCase):
  def test_score_rewards_consistent_positive_returns(self):
@@ -49,6 +49,30 @@ class ChampionLeagueTests(unittest.TestCase):
    {'genome_id':'a','notes':{'historical_priority_tier':'A+'}},
   ]
   self.assertEqual([r['genome_id'] for r in sorted(rows,key=_priority_sort_key)],['a','b','z'])
+
+
+ def test_canary_gate_requires_25_fresh_reliable_trades(self):
+  good={'forward':{'n':25,'days':3,'win_rate':.60,'worst':-10,'median':1.0,'positive_day_rate':.67,'score':2},
+        'arena':{'score':1},'total':1.5}
+  self.assertTrue(_passes_canary_paper_gate(good))
+  bad={**good,'forward':{**good['forward'],'n':24}}
+  self.assertFalse(_passes_canary_paper_gate(bad))
+
+ def test_upstart_must_beat_canary_forward_total_and_arena(self):
+  incumbent={'forward':{'n':80,'days':8,'win_rate':.55,'worst':-20,'median':.3,'positive_day_rate':.7,'score':1},
+             'arena':{'score':1},'total':1}
+  challenger={'forward':{'n':25,'days':3,'win_rate':.65,'worst':-10,'median':1,'positive_day_rate':.8,'score':2},
+              'arena':{'score':2},'total':2}
+  self.assertTrue(_challenger_beats_canary(challenger,incumbent))
+  challenger['total']=.5
+  self.assertFalse(_challenger_beats_canary(challenger,incumbent))
+
+
+ def test_canary_members_are_protected_from_generic_qualification_culls(self):
+  import inspect,colony.champion_league as cl
+  src=inspect.getsource(cl.refresh_rankings)
+  self.assertIn("protected_dupes=[q for q in duplicate_retire if q['genome_id'] in canary_ids]",src)
+  self.assertIn("if q['genome_id'] in canary_ids: continue",src)
 
  def test_training_budget_retirement(self):
   self.assertIsNone(_retirement_reason(MAX_QUALIFICATION_DAYS-1,0,-99,-1))

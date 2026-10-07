@@ -71,6 +71,7 @@ services:
     environment:
       DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
       PORT: "8000"
+      CHAMPION_CANARY_ROSTER_SIZE: "${CHAMPION_CANARY_ROSTER_SIZE:-5}"
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:
@@ -271,6 +272,7 @@ services:
       CANARY_FLOOR_GBP: "0.00"
       CANARY_MIN_VOTES: "1"
       CANARY_RESERVE_SOL: "0.003"
+      CHAMPION_CANARY_ROSTER_SIZE: "${CHAMPION_CANARY_ROSTER_SIZE:-5}"
       CANARY_START_AFTER_CANDIDATE_ID: "2283"
       CANARY_ADDRESS_FILE: /run/canary/reversal_canary_address.txt
     volumes:
