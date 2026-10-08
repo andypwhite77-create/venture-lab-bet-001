@@ -52,7 +52,7 @@ All other existing candidates enter **Qualification**. The latest two Queen fina
 
 A challenger may replace the weakest Elite only when it is behaviourally distinct, has at least 25 forward observations across at least three days, and beats the incumbent on both conservative historical Arena score and conservative forward score. Arena results are intentionally not a sealed exam and may be used as ranking evidence. The existing sealed Spartan exam remains separate and is not fed back into breeding.
 
-`colony/champion_league.py` owns the research league. `scripts/champion_league_tick.py` performs a signer-free maintenance tick: seed/retain incumbents, admit the latest Queen top two, capture new forward-paper opportunities, refresh Arena ranking, and apply research-pool promotions. A five-minute cron runs this research-only tick under `flock`; it has no wallet, signer, or broadcast authority.
+`colony/champion_league.py` owns the research league. `scripts/champion_league_tick.py` performs a signer-free maintenance tick: seed/retain incumbents, admit the latest Queen top five behaviour-distinct finalists, capture new forward-paper opportunities, refresh Arena ranking, and apply research-pool promotions. A five-minute cron runs this research-only tick under `flock`; it has no wallet, signer, or broadcast authority.
 
 Real-money Canary execution remains a separate human-controlled layer and is not automatically armed by Elite status or league promotion.
 

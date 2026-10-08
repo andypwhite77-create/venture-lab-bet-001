@@ -4,7 +4,7 @@
 
 Breeding Queen is the sole genome factory. She owns mutation, breeding, diversity maintenance and ranked campaign finalists. She may use research-safe Swarm priorities as search guidance, but Swarm prose or LLM output never directly creates a genome.
 
-Only the top two ranked performers from each completed Breeding Queen campaign are handed into the active Qualification league. Those challengers must still beat incumbent Elite performance on cumulative Arena evidence and genuine forward evidence before promotion.
+Only the top five behaviour-distinct ranked performers from each completed Breeding Queen campaign are handed into the active Qualification league. This widens prospective exploration without weakening any evidence or promotion gate. Those challengers must still beat incumbent Elite performance on cumulative Arena evidence and genuine forward evidence before promotion.
 
 Breeding Queen has no wallet, signing or capital-allocation authority and cannot change Spartan's sealed exam or evidence gates.
 

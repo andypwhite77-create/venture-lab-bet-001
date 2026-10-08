@@ -16,7 +16,7 @@ BREEDING_QUEEN = {
         "learn_from_research_safe_history_and_forward_careers",
         "maintain_behavioural_diversity",
         "produce_ranked_campaign_finalists",
-        "handoff_top_two_to_qualification",
+        "handoff_top_five_distinct_to_qualification",
     ],
     "forbidden": [
         "trade_or_sign",
@@ -24,7 +24,7 @@ BREEDING_QUEEN = {
         "lower_evidence_gates",
         "allocate_real_capital",
     ],
-    "qualification_handoff": 2,
+    "qualification_handoff": 5,
     "operating_mode": "precision",
     "batch_size": 10000,
     "waves_per_campaign": 2,

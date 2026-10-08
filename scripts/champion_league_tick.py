@@ -2,13 +2,13 @@
 """One research-only Champion League maintenance tick.
 
 No signer, no wallet access, no broadcast capability. It enrolls the latest Queen top
-2, records forward paper opportunities, appends immutable qualification evidence,
+5 distinct finalists, records forward paper opportunities, appends immutable qualification evidence,
 refreshes Arena rankings, and applies research-pool promotions only when both
 historical and forward evidence beat an Elite incumbent.
 """
 import asyncio,json
 from db import init_db,connection
-from colony.champion_league import seed_founders,enroll_queen_top2,paper_run_once,refresh_rankings
+from colony.champion_league import seed_founders,enroll_queen_candidates,paper_run_once,refresh_rankings
 from colony.qualification_corpus import sync as sync_corpus,snapshot as corpus_snapshot
 from colony.reliability_lab import enroll as enroll_reliability_lab
 
@@ -21,7 +21,7 @@ async def main():
   queen=None
   if r:
    fs=r['finalists'];fs=json.loads(fs) if isinstance(fs,str) else list(fs or [])
-   queen=await enroll_queen_top2(c,fs,int(r['id']))
+   queen=await enroll_queen_candidates(c,fs,int(r['id']))
   paper=await paper_run_once(c,1000)
   corpus_sync=await sync_corpus(c)
   ranking=await refresh_rankings(c,allow_promotion=True)

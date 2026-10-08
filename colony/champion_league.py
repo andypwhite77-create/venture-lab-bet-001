@@ -228,7 +228,7 @@ async def seed_founders(c):
     r['genome_id'],r['family'],json.dumps(_json(r['genome'])),r['source'],cutoff)
  return {'elite':seeded,'qualification':await c.fetchval("SELECT count(*) FROM champion_league WHERE pool='qualification'")}
 
-async def enroll_queen_top2(c,finalists,campaign):
+async def enroll_queen_candidates(c,finalists,campaign):
  await ensure_schema(c);cutoff=int(await c.fetchval('SELECT coalesce(max(id),0) FROM research_candidates') or 0)
  ranked=sorted(finalists or [],key=lambda x:float(x.get('selection_score',-1e9)),reverse=True)
  added=[]

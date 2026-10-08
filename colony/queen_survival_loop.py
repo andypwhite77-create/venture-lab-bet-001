@@ -1,7 +1,7 @@
 """Persistent Breeding Queen discovery loop.
 
 Breeding Queen is the sole genome factory. She breeds on research-safe train+validation
-evidence, produces ranked finalists, and hands only her top two campaign performers to
+evidence, produces ranked finalists, and hands only a small behaviour-distinct finalist cohort to
 Qualification. Swarm Queen is a separate research director and never spawns genomes.
 Exact Spartan thresholds/results are not fed back into breeding.
 """

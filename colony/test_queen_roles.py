@@ -5,7 +5,7 @@ class QueenRoleTests(unittest.TestCase):
     def test_breeding_queen_is_only_genome_factory(self):
         self.assertEqual(BREEDING_QUEEN['authority'],'sole_genome_factory')
         self.assertIn('breed_and_mutate_genomes',BREEDING_QUEEN['responsibilities'])
-        self.assertEqual(BREEDING_QUEEN['qualification_handoff'],2)
+        self.assertEqual(BREEDING_QUEEN['qualification_handoff'],5)
 
     def test_swarm_is_research_director_not_breeder(self):
         self.assertEqual(SWARM_QUEEN['authority'],'research_director')
