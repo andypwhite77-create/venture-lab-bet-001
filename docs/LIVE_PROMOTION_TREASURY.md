@@ -14,9 +14,13 @@ The five Eve v2 reference ants are registered as `reference-testing` across reve
 
 The five frozen Eve v3 Beast Cohort ants are also registered as `reference-testing` across pullback, accumulation, compression, exhaustion and drawdown-reversal families. They begin forward paper evidence only after the v3 freeze and do not inherit v2 paper history.
 
-## Canary profiles
+## Canary roster and profiles
 
-The existing Reversal canary remains unchanged and consensus-based. Individual Spartan graduates and Eve reference ants use the registry profile `individual-ant-v1`; this is a routing contract for the future individual-ant canary runner and does not reuse the Reversal consensus exam.
+The real-money Canary signal source is now a fixed, merit-based Champion roster rather than the entire active Reversal tournament population. The roster defaults to five seats and is configured with `CHAMPION_CANARY_ROSTER_SIZE`. Only Champion paper entries from genomes holding a current `canary_slot` may generate a Canary intent; research ants outside the roster have no direct real-money signal authority.
+
+Each generated intent records its individual supporting voters in `canary_intent_votes`, including `genome_id`, Canary slot and intended hold. This creates auditable per-ant Canary evidence for the later promotion ladder without granting those ants independent signing authority.
+
+Individual Spartan graduates and Eve reference ants still use the registry profile `individual-ant-v1`; registry status is separate from the current Champion-roster signal path and never grants execution authority by itself.
 
 ## Treasury policy
 
@@ -48,9 +52,19 @@ Closed forward outcomes are included in Queen prospective experience. Their mint
 
 The research promotion model now uses five incumbent **Elite** behaviours rather than treating Spartan as a binary executioner. The founding Elite are the five best distinct full-period Reversal behaviours from the forward tournament; duplicate entry signatures are collapsed so clones cannot manufacture consensus.
 
-All other existing candidates enter **Qualification**. The latest two Queen finalists from each observed Queen run are admitted to Qualification; the rest remain research history rather than bloating the active challenger pool. Qualification is continuously ranked in a public **Spartan Arena** over the broad historical dataset, while each challenger also accumulates prospective paper evidence from its enrollment cutoff.
+All other existing candidates enter **Qualification**. The latest five behaviour-distinct Queen finalists from each observed Queen run are admitted to Qualification; the rest remain research history rather than bloating the active challenger pool. Qualification is continuously ranked in a public **Spartan Arena** over the broad historical dataset, while each challenger also accumulates prospective paper evidence from its enrollment cutoff.
 
 A challenger may replace the weakest Elite only when it is behaviourally distinct, has at least 25 forward observations across at least three days, and beats the incumbent on both conservative historical Arena score and conservative forward score. Arena results are intentionally not a sealed exam and may be used as ranking evidence. The existing sealed Spartan exam remains separate and is not fed back into breeding.
+
+### Merit-based Canary rotation — 8 October 2026
+
+Champion League now maintains a fixed-size Canary roster. Every maintenance tick evaluates non-roster challengers against the weakest current Canary member. A challenger must have at least 25 genuinely post-enrollment forward observations across at least three days, at least 55% wins, median return of at least +0.25%, at least 60% positive days, no single forward loss worse than -25%, and a behaviour signature not already represented by the rest of the Canary roster. It must also beat the incumbent on forward score, historical Arena score and combined Champion score.
+
+At most one Canary seat may rotate per maintenance tick. Canary members are protected from generic qualification duplicate-culls and training-budget expiry while they hold a seat; normal removal is through being beaten by a qualified upstart or an explicit roster-size change.
+
+The first automatic Canary eviction occurred on 8 October 2026: `g_50357d0bba4d8ad9` reached the gate at 25 fresh trades / three days and replaced `g_bd729464d0b52699` in Canary slot 3. This was a roster change only; it did not alter global arming or signer authority.
+
+The intended longer ladder is `paper -> Canary roster -> per-ant Canary evidence -> live pool`. The later requirement of roughly 25 attributable Canary trades before live-pool eligibility is a planned gate, not yet an automatic promotion rule. Live authority remains explicitly human-controlled.
 
 `colony/champion_league.py` owns the research league. `scripts/champion_league_tick.py` performs a signer-free maintenance tick: seed/retain incumbents, admit the latest Queen top five behaviour-distinct finalists, capture new forward-paper opportunities, refresh Arena ranking, and apply research-pool promotions. A five-minute cron runs this research-only tick under `flock`; it has no wallet, signer, or broadcast authority.
 
@@ -65,7 +79,7 @@ New challengers can therefore be fast-tracked through the full accumulated corpu
 The admin control plane exposes the five Elite incumbents, the top Qualification leaderboard and corpus coverage. It also stores an operator-requested Elite capital mode (`off`, `canary`, `live`). This state is intentionally separate from execution authority: league promotion never grants money access, global live-stop forces the requested mode back to `off`, and `live` remains blocked unless a separate execution bridge is explicitly connected.
 
 
-## Reversal Canary hardening — 2 October 2026
+## Reversal Canary hardening — 2 October 2026 (historical; trigger/floor later superseded)
 
 The Reversal Canary is an isolated, human-gated execution path with £1 maximum trade size, £4 wallet floor, >=80% active-Reversal consensus, one-position maximum, fresh Kraken SOL/GBP validation, Jupiter quote validation and fail-closed crash reconciliation. The controller creates intents but owns no broadcast capability; the executor/signer path remains disarmed until the dry-run gate is satisfied and the operator explicitly arms it.
 

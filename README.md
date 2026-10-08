@@ -34,6 +34,14 @@ Reversal runs a bounded continuous-v2 prospective lineage; failed but informativ
 
 See `docs/QUEEN_ARCHITECTURE.md`, `docs/grace-colony-architecture.md`, `docs/grace-evolutionary-trading-swarm.md`, and `docs/SPARTAN_V2.md` for the current platform model.
 
+### Champion Canary merit roster — 8 October 2026
+
+The Canary signal source is a fixed Champion roster (default five seats), not the full Reversal research population. Research challengers earn a roster seat only after at least 25 fresh paper trades across three days and must satisfy reliability gates for win rate, median return, positive-day rate and worst loss while beating the weakest incumbent on forward, historical Arena and combined Champion scores. One roster seat may rotate per five-minute maintenance tick.
+
+Canary intents persist individual voter attribution in `canary_intent_votes`, making future per-ant Canary qualification measurable. The intended next rung is to require a meaningful attributable Canary sample (target roughly 25 Canary trades) before live-pool eligibility; that second automatic promotion is not implemented yet. Global live authority remains human-controlled.
+
+Breeding Queen campaign handoff is now five behaviour-distinct finalists rather than two. Search volume remains two 10,000-genome waves followed by the restart-safe 24-hour cooldown, and no Champion/Canary/Spartan evidence gate was weakened.
+
 ## Safety / research guardrails
 
 The current build has deliberately hard boundaries:
@@ -42,7 +50,7 @@ The current build has deliberately hard boundaries:
 - Queen/research services receive no private keys or signer credentials;
 - the isolated Canary signer path is disabled unless explicitly human-armed after a successful genuine future dry run;
 - no leverage or borrowing;
-- £1 Canary max trade, £4 wallet floor, >=80% Reversal consensus, one-position maximum and fail-closed reconciliation;
+- £1 Canary max trade, 0.003 SOL network/exit reserve, fixed Champion Canary roster, one-position maximum and fail-closed reconciliation;
 - conservative assumed round-trip friction on research trades;
 - RPC credit budgets with hard stops;
 - candidate deduplication/cooldowns;

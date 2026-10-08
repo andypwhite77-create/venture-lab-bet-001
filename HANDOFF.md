@@ -13,7 +13,7 @@ Important existing facts:
 - Existing controller: `colony/canary_controller.py`.
 - Existing table: `canary_trade_intents`.
 - Existing scripts: `scripts/canary-*`.
-- Current limits are £1 max trade, £4 wallet floor, >=80% Reversal consensus, one open position maximum, no leverage/margin/borrowing.
+- Current live limits are £1 max trade, 0.003 SOL network/exit reserve, fixed Champion Canary roster, one open position maximum, no leverage/margin/borrowing. Historical sections below retain superseded consensus/floor settings for audit context.
 
 Security rules:
 - Never print, echo, copy, expose, or log private keys, API keys, bearer tokens, or secret `.env` values.
@@ -203,3 +203,17 @@ The two historical bug exposures were migrated to `status=recovery` only after p
 - #130 is reconciled as `canary_execution_v2`: entry fee 0.000010907 SOL, exit fee 0.000009330 SOL, known recoverable rent 0.001488440 SOL, and net economic loss after known rent of about 0.001816235 SOL.
 - Older eight closed live trades are explicitly tagged `legacy_v1`; they were not bulk-rewritten because the historical on-chain reconciliation batch was blocked by a platform safeguard.
 - Full colony suite passed 115/115 after cleanup. Commit: f9db422.
+
+## Champion Canary roster and Queen handoff — 2026-10-08
+
+The Canary signal source has moved from the broad active Reversal population to a fixed Champion roster. Default roster size is five (`CHAMPION_CANARY_ROSTER_SIZE=5`). `colony/canary_controller.py` now reads current roster members from `champion_league.canary_slot` and only considers their fresh `champion_paper_entries`. It records per-intent supporting genomes, roster slots and intended holds in `canary_intent_votes`.
+
+Automatic Canary rotation runs inside the existing five-minute Champion maintenance tick. A challenger must have >=25 genuinely fresh forward observations across >=3 days, win rate >=55%, median >=+0.25%, positive-day rate >=60%, worst forward trade >=-25%, a non-duplicate behaviour signature, and must beat the weakest Canary incumbent on forward, Arena and combined Champion score. At most one roster seat changes per tick. A seated Canary ant is protected from generic qualification expiry/duplicate culls until displaced or removed by roster resizing.
+
+First automatic eviction: on 2026-10-08, `g_50357d0bba4d8ad9` replaced `g_bd729464d0b52699` in Canary slot 3 after reaching 25 fresh trades across three days. This did not alter signer/global arm state.
+
+The Breeding Queen handoff is now five behaviour-distinct finalists per completed campaign instead of two. This widens prospective paper exploration only. Breeding remains 10,000 genomes per wave, two waves per campaign, 24-hour restart-safe cooldown. Spartan, Champion and Canary evidence gates are unchanged.
+
+Intended future ladder: paper evidence -> Canary roster -> attributable per-ant Canary evidence -> live pool. A target of roughly 25 attributable Canary trades before live-pool eligibility is planned but is NOT yet an automatic rule. Human authority remains required for live enable.
+
+Known evidence-pipeline issue: Champion paper accepts arbitrary genome hold durations, but the standard research outcome bank does not automatically request every noncanonical exact horizon. A six-minute genome can therefore accumulate Champion paper entries without corresponding six-minute scored outcomes. Do not retrospectively backfill these as prospective evidence. The correct future repair is to prospectively call `request_candidate_outcome()` when Champion records a noncanonical hold, before that horizon matures.
