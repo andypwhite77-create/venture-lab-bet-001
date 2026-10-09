@@ -217,3 +217,13 @@ The Breeding Queen handoff is now five behaviour-distinct finalists per complete
 Intended future ladder: paper evidence -> Canary roster -> attributable per-ant Canary evidence -> live pool. A target of roughly 25 attributable Canary trades before live-pool eligibility is planned but is NOT yet an automatic rule. Human authority remains required for live enable.
 
 Known evidence-pipeline issue: Champion paper accepts arbitrary genome hold durations, but the standard research outcome bank does not automatically request every noncanonical exact horizon. A six-minute genome can therefore accumulate Champion paper entries without corresponding six-minute scored outcomes. Do not retrospectively backfill these as prospective evidence. The correct future repair is to prospectively call `request_candidate_outcome()` when Champion records a noncanonical hold, before that horizon matures.
+
+## Admin trading desk — 2026-10-09
+
+The private admin console now has a read-only trading desk powered by `colony/admin_analytics.py` and `GET /admin/api/analytics?window=...`. Supported windows are 24h, 7d, 30d, 90d and all-time.
+
+Server-side analytics are the accounting authority for the UI. They calculate realised live Canary P&L after network fees, economic-equity curve, per-trade P&L, cumulative P&L, cumulative fees, running win rate, profit factor, max drawdown, current wallet cash, spendable cash above the 0.003 SOL reserve, open/recovery/uncertain positions, rejection reasons, roster state, challenger promotion progress and equal-share voter attribution. The browser only renders these values.
+
+The admin UI provides adjustable chart metric/window selectors plus tables for positions, real Canary fills, execution quality, Canary seats, promotion race and ant contribution. It intentionally has no manual order-entry ticket and grants no new execution authority.
+
+The stale £4 admin wallet/component floor has been migrated to £0 to match current Canary execution configuration. The real reserve remains 0.003 SOL and the real max trade remains £1. Deployment restarted only the admin service; Canary controller/executor were not rebuilt or restarted.

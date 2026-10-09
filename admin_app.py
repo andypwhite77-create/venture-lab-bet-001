@@ -10,6 +10,8 @@ from colony.champion_league import ensure_schema as ensure_champion_schema
 from colony.qualification_corpus import ensure_schema as ensure_corpus_schema, snapshot as qualification_corpus_snapshot
 from colony.queen_roles import snapshot as queen_role_snapshot
 from colony.admin_auth import ensure_schema as ensure_auth_schema, current_password_hash, verify_password as verify_admin_password, reset_password_with_token
+from colony.admin_analytics import snapshot as trading_analytics_snapshot, WINDOWS as ANALYTICS_WINDOWS
+from colony.paper_economics import sol_gbp_rate
 
 app = FastAPI(title="Venture Lab Control Plane", docs_url=None, redoc_url=None, openapi_url=None)
 USER = os.getenv("ADMIN_USERNAME", "admin")
@@ -107,8 +109,8 @@ async def ensure_schema():
         for name,svc,mode in defaults:
             await c.execute('INSERT INTO admin_components(name,service_name,mode) VALUES($1,$2,$3) ON CONFLICT(name) DO NOTHING',name,svc,mode)
         addr='j4nCnM29iyZx9n8oKHXBk8HNJESZb5yaBsA1VkvtkGZ'
-        wid=await c.fetchval("INSERT INTO admin_wallets(label,address,mode,max_trade_gbp,floor_gbp) VALUES('Reversal Canary',$1,'shadow',1,4) ON CONFLICT(address) DO UPDATE SET address=EXCLUDED.address RETURNING id",addr)
-        await c.execute("UPDATE admin_components SET wallet_id=COALESCE(wallet_id,$1),max_trade_gbp=COALESCE(max_trade_gbp,1),floor_gbp=COALESCE(floor_gbp,4) WHERE name='reversal_canary'",wid)
+        wid=await c.fetchval("INSERT INTO admin_wallets(label,address,mode,max_trade_gbp,floor_gbp) VALUES('Reversal Canary',$1,'shadow',1,0) ON CONFLICT(address) DO UPDATE SET floor_gbp=0 RETURNING id",addr)
+        await c.execute("UPDATE admin_components SET wallet_id=COALESCE(wallet_id,$1),max_trade_gbp=COALESCE(max_trade_gbp,1),floor_gbp=0 WHERE name='reversal_canary'",wid)
 
 async def audit(action,target=None,detail=None):
     async with connection() as c:
@@ -202,6 +204,21 @@ async def api_state(request:Request):
     roles=queen_role_snapshot()
     queen={'campaign':qsurv.get('campaign'),'tested':qsurv.get('tested'),'finalists':qsurv.get('finalists'),'holdout_positive':qsurv.get('holdout_positive'),'spartan_survivors':qsurv.get('spartan_survivors'),'memory_campaigns':qmem.get('campaigns'),'preferred_features':(qmem.get('preferred_features') or [])[:6],'role':roles['breeding_queen']}
     return {'wallets':wallets,'components':components,'control':control,'elite_control':elite_control,'elite_roster':elite_roster,'qualification_top':qualification_top,'qualification_corpus':qualification_corpus,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'swarm_queen':swarm,'queen_roles':roles,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
+
+@app.get('/admin/api/analytics')
+async def api_analytics(request:Request,window:str='24h'):
+    auth(request)
+    if window not in ANALYTICS_WINDOWS: raise HTTPException(400,'bad_window')
+    rate,rate_source=sol_gbp_rate()
+    balance=None
+    async with connection() as c:
+        addr=await c.fetchval("SELECT address FROM admin_wallets WHERE label='Reversal Canary' ORDER BY id LIMIT 1")
+        if addr:
+            try: balance=await sol_balance(addr)
+            except Exception: balance=None
+        payload=await trading_analytics_snapshot(c,window,float(rate),balance,float(os.getenv('CANARY_RESERVE_SOL','0.003')))
+    payload['rate_source']=rate_source
+    return payload
 
 @app.post('/admin/api/wallets')
 async def add_wallet(data:WalletIn,request:Request):

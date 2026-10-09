@@ -34,6 +34,14 @@ Reversal runs a bounded continuous-v2 prospective lineage; failed but informativ
 
 See `docs/QUEEN_ARCHITECTURE.md`, `docs/grace-colony-architecture.md`, `docs/grace-evolutionary-trading-swarm.md`, and `docs/SPARTAN_V2.md` for the current platform model.
 
+### Private trading desk — 9 October 2026
+
+The authenticated admin control plane now includes a read-only trading desk backed by a dedicated server-side analytics layer. It exposes selectable 24h/7d/30d/90d/all-time windows and adjustable economic-equity, cumulative-P&L, per-trade P&L, drawdown, cumulative-fee and running-win-rate charts.
+
+The same surface reports live wallet cash and reserve, realised P&L, profit factor, max drawdown, network fees, open/recovery/uncertain positions, Canary trade history, rejection reasons, current Canary roster, qualification/promotion race and voter-attributed ant contribution. Accounting semantics are calculated on the server rather than reconstructed in browser JavaScript. The desk is observational only: it does not add a manual order ticket or bypass the existing Canary/human authority boundary.
+
+Admin Canary metadata now reflects the actual current execution policy: £1 maximum trade, no obsolete £4 wallet floor, and 0.003 SOL reserved for network/exit safety.
+
 ### Champion Canary merit roster — 8 October 2026
 
 The Canary signal source is a fixed Champion roster (default five seats), not the full Reversal research population. Research challengers earn a roster seat only after at least 25 fresh paper trades across three days and must satisfy reliability gates for win rate, median return, positive-day rate and worst loss while beating the weakest incumbent on forward, historical Arena and combined Champion scores. One roster seat may rotate per five-minute maintenance tick.
