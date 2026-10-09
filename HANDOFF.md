@@ -218,6 +218,14 @@ Intended future ladder: paper evidence -> Canary roster -> attributable per-ant 
 
 Known evidence-pipeline issue: Champion paper accepts arbitrary genome hold durations, but the standard research outcome bank does not automatically request every noncanonical exact horizon. A six-minute genome can therefore accumulate Champion paper entries without corresponding six-minute scored outcomes. Do not retrospectively backfill these as prospective evidence. The correct future repair is to prospectively call `request_candidate_outcome()` when Champion records a noncanonical hold, before that horizon matures.
 
+## Reversal parent downgrade and bounded recovery — 2026-10-09
+
+The reported fall from two proven Reversal parents to zero occurred on 2026-10-09 between 11:46 and 11:51 Europe/London time. No births, culls or deactivations occurred at the transition. Both selected parents remained alive but switched to relative_tail_repair because fresh paper evidence crossed unchanged reliable-parent quality gates. g_103fe8a53ab91b13: n23, win 52.17%, median +0.229%; g_d20b45ea6d9be79a: n50, win 52.0%, median +0.962%. Both retain positive mean and sub-25% worst observed trade. The shared 5-minute outcome at candidate 5144 was about -7.12% and preceded the downgrade.
+
+To prevent full-population breeding stagnation without weakening evidence qualification, the research-only Reversal turnover rule now allows early replacement at n>=20 only for an ant with BOTH win rate <40% and negative median. The normal n>=25 mature-underperformer turnover and 20-nonbaseline-survivor floor remain. Current Champion elites and Canary-seat holders are protected from this turnover; protection does not confer reliable-parent status or live authority. First deployment confirmed retirement of g_1be9a305f61020fb (n21, wins ~38%, median negative) and birth of g_1eda475127648857, preserving population 36. Parent identity, class, gate-failure reasons, population room and breeding wait reason are now logged each tick.
+
+The Spartan alumni evolution summary now includes two separately genome-labelled objects, most_observations and highest_average, alongside legacy scalar fields. The high-observation ant g_621ca8d3ebe1ed8a had n60 but average ~-0.95%; the +11.67% average belongs to g_2298a9dcd705daec with only n12. These must never be merged into one fictitious ant. The sealed Spartan exam remains unchanged.
+
 ## Admin trading desk — 2026-10-09
 
 The private admin console now has a read-only trading desk powered by `colony/admin_analytics.py` and `GET /admin/api/analytics?window=...`. Supported windows are 24h, 7d, 30d, 90d and all-time.

@@ -230,6 +230,23 @@ async def promote_reversal_elite_to_production_pool(conn, minimum_mints=20, keep
         promoted.append({'genome_id':gid,'n':r.get('n'),'score':r.get('adjusted_score',r.get('tournament_score'))})
     return promoted
 
+def clearly_failing_reversal_research_ant(rec):
+    """Allow bounded early turnover for obvious weak performers, never sparse evidence.
+
+    Regular mature underperformers still require 25 observations. The tighter 20-event
+    early rule needs BOTH a sub-40% win rate and negative median; this is research
+    turnover only, not a parent-promotion or live-capital gate.
+    """
+    n=int(rec.get('n', 0))
+    if n < 20:
+        return False
+    if n >= 25:
+        return (rec.get('avg_return_pct', 0) <= 0 or
+                rec.get('median_return_pct', 0) <= 0 or
+                rec.get('win_rate', 0) < .45)
+    return rec.get('win_rate', 0) < .40 and rec.get('median_return_pct', 0) < 0
+
+
 async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=5, minimum_parent_mints=20):
     """Bounded forward-only breeding for the profitable Reversal lineage.
 
@@ -255,19 +272,17 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=5
         await conn.execute(ddl)
     ants=await conn.fetch("SELECT genome_id,genome,baseline,cohort,generation,born_at FROM reversal_tournament_ants WHERE run_id=$1 AND active=true",run['run_id'])
     recs=await reversal_metrics(conn,run['run_id'])
-    # Faster turnover after meaningful forward proof. Never kill baseline here.
-    # Mature mediocrity consumes scarce evidence budget just as surely as catastrophe.
+    # Protect Champion incumbents and Canary seats as research reserve; protection
+    # does NOT mark them reliable parents or override any live promotion gate.
+    protected_elites={r['genome_id'] for r in await conn.fetch(
+        "SELECT genome_id FROM champion_league WHERE active=true AND (pool='elite' OR canary_slot IS NOT NULL)")}
+    # Allow early turnover ONLY after 20 fresh observations showing both <40% wins
+    # and a negative median. Ordinary mediocre ants still need the 25-event gate.
     losers=[]
     for a in ants:
-        if a['baseline']:continue
+        if a['baseline'] or a['genome_id'] in protected_elites: continue
         r=recs.get(a['genome_id'],{})
-        n=int(r.get('n',0))
-        if n<20:continue
-        mature_weak=(n>=25 and (
-            r.get('avg_return_pct',0)<=0
-            or r.get('median_return_pct',0)<=0
-            or r.get('win_rate',0)<.45))
-        if catastrophic(r) or mature_weak:
+        if int(r.get('n',0))>=20 and (catastrophic(r) or clearly_failing_reversal_research_ant(r)):
             losers.append(a['genome_id'])
     # Avoid population collapse: at least 20 non-baseline ants survive every maintenance pass.
     max_cull=max(0,len([a for a in ants if not a['baseline']])-20)
@@ -302,8 +317,6 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=5
     # Reserve-repair fallback: if strict qualification temporarily drops to zero,
     # keep evolution alive from protected incumbent elites with substantial evidence.
     # They are explicitly NOT counted as reliable parents and get broader repair mutations.
-    protected_elites={r['genome_id'] for r in await conn.fetch(
-        "SELECT genome_id FROM champion_league WHERE active=true AND pool='elite'")}
     if not parents:
         reserve={}
         for a in ants:
@@ -377,9 +390,27 @@ async def evolve_reversal_forward(conn, target_population=36, births_per_cycle=5
         vals.append(float(r.get('avg_return_pct',0)));win_rates.append(float(r.get('win_rate',0)));ns.append(int(r.get('n',0)));scores.append(float(r.get('tournament_score',-999)))
     proven_parents=sum(1 for _,r in parents if r.get('parent_class')=='reliable')
     relative_parents=sum(1 for _,r in parents if r.get('parent_class')=='relative_tail_repair')
+    # Parent genome identity and the actual failed gates must accompany the count:
+    # otherwise a downgrade from reliable to tail-repair looks like a deletion.
+    parent_diagnostics=[]
+    for gid,r in parents:
+        missed=[]
+        if float(r.get('avg_return_pct',-999)) <= 0: missed.append('mean_not_positive')
+        if float(r.get('median_return_pct',-999)) < .25: missed.append('median_below_0.25')
+        if float(r.get('win_rate',0)) < .55: missed.append('win_rate_below_55pct')
+        if float(r.get('worst_return_pct',-999)) < -25: missed.append('worst_below_minus_25pct')
+        parent_diagnostics.append({'genome_id':gid,'class':r.get('parent_class'),
+            'n':int(r.get('n',0)),'win_rate':r.get('win_rate'),
+            'median_return_pct':r.get('median_return_pct'),
+            'worst_return_pct':r.get('worst_return_pct'),
+            'reliable_gate_failures':missed})
+    wait_reason=('no_eligible_parent' if not parents else
+                 'full_population_waiting_for_evidence' if not room else
+                 'birth_cadence' if want==0 else 'birth_requested')
     snap={'evidence_ants':len(vals),'median_n':statistics.median(ns) if ns else 0,'mean_avg_return_pct':statistics.fmean(vals) if vals else 0,
           'median_avg_return_pct':statistics.median(vals) if vals else 0,'mean_win_rate':statistics.fmean(win_rates) if win_rates else 0,
           'median_tournament_score':statistics.median(scores) if scores else None,'distinct_parent_behaviours':len(parents),
-          'proven_parent_behaviours':proven_parents,'tail_repair_parent_behaviours':relative_parents}
+          'proven_parent_behaviours':proven_parents,'tail_repair_parent_behaviours':relative_parents,
+          'parent_diagnostics':parent_diagnostics,'breeding_wait_reason':wait_reason,'unfilled_slots':room}
     await conn.execute("INSERT INTO reversal_evolution_log(run_id,generation,active_ants,born,culled,parent_ids,metrics) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)",run['run_id'],generation,len(ants)+len(born),len(born),len(losers),json.dumps(sorted(set(parent_used))),json.dumps(snap))
     return {'run':run['run_id'],'generation':generation,'active':len(ants)+len(born),'born':born,'culled':losers,'parents':sorted(set(parent_used)),'metrics':snap}

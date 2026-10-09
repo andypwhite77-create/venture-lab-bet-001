@@ -34,6 +34,14 @@ Reversal runs a bounded continuous-v2 prospective lineage; failed but informativ
 
 See `docs/QUEEN_ARCHITECTURE.md`, `docs/grace-colony-architecture.md`, `docs/grace-evolutionary-trading-swarm.md`, and `docs/SPARTAN_V2.md` for the current platform model.
 
+### Reversal parent recovery and Spartan summary — 9 October 2026
+
+The two Reversal parents were not lost or erased: new prospective evidence downgraded them from reliable to tail-repair (in particular, win rates dipped below the unchanged 55% proven-parent rule). An additional -7.12% five-minute outcome on candidate 5144 was present immediately before the transition. This is a genuine evidence-quality downgrade, not a process or wallet failure.
+
+The bounded Reversal breeder now allows one early research-only replacement after at least 20 observations only if both win rate is below 40% and median return is negative. Champion elites and seated Canary genomes are protected as reserve populations; none of the reliable-parent, Canary-promotion, Spartan, signing or money-risk gates change. In the first deployed maintenance cycle, g_1be9a305f61020fb was retired and one new descendant g_1eda475127648857 was born from g_103fe8a53ab91b13, maintaining 36 active ants.
+
+Each Reversal evolution log now records parent genome IDs, classes, samples, and their exact failed reliable gates, plus whether full population/evidence/cadence is currently blocking births. Spartan alumni monitoring separately labels the genome with most observations and the genome with highest average, retaining legacy scalar fields only for compatibility; these maxima must never be attributed to the same ant without checking IDs.
+
 ### Private trading desk — 9 October 2026
 
 The authenticated admin control plane now includes a read-only trading desk backed by a dedicated server-side analytics layer. It exposes selectable 24h/7d/30d/90d/all-time windows and adjustable economic-equity, cumulative-P&L, per-trade P&L, drawdown, cumulative-fee and running-win-rate charts.

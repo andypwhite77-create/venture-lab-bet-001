@@ -74,6 +74,26 @@ async def metrics(conn):
         out[gid]=mm
     return out
 
+def spartan_evidence_leaders(recs):
+    """Keep independent evidence maxima attached to their own genomes.
+
+    Most observations and highest average return are not necessarily the same ant;
+    never combine their values into a fictitious best performer.
+    """
+    rows=[(gid,r) for gid,r in recs.items() if int(r.get('n',0))>0]
+    by_n=sorted(rows,key=lambda x:(-int(x[1]['n']),-float(x[1].get('avg_return_pct') if x[1].get('avg_return_pct') is not None else -999),x[0]))
+    by_avg=sorted(rows,key=lambda x:(-float(x[1].get('avg_return_pct') if x[1].get('avg_return_pct') is not None else -999),-int(x[1]['n']),x[0]))
+    def detail(pair):
+        if not pair:return None
+        gid,r=pair
+        return {'genome_id':gid,'n':int(r.get('n',0)),
+                'avg_return_pct':r.get('avg_return_pct'),
+                'median_return_pct':r.get('median_return_pct'),
+                'worst_return_pct':r.get('worst_return_pct')}
+    return {'most_observations':detail(by_n[0] if by_n else None),
+            'highest_average':detail(by_avg[0] if by_avg else None)}
+
+
 async def evolve(conn):
     await ensure_schema(conn)
     recs=await metrics(conn)
@@ -152,9 +172,11 @@ async def evolve(conn):
         res=await conn.execute("""INSERT INTO spartan_alumni_pool(genome_id,genome,family,role,generation,parent_ids)
           VALUES($1,$2::jsonb,'exhaustion','prospective_child',$3,$4::jsonb) ON CONFLICT DO NOTHING""",cid,json.dumps(child),int(p['generation'])+1,json.dumps([p['genome_id']]))
         if res.endswith('1'): born.append(cid); active_ids.add(cid)
+    leaders=spartan_evidence_leaders(recs)
     summary={'active':await conn.fetchval('select count(*) from spartan_alumni_pool where active'),
              'evidence_ants':sum(1 for r in recs.values() if r.get('n',0)>0),'culled':culled,'born':born,
-             'best_n':max((r.get('n',0) for r in recs.values()),default=0),
-             'best_avg_return_pct':max((r.get('avg_return_pct',-999) for r in recs.values()),default=None)}
+             'best_n':leaders['most_observations']['n'] if leaders['most_observations'] else 0,
+             'best_avg_return_pct':leaders['highest_average']['avg_return_pct'] if leaders['highest_average'] else None,
+             **leaders}
     await conn.execute("INSERT INTO spartan_alumni_state(key,value,updated_at) VALUES('last_evolution',$1::jsonb,now()) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=now()",json.dumps(summary))
     return summary
