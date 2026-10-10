@@ -6,6 +6,7 @@ aggregate computed from our DB; novel external theses remain unverified.
 import asyncio,json,os,time,httpx
 from db import connection,init_db
 from colony.queen_opportunity_queue import ensure_schema,submit,KINDS
+from colony.queen_roles import HIVE_CREED
 
 MODEL=os.getenv('SWARM_STRATEGIC_MODEL','qwen3:1.7b')
 URL=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
@@ -63,7 +64,7 @@ async def run():
   run_id=rec['id']; s=await snapshot(c)
   await c.execute('UPDATE queen_autonomous_research_runs SET snapshot=$2::jsonb WHERE id=$1',run_id,json.dumps(s,default=str))
  try:
-  proposer=await _inference('You are Swarm Queen in a hostile adaptive trading environment. Form ONE specific research-only hypothesis grounded exclusively in the JSON evidence below, not invented market information. Stay within Solana execution research, feed reliability, or bounded research infrastructure. No market manipulation, trading or system access. JSON keys: kind, title, thesis, failure_modes (array of 2-4 strings). Kinds: market_dislocation, research_infrastructure, colony_expansion, other. Evidence: '+json.dumps(s,default=str)[:3300],480)
+  proposer=await _inference('You are Swarm Queen. '+HIVE_CREED+' Form ONE specific research-only hypothesis grounded exclusively in the JSON evidence below, not invented market information. Stay within Solana execution research, feed reliability, or bounded research infrastructure. No market manipulation, trading or system access. JSON keys: kind, title, thesis, failure_modes (array of 2-4 strings). Kinds: market_dislocation, research_infrastructure, colony_expansion, other. Evidence: '+json.dumps(s,default=str)[:3300],480)
   critic=await _inference('You are an independent adversarial examiner. Find weaknesses, confounding and missing evidence. Reject speculative assertions presented as established facts. Do not use Spartan/holdout data. Respond JSON with research_appropriate (boolean), objections (array of strings), strongest_counterargument (string). Hypothesis: '+json.dumps(proposer)[:1900]+' Observations: '+json.dumps(s,default=str)[:2500],360)
   approved=validate(proposer,critic,s)
   async with connection() as c:

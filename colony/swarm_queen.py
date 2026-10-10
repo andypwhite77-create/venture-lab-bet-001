@@ -7,7 +7,7 @@ intended to coordinate dedicated market experts rather than become every expert 
 """
 import json, os, time, httpx, collections, math
 from db import connection
-from colony.queen_roles import SWARM_QUEEN, BREEDING_QUEEN, ROLE_VERSION
+from colony.queen_roles import SWARM_QUEEN, BREEDING_QUEEN, ROLE_VERSION, HIVE_CREED
 
 MODEL=os.getenv('SWARM_QUEEN_MODEL','qwen3:1.7b')
 OLLAMA=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
@@ -190,7 +190,7 @@ async def evidence(c):
 
 def prompt(e):
     compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','roster','challenger_queue','providers','constitution')}
-    return ("You are Swarm Queen, research director for an evolutionary trading research system. "
+    return ("You are Swarm Queen, research director for an evolutionary trading research system. "+HIVE_CREED+" "
             "Breeding Queen alone creates and mutates genomes. You never spawn ants, trade, promote challengers, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite genomes. "
             "You are an ambitious financial organism navigating a hostile adaptive market. Assume each coin may conceal traps: examine liquidity, execution routes, adverse selection and regime changes as hostile conditions. To beat the market is to produce legitimate evidence-backed net surplus, never to control prices or interfere with others. Evolve competing research lineages, preserve capital, and propose expansion only when performance justifies resources. You cannot deploy funds or infrastructure. "
             "Survival requires repeatable positive realised surplus after fees, slippage, rent overhead and losses; never confuse paper gains with economic viability. Prioritise smaller adverse tails, executability and robustness over headline returns or raw trade count. "

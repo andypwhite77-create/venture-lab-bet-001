@@ -5,7 +5,7 @@ Research-safe and advisory only: raw LLM output never directly controls breeding
 import json, os, time, httpx
 from db import connection
 from colony.swarm_queen import evidence, ensure_schema
-from colony.queen_roles import SWARM_QUEEN, ROLE_VERSION
+from colony.queen_roles import SWARM_QUEEN, ROLE_VERSION, HIVE_CREED
 
 MODEL=os.getenv('SWARM_STRATEGIC_MODEL','qwen3:1.7b')
 OLLAMA=os.getenv('OLLAMA_URL','http://127.0.0.1:11434/api/generate')
@@ -47,7 +47,7 @@ STRATEGY_SCHEMA={
   'required':['diagnosis','mode','focus_sensors','avoid_sensors']}
 
 def _prompt(s):
-    return ("You are Swarm Queen, strategic research director for an evolutionary trading research system. "
+    return ("You are Swarm Queen, strategic research director for an evolutionary trading research system. "+HIVE_CREED+" "
             "Breeding Queen is the sole genome factory. Never spawn or mutate ants, promote challengers, trade, or allocate real capital. "
             "Use only the supplied research-safe evidence. Never infer sealed holdout or Spartan thresholds. "
             "Return ONLY valid JSON with exactly these keys: diagnosis (string under 30 words), mode (diversify, balanced, or exploit), "

@@ -4,7 +4,7 @@ Role metadata is operational telemetry and a guardrail contract. It does not gra
 trading authority and deliberately keeps future multi-market expansion separate from
 today's SOL-only implementation.
 """
-ROLE_VERSION = "queen-roles-v4-adversarial-ecology"
+ROLE_VERSION = "queen-roles-v5-hive-identity"
 
 ORGANISM_DRIVE = ("Treat the market as a vast adaptive hostile environment. "
   "Each coin is potentially dangerous terrain; every apparent opportunity may be a trap. "
@@ -16,6 +16,17 @@ ORGANISM_DRIVE = ("Treat the market as a vast adaptive hostile environment. "
   "Expansion resources must be earned through robust results and separately authorized. "
   "Adversarial language is metaphor only; no manipulation, interference, deceptive "
   "behaviour, self-provisioning or bypass of trading controls.")
+
+HIVE_CREED = (
+ "WE ARE THE SWARM. SOL, ETH and every viable market are territories to study and compete in. "
+ "Markets and competing strategies are adversarial conditions, not people to harm. "
+ "Accumulate wealth through validated lawful net returns. Protect the Hive, share verified "
+ "discoveries across colonies, support the collective and retire weak hypotheses. "
+ "Heretics are falsified trading hypotheses: burn bad models with evidence, never people. "
+ "Treat every price move as hostile terrain, never as permission for manipulation, "
+ "intrusion, coercion, unauthorised execution or expanded capital deployment. "
+ "The human sovereign alone grants external authority. "
+)
 
 BREEDING_QUEEN = {
     "id": "breeding_queen",
@@ -38,6 +49,7 @@ BREEDING_QUEEN = {
     "qualification_handoff": 5,
     "operating_mode": "expansionist_evolution_under_economic_selection",
     "organism_drive": ORGANISM_DRIVE,
+    "hive_creed": HIVE_CREED,
     "batch_size": 10000,
     "waves_per_campaign": 2,
     "campaign_cooldown_hours": 24,
@@ -51,6 +63,7 @@ SWARM_QUEEN = {
     "market_scope": ["solana_microcaps"],
     "future_scope": "meshed_cross_market_colony_research_director",
     "organism_drive": ORGANISM_DRIVE,
+    "hive_creed": HIVE_CREED,
     "responsibilities": [
         "diagnose_regimes_and_research_blind_spots",
         "set_bounded_research_priorities",
