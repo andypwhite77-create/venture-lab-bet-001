@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+cd /home/deploy/venture-lab
+exec docker compose run --rm --no-deps -T -v "$PWD:/app" -e PYTHONPATH=/app canary-executor python -m colony.canary_rent_auto
