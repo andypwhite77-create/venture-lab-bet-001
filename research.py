@@ -98,6 +98,11 @@ def _dex_buy_ratio(market):
 
 
 async def _record(strategy, mint, score, tier, shadow_trade, features, market, cooldown=30):
+    # Persist the observed market evidence even when candidate cooldown suppresses
+    # a duplicate trading/research signal. Snapshots are append-only observations,
+    # not prospective outcomes and never unlock holdout training.
+    if market:
+        await save_market_snapshot(mint, strategy, market)
     if await candidate_exists_recently(strategy, mint, cooldown, tier=tier):
         return None
     entry_price = market.get("price_usd") if market else None
@@ -107,8 +112,6 @@ async def _record(strategy, mint, score, tier, shadow_trade, features, market, c
         shadow_trade=shadow_trade, entry_price=entry_price,
         features=features, market=market or {}, assumed_cost_bps=80.0,
     )
-    if market:
-        await save_market_snapshot(mint, strategy, market)
     return {
         "id": candidate_id, "strategy": strategy, "mint": mint,
         "score": round(score, 3), "tier": tier,

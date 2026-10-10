@@ -307,3 +307,6 @@ The four strategy families now operate as isolated evolutionary colonies over a 
 ### Canary dry-run milestone
 
 The first qualifying end-to-end Reversal Canary dry run completed on 2 October 2026. A genuine future 100%-consensus signal was claimed fresh, quoted through Jupiter, simulated for its original five-minute hold, quoted for exit and persisted closed with `broadcast=false`. The arm gate is therefore satisfied, but the Canary remains stopped/disarmed until a human explicitly invokes `scripts/canary-arm`.
+
+### Economic survival and market history — 10 October 2026
+Swarm and Breeding Queen objectives now emphasize *repeatable, realised net surplus after fees, slippage and losses*, not high paper returns or raw win count. This is a guidance change; deterministic fitness, promotion, Spartan and live trading controls are unchanged. `research._record` saves provider market observations even when a candidate is not issued due to cooldown. This is not universal provider-response capture; the remaining ingress paths must be audited and holdouts protected. See `HANDOFF.md` for boundaries.

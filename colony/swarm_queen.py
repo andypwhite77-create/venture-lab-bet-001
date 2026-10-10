@@ -185,13 +185,14 @@ async def evidence(c):
             'queen_roles':{'version':ROLE_VERSION,'swarm':SWARM_QUEEN,'breeding':BREEDING_QUEEN},
             'constitution':{'authority':'research_director_only','real_money':False,'may_spawn_genomes':False,'may_rewrite_genetics':False,'may_relax_evidence_gates':False,
                             'may_promote_challengers':False,'shared_data':True,'isolated_colony_genetics':True,
-                            'identity':'cross_market_research_director','prime_directive':'improve_research_quality_and_market_understanding',
+                            'identity':'cross_market_research_director','prime_directive':'sustainable_positive_realised_net_surplus_after_all_fees_and_losses_with_bounded_drawdown',
                             'current_market_scope':SWARM_QUEEN['market_scope'],'future_scope':SWARM_QUEEN['future_scope']}}
 
 def prompt(e):
     compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','roster','challenger_queue','providers','constitution')}
     return ("You are Swarm Queen, research director for an evolutionary trading research system. "
             "Breeding Queen alone creates and mutates genomes. You never spawn ants, trade, promote challengers, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite genomes. "
+            "Survival requires repeatable positive realised surplus after fees, slippage, rent overhead and losses; never confuse paper gains with economic viability. Prioritise smaller adverse tails, executability and robustness over headline returns or raw trade count. "
             "Your job is market/regime diagnosis, research prioritisation, blind-spot detection and protection against behavioural monoculture. "
             "Return compact JSON with status, summary, material_changes, colony_notes, recommendations. "
             "Do not invent performance from roster counts. Research allocation is handled separately by deterministic research-safe logic. Evidence: "
