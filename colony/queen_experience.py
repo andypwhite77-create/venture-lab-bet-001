@@ -101,9 +101,12 @@ async def learn(conn):
       'economic_result':economic,'diagnosis':'negative_net_after_network_fees' if economic['net_sol']<0 else 'insufficient_or_nonnegative',
       'research_priority':'investigate_loss_tail_entry_exit_and_liquidity_before_proposing_new_features' if economic['net_sol']<0 else 'continue_independent_prospective_validation',
       'authority':'diagnosis_only_no_genome_promotion_or_live_capital_change'}
+    try:
+        active_experiments=[dict(r) for r in await conn.fetch("SELECT id,kind,hypothesis,prediction,metric,baseline,status FROM hive_experiments WHERE status='awaiting_prospective_test' ORDER BY id DESC LIMIT 5")]
+    except Exception:active_experiments=[]
     out={'updated_at':time.time(),'observations':len(rows),'career_count':len(careers),'eligible_careers':len(eligible),
          'experienced_mints':sorted(experienced),'preferred_features':preferred,'feature_stats':feature,
-         'parent_templates':parents,'live_failure_diagnostic':failure,'careers':[{k:v for k,v in c.items() if k!='genome'} for c in ranked[:50]],
+         'parent_templates':parents,'live_failure_diagnostic':failure,'active_research_experiments':active_experiments,'careers':[{k:v for k,v in c.items() if k!='genome'} for c in ranked[:50]],
          'reference_careers':[{k:v for k,v in c.items() if k!='genome'} for c in reference],
          'reference_observations':sum(int(c.get('n') or 0) for c in reference),
          'reference_eligible_careers':sum(int(c.get('unique_mints') or 0)>=5 for c in reference)}

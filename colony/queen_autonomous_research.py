@@ -42,10 +42,13 @@ async def snapshot(conn):
  try:
   findings=[dict(x) for x in await conn.fetch("SELECT colony,claim,evidence_grade,source_type,source_id FROM hive_findings ORDER BY created_at DESC LIMIT 8")]
  except Exception:findings=[]
+ try:
+  experiments=[dict(x) for x in await conn.fetch("SELECT id,kind,hypothesis,prediction,metric,status FROM hive_experiments ORDER BY id DESC LIMIT 5")]
+ except Exception:experiments=[]
  # No sealed examiner outcomes or private wallets sent to the model.
  return {'window':'last_7_days','canary_intents':dict(routes),
          'provider_health':[dict(p) for p in providers],
-         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,'graded_shared_findings':findings,
+         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,'graded_shared_findings':findings,'active_experiments':experiments,
          'shadow_filter':dict(shadow) if shadow else None,
          'source_tables':['canary_trade_intents','colony_market_ingress','capital_preservation_shadow_runs'],
          'note':'Observed records, not complete market coverage. No verified external major-asset evidence.'}
