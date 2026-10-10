@@ -38,10 +38,14 @@ async def snapshot(conn):
    FROM canary_trade_intents WHERE status='closed' AND broadcast
    AND execution ? 'realized_market_pnl_after_network_fees_sol'
    AND created_at>=now()-interval '7 days'""")
+ # Shared claims carry explicit provenance and evidence grade, never authority.
+ try:
+  findings=[dict(x) for x in await conn.fetch("SELECT colony,claim,evidence_grade,source_type,source_id FROM hive_findings ORDER BY created_at DESC LIMIT 8")]
+ except Exception:findings=[]
  # No sealed examiner outcomes or private wallets sent to the model.
  return {'window':'last_7_days','canary_intents':dict(routes),
          'provider_health':[dict(p) for p in providers],
-         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,
+         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,'graded_shared_findings':findings,
          'shadow_filter':dict(shadow) if shadow else None,
          'source_tables':['canary_trade_intents','colony_market_ingress','capital_preservation_shadow_runs'],
          'note':'Observed records, not complete market coverage. No verified external major-asset evidence.'}
