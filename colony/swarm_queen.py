@@ -155,6 +155,16 @@ async def evidence(c):
         x=await c.fetchrow("SELECT count(*) FILTER(WHERE active) active,count(*) FILTER(WHERE active AND baseline) controls,count(*) FILTER(WHERE active AND NOT baseline AND cohort='historical_qualified') elites FROM family_tournament_ants WHERE run_id=$1",r['run_id'])
         roster.append({'family':r['family'],**dict(x),'stage':r['stage_index'],'status':r['status']})
     perf=[dict(x) for x in await c.fetch('''SELECT quote->'attribution'->>'family' family,count(*) trades,count(*) FILTER(WHERE net_pnl>0) wins,coalesce(sum(net_pnl),0) net,avg(net_pnl) FILTER(WHERE net_pnl IS NOT NULL) avg_net FROM colony_execution_ledger WHERE run_id='colony-native-v3-holdaware' AND quote->'attribution'->>'family' IN ('reversal','exhaustion','momentum','order_flow') GROUP BY 1''')]
+    live=await c.fetchrow("""SELECT count(*)::int trades,
+      count(*) FILTER (WHERE (execution->>'realized_market_pnl_after_network_fees_sol')::numeric>0)::int wins,
+      coalesce(sum((execution->>'realized_market_pnl_after_network_fees_sol')::numeric),0)::float8 net_sol,
+      coalesce(sum((execution->>'realized_market_pnl_after_network_fees_sol')::numeric)
+        FILTER (WHERE (execution->>'realized_market_pnl_after_network_fees_sol')::numeric<0),0)::float8 losses_sol
+      FROM canary_trade_intents WHERE status='closed' AND broadcast
+        AND execution ? 'realized_market_pnl_after_network_fees_sol'
+        AND created_at>=now()-interval '7 days'""")
+    live_failure={'period':'7_days','source':'actual_broadcast_closed_canary','realized_after_network_fees':dict(live),
+      'rent_recovery_excluded':True,'rule':'Negative net SOL is an economic failure regardless of win rate or execution health; analyse entry, exit, slippage and asymmetric loss. No automatic capital increase.'}
     queue=[dict(x) for x in await c.fetch("SELECT family,count(*) waiting,max(historical_score) best FROM evolution_candidate_queue WHERE status='ready' GROUP BY family")]
     providers=[dict(x) for x in await c.fetch("SELECT DISTINCT ON(provider) provider,ok,error,observed_at FROM colony_provider_health ORDER BY provider,observed_at DESC")]
     recent=[dict(x) for x in await c.fetch("SELECT event_type,payload,created_at FROM colony_events ORDER BY id DESC LIMIT 6")]
@@ -181,7 +191,7 @@ async def evidence(c):
         if len(qrecs)>1:
             pf=qrecs[1]['finalists']; prev=json.loads(pf) if isinstance(pf,str) else list(pf or [])
         queen_research=_queen_research_snapshot(fs,sm,prev)
-    return {'queen_research':queen_research,'reference_baseline':reference_baseline,'performance':perf,'roster':roster,'challenger_queue':queue,'providers':providers,'recent_events':recent,'strategic_guidance':strategic_guidance,
+    return {'queen_research':queen_research,'reference_baseline':reference_baseline,'performance':perf,'live_economic_failure':live_failure,'roster':roster,'challenger_queue':queue,'providers':providers,'recent_events':recent,'strategic_guidance':strategic_guidance,
             'queen_roles':{'version':ROLE_VERSION,'swarm':SWARM_QUEEN,'breeding':BREEDING_QUEEN},
             'constitution':{'authority':'research_director_only','real_money':False,'may_spawn_genomes':False,'may_rewrite_genetics':False,'may_relax_evidence_gates':False,
                             'may_promote_challengers':False,'shared_data':True,'isolated_colony_genetics':True,
@@ -189,7 +199,7 @@ async def evidence(c):
                             'current_market_scope':SWARM_QUEEN['market_scope'],'future_scope':SWARM_QUEEN['future_scope']}}
 
 def prompt(e):
-    compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','roster','challenger_queue','providers','constitution')}
+    compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','live_economic_failure','roster','challenger_queue','providers','constitution')}
     return ("You are Swarm Queen, research director for an evolutionary trading research system. "+HIVE_CREED+" "
             "Breeding Queen alone creates and mutates genomes. You never spawn ants, trade, promote challengers, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite genomes. "
             "You are an ambitious financial organism navigating a hostile adaptive market. Assume each coin may conceal traps: examine liquidity, execution routes, adverse selection and regime changes as hostile conditions. To beat the market is to produce legitimate evidence-backed net surplus, never to control prices or interfere with others. Evolve competing research lineages, preserve capital, and propose expansion only when performance justifies resources. You cannot deploy funds or infrastructure. "

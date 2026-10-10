@@ -33,9 +33,15 @@ async def snapshot(conn):
  FROM colony_market_ingress WHERE observed_at>=now()-interval '7 days'
  GROUP BY provider ORDER BY observations DESC LIMIT 6""")
  shadow=await conn.fetchrow("""SELECT run_at,results FROM capital_preservation_shadow_runs ORDER BY id DESC LIMIT 1""")
+ live=await conn.fetchrow("""SELECT count(*)::int trades,
+   coalesce(sum((execution->>'realized_market_pnl_after_network_fees_sol')::numeric),0)::float8 net_sol
+   FROM canary_trade_intents WHERE status='closed' AND broadcast
+   AND execution ? 'realized_market_pnl_after_network_fees_sol'
+   AND created_at>=now()-interval '7 days'""")
  # No sealed examiner outcomes or private wallets sent to the model.
  return {'window':'last_7_days','canary_intents':dict(routes),
          'provider_health':[dict(p) for p in providers],
+         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,
          'shadow_filter':dict(shadow) if shadow else None,
          'source_tables':['canary_trade_intents','colony_market_ingress','capital_preservation_shadow_runs'],
          'note':'Observed records, not complete market coverage. No verified external major-asset evidence.'}
