@@ -262,6 +262,11 @@ async def paper_run_once(c,limit=1000):
    res=await c.execute("""INSERT INTO champion_paper_entries(genome_id,candidate_id,mint,observed_at,hold_minutes,stake_gbp)
      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING""",a['genome_id'],rr['id'],rr['mint'],rr['created_at'],hold,TARGET_STAKE_GBP)
    inserted+=int(res.endswith('1'))
+   if res.endswith('1'):
+    # Future-only exact-horizon outcome request. Never backfill a horizon
+    # that has already matured, nor count it as independent validation.
+    from research_db import request_candidate_outcome
+    await request_candidate_outcome(c,rr['id'],hold,'champion_prospective_exact_hold')
  if rows:await c.execute('UPDATE champion_paper_progress SET last_candidate_id=$1,updated_at=now() WHERE id=1',rows[-1]['id'])
  priority_counts={'A+':0,'A':0}
  for a in ants:

@@ -310,3 +310,6 @@ The first qualifying end-to-end Reversal Canary dry run completed on 2 October 2
 
 ### Economic survival and market history — 10 October 2026
 Swarm and Breeding Queen objectives now emphasize *repeatable, realised net surplus after fees, slippage and losses*, not high paper returns or raw win count. This is a guidance change; deterministic fitness, promotion, Spartan and live trading controls are unchanged. `research._record` saves provider market observations even when a candidate is not issued due to cooldown. This is not universal provider-response capture; the remaining ingress paths must be audited and holdouts protected. See `HANDOFF.md` for boundaries.
+
+### Research evidence mesh — 10 October 2026
+Research-only archive `colony_market_ingress` captures combined provider-hub observations and GeckoTerminal trending market observations before candidate filtering; `colony_mesh_registry` records proposed research colonies with hard no-allocation constraints. `capital_preservation_shadow_runs` compares a shadow capital-preservation filter with prospective outcome records retrospectively; it never vetoes live trades. Champion requests exact prospective hold-horizon labels. The archive does not yet intercept all underlying raw provider HTTP responses; see HANDOFF.md. No live trade controls have changed.

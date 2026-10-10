@@ -2,6 +2,7 @@
 import asyncio,time
 from colony.jupiter_quotes import quote,SOL
 from colony.sensors import snapshot as corroboration_snapshot
+from colony.market_ingress import capture
 _CACHE={}; LOCKS={}; TTL=20
 
 async def jupiter_entry(mint,lamports,slippage_bps=100):
@@ -19,5 +20,12 @@ async def jupiter_entry(mint,lamports,slippage_bps=100):
 async def market_snapshot(mint,lamports=None):
  corroboration=await corroboration_snapshot(mint)
  execution=await jupiter_entry(mint,lamports) if lamports else {'provider':'jupiter','ok':None,'role':'execution_truth','reason':'no_size'}
- return {'mint':mint,'execution':execution,'corroboration':corroboration,
+ result={'mint':mint,'execution':execution,'corroboration':corroboration,
   'policy':'Jupiter determines executability; Birdeye/CoinGecko degradation alone never grants or vetoes authority.'}
+ try:
+  await capture(mint,'provider_hub','combined_market_snapshot',result,lamports)
+ except Exception as ex:
+  # Non-authoritative archive: keep research sensing operational but surface loss.
+  import logging
+  logging.getLogger(__name__).warning('market_ingress_archive_error %s',type(ex).__name__)
+ return result

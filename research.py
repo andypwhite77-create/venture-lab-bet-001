@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from marketdata import fetch_market_snapshots, fetch_trending_market_snapshots
+from colony.market_ingress import capture
 from research_db import candidate_exists_recently, create_candidate, recent_token_events, save_market_snapshot
 
 log = logging.getLogger("signal-engine.research")
@@ -147,6 +148,10 @@ async def run_research_cycle():
 
     trending = await fetch_trending_market_snapshots(limit=20)
     for mint, market in trending.items():
+        try:
+            await capture(mint,'geckoterminal','trending_seen_pre_filter',market)
+        except Exception as ex:
+            log.warning('market_ingress_archive_error %s',type(ex).__name__)
         if mint in IGNORE_MINTS:
             continue
         f = _features(stats.get(mint))
