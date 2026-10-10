@@ -144,6 +144,8 @@ async def startup():
         AUTH_EPOCH=int((await c.fetchrow('SELECT auth_epoch FROM admin_auth_state WHERE id=1'))['auth_epoch'])
         await ensure_live_schema(c); await sync_spartan_passers(c)
         await ensure_champion_schema(c); await ensure_corpus_schema(c)
+        await ensure_proposals(c)
+        queen_proposals=[dict(x) for x in await c.fetch("SELECT id,title,kind,thesis,failure_modes,requested_resources,status,created_at,submitted_by FROM queen_opportunity_proposals WHERE status='proposed' ORDER BY created_at DESC LIMIT 20")]
 
 @app.post('/admin/api/login')
 async def login(data:Login,request:Request,response:Response):
@@ -191,6 +193,8 @@ async def api_state(request:Request):
         control=dict(await c.fetchrow('SELECT * FROM admin_control WHERE id=1'))
         elite_control=dict(await c.fetchrow('SELECT * FROM elite_control WHERE id=1'))
         await ensure_champion_schema(c); await ensure_corpus_schema(c)
+        await ensure_proposals(c)
+        queen_proposals=[dict(x) for x in await c.fetch("SELECT id,title,kind,thesis,failure_modes,requested_resources,status,created_at,submitted_by FROM queen_opportunity_proposals WHERE status='proposed' ORDER BY created_at DESC LIMIT 20")]
         elite_roster=[dict(r) for r in await c.fetch("SELECT elite_slot,genome_id,family,source,arena_score,forward_score,total_score,arena_stats,forward_stats,promoted_at FROM champion_league WHERE pool='elite' ORDER BY elite_slot")]
         qualification_top=[dict(r) for r in await c.fetch("SELECT qualification_rank,genome_id,family,source,arena_score,forward_score,total_score,arena_stats,forward_stats FROM champion_league WHERE pool='qualification' ORDER BY qualification_rank NULLS LAST,total_score DESC NULLS LAST LIMIT 10")]
         qualification_corpus=await qualification_corpus_snapshot(c)
@@ -213,7 +217,7 @@ async def api_state(request:Request):
     qsurv=read_json(QUEEN_SURVIVAL); qmem=read_json(QUEEN_MEMORY)
     roles=queen_role_snapshot()
     queen={'campaign':qsurv.get('campaign'),'tested':qsurv.get('tested'),'finalists':qsurv.get('finalists'),'holdout_positive':qsurv.get('holdout_positive'),'spartan_survivors':qsurv.get('spartan_survivors'),'memory_campaigns':qmem.get('campaigns'),'preferred_features':(qmem.get('preferred_features') or [])[:6],'role':roles['breeding_queen']}
-    return {'wallets':wallets,'components':components,'control':control,'elite_control':elite_control,'elite_roster':elite_roster,'qualification_top':qualification_top,'qualification_corpus':qualification_corpus,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'swarm_queen':swarm,'queen_roles':roles,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
+    return {'wallets':wallets,'components':components,'control':control,'elite_control':elite_control,'elite_roster':elite_roster,'qualification_top':qualification_top,'qualification_corpus':qualification_corpus,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'swarm_queen':swarm,'queen_roles':roles,'queen_proposals':queen_proposals,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
 
 @app.get('/admin/api/analytics')
 async def api_analytics(request:Request,window:str='24h'):
@@ -352,6 +356,7 @@ PAGE='''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" c
 <div id="app" class="hidden"><div class="row"><div class="card"><h3>Breeding Queen / Spartan</h3><div id="queen">Loading…</div></div><div class="card"><h3>Reversal canary</h3><div id="canary"></div></div><div class="card"><h3>Live safety</h3><div id="global"></div><br><div class="mobileActions"><button class="danger" onclick="post('/admin/api/global-stop')">GLOBAL LIVE STOP</button> <button onclick="post('/admin/api/global-resume')">Clear stop flag</button></div></div></div>
 <div class="card"><h3>Wallet registry</h3><div class="muted">Public addresses only. Private keys are never stored here.</div><input id="wlabel" placeholder="Label"><input id="waddr" placeholder="Solana address" size="48"><button onclick="addWallet()">Add wallet</button><div class="tablewrap"><table><thead><tr><th>Label</th><th>Address</th><th>Balance</th><th>Mode</th><th></th></tr></thead><tbody id="wallets"></tbody></table></div></div>
 <div class="card"><h3>Network components</h3><div class="tablewrap"><table><thead><tr><th>Component</th><th>Service</th><th>Mode</th><th>Wallet</th><th>Max £</th><th>Floor £</th><th></th></tr></thead><tbody id="components"></tbody></table></div></div>
+<div class="card"><h3>QUEEN PROPOSALS REQUIRING HUMAN SANITY CHECK</h3><div class="muted">Hostile-market reconnaissance. Review permits research only, never trades or new spending.</div><div id="proposals">Loading proposals...</div></div>
 <div class="card"><h3>Audit log</h3><div class="tablewrap"><table id="auditTable"><tbody id="audit"></tbody></table></div></div></div>
 <script>let csrf='',state=null;const modes=['disabled','research','paper','shadow','live-ready','live'];
 async function req(url,opt={}){opt.headers=Object.assign({'content-type':'application/json'},opt.headers||{});if(csrf)opt.headers['x-csrf-token']=csrf;let r=await fetch(url,opt);if(!r.ok)throw Error(await r.text());return r.json()}
@@ -363,9 +368,11 @@ async function load(){state=await req('/admin/api/state');global.innerHTML=state
 wallets.innerHTML=state.wallets.map(w=>`<tr><td>${esc(w.label)}</td><td><code class="walletaddr">${esc(w.address)}</code></td><td>${w.balance_sol==null?'?':w.balance_sol.toFixed(6)+' SOL'}</td><td>${esc(w.mode)}</td><td><button onclick="delWallet(${w.id})">Remove</button></td></tr>`).join('');
 let opts='<option value="">none</option>'+state.wallets.map(w=>`<option value="${w.id}">${esc(w.label)}</option>`).join('');
 components.innerHTML=state.components.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.service_name||'')}</td><td><select id="m${c.id}">${modes.map(m=>`<option ${m==c.mode?'selected':''}>${m}</option>`).join('')}</select></td><td><select id="w${c.id}">${opts.replace('value="'+c.wallet_id+'"','value="'+c.wallet_id+'" selected')}</select></td><td><input id="x${c.id}" size="5" value="${c.max_trade_gbp??''}"></td><td><input id="f${c.id}" size="5" value="${c.floor_gbp??''}"></td><td><button onclick="saveComp(${c.id})">Save</button></td></tr>`).join('');
+const prop=document.getElementById('proposals');if(prop){prop.innerHTML=(state.queen_proposals||[]).length?(state.queen_proposals||[]).map(p=>`<div class="card"><strong>${esc(p.title)}</strong> <span class="pill">${esc(p.kind)}</span><p>${esc(p.thesis)}</p><div class="muted">${esc(p.submitted_by)} · ${(p.failure_modes||[]).map(esc).join(' / ')}</div><div class="mobileActions"><button onclick="reviewQueen(${p.id},'research_approved')">Approve research</button> <button class="danger" onclick="reviewQueen(${p.id},'rejected')">Reject</button></div></div>`).join(''):'No proposals awaiting a decision.';}
 audit.innerHTML=state.audit.map(a=>`<tr><td>${a.created_at}</td><td>${esc(a.action)}</td><td>${esc(a.target||'')}</td></tr>`).join('')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function post(url,body={}){try{await req(url,{method:'POST',body:JSON.stringify(body)});await load()}catch(e){alert(e.message)}}
+async function reviewQueen(id,decision){let note=prompt('Reason for '+decision+' (research-only):');if(!note)return;await post('/admin/api/queen-proposals/'+id+'/review',{decision,note});}
 async function addWallet(){await post('/admin/api/wallets',{label:wlabel.value,address:waddr.value});wlabel.value='';waddr.value=''}
 async function delWallet(id){if(confirm('Remove this wallet from the registry?')){try{await req('/admin/api/wallets/'+id,{method:'DELETE'});await load()}catch(e){alert(e.message)}}}
 async function saveComp(id){let wid=document.getElementById('w'+id).value;let max=document.getElementById('x'+id).value;let floor=document.getElementById('f'+id).value;await post('/admin/api/components/'+id,{mode:document.getElementById('m'+id).value,wallet_id:wid?Number(wid):null,max_trade_gbp:max===''?null:Number(max),floor_gbp:floor===''?null:Number(floor)})}
