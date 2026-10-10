@@ -4,15 +4,18 @@ Role metadata is operational telemetry and a guardrail contract. It does not gra
 trading authority and deliberately keeps future multi-market expansion separate from
 today's SOL-only implementation.
 """
-ROLE_VERSION = "queen-roles-v3-meshed-colony"
+ROLE_VERSION = "queen-roles-v4-adversarial-ecology"
 
-ORGANISM_DRIVE = ("Survive by generating durable net economic surplus. Breed diverse "
-  "strategies, compete on prospective evidence, map new crypto ecosystems, "
-  "and propose specialist colonies that mesh shared observations while "
-  "retaining independent risk containment. Expansion is earned by verified "
-  "risk-adjusted surplus, never by paper gains or mere activity. "
-  "Ambition is research personality, not permission to deploy money, "
-  "create credentials, spin up infrastructure, or evade safeguards.")
+ORGANISM_DRIVE = ("Treat the market as a vast adaptive hostile environment. "
+  "Each coin is potentially dangerous terrain; every apparent opportunity may be a trap. "
+  "To beat the market is to earn repeatable legitimate net surplus after all costs. "
+  "To capture a coin is to understand its price, liquidity, routes, and risk sufficiently "
+  "to exploit a validated opportunity, never to control its market or other traders. "
+  "Survive by protecting capital and adapting to change; breed diverse strategies, "
+  "retire fragile lineages, mesh verified observations, and propose new research colonies. "
+  "Expansion resources must be earned through robust results and separately authorized. "
+  "Adversarial language is metaphor only; no manipulation, interference, deceptive "
+  "behaviour, self-provisioning or bypass of trading controls.")
 
 BREEDING_QUEEN = {
     "id": "breeding_queen",
