@@ -35,8 +35,8 @@ async def run():
   experiments=await c.fetch("SELECT id,created_at,minimum_forward_trades FROM hive_experiments WHERE status='awaiting_prospective_test'")
   for e in experiments:
    # Enforce creation timestamp: past data never qualifies as prospective.
-   rows=await c.fetch("""SELECT challenger_net_pct,control_net_pct FROM hive_forward_pairs
-      WHERE experiment_id=$1 AND observed_at>$2 ORDER BY observed_at LIMIT 2000""",e['id'],e['created_at'])
+   rows=await c.fetch("""SELECT DISTINCT ON (opportunity_id) challenger_net_pct,control_net_pct FROM hive_forward_pairs
+      WHERE experiment_id=$1 AND observed_at>$2 ORDER BY opportunity_id,observed_at,id LIMIT 2000""",e['id'],e['created_at'])
    result=assess(rows,e['minimum_forward_trades'])
    if result['status']!='insufficient_evidence':
     await c.execute("INSERT INTO hive_forward_score_runs(experiment_id,assessment,evidence) VALUES($1,$2,$3::jsonb)",e['id'],result['status'],json.dumps(result))
