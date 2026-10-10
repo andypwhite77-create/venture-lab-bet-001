@@ -9,6 +9,7 @@ from colony.eve_reference_paper import stats as eve_reference_stats
 from colony.champion_league import ensure_schema as ensure_champion_schema
 from colony.qualification_corpus import ensure_schema as ensure_corpus_schema, snapshot as qualification_corpus_snapshot
 from colony.queen_roles import snapshot as queen_role_snapshot
+from colony.queen_opportunity_queue import ensure_schema as ensure_proposals, review as review_proposal, submit as submit_proposal
 from colony.admin_auth import ensure_schema as ensure_auth_schema, current_password_hash, verify_password as verify_admin_password, reset_password_with_token
 from colony.admin_analytics import snapshot as trading_analytics_snapshot, WINDOWS as ANALYTICS_WINDOWS
 from colony.paper_economics import sol_gbp_rate
@@ -36,6 +37,15 @@ class RecoverIn(BaseModel): username:str; recovery_code:str; new_password:str
 class WalletIn(BaseModel): label:str; address:str
 class ComponentIn(BaseModel): mode:str; wallet_id:int|None=None; max_trade_gbp:float|None=None; floor_gbp:float|None=None
 class AuthorityIn(BaseModel): enabled:bool
+class QueenProposalReview(BaseModel): decision:str; note:str
+class QueenProposalIn(BaseModel):
+    kind:str
+    title:str
+    thesis:str
+    evidence:dict
+    failure_modes:list
+    requested_resources:dict={}
+    risk_notes:str=''
 class EliteModeIn(BaseModel): mode:str
 class TreasuryIn(BaseModel):
     enabled:bool=False
@@ -219,6 +229,35 @@ async def api_analytics(request:Request,window:str='24h'):
         payload=await trading_analytics_snapshot(c,window,float(rate),balance,float(os.getenv('CANARY_RESERVE_SOL','0.003')))
     payload['rate_source']=rate_source
     return payload
+
+@app.get('/admin/api/queen-proposals')
+async def list_queen_proposals(request:Request):
+    auth(request)
+    async with connection() as c:
+        await ensure_proposals(c)
+        rows=await c.fetch('SELECT * FROM queen_opportunity_proposals ORDER BY created_at DESC LIMIT 100')
+    return {'proposals':[dict(r) for r in rows],'approval_scope':'research_only_no_trading_authority'}
+
+@app.post('/admin/api/queen-proposals')
+async def create_queen_proposal(data:QueenProposalIn,request:Request):
+    s=auth(request); require_csrf(request,s)
+    try:
+        async with connection() as c:
+            pid=await submit_proposal(c,data.kind,data.title,data.thesis,'admin_research',data.evidence,data.failure_modes,data.requested_resources,data.risk_notes)
+    except ValueError as e:raise HTTPException(400,str(e))
+    await audit('queen_research_proposal_created','admin',{'proposal_id':pid})
+    return {'id':pid,'status':'proposed','authority':'none'}
+
+@app.post('/admin/api/queen-proposals/{proposal_id}/review')
+async def approve_queen_proposal(proposal_id:int,data:QueenProposalReview,request:Request):
+    s=auth(request);require_csrf(request,s)
+    try:
+        async with connection() as c:
+            row=await review_proposal(c,proposal_id,data.decision,s['user'],data.note)
+    except ValueError as e:raise HTTPException(400,str(e))
+    if not row:raise HTTPException(409,'proposal_not_pending')
+    await audit('queen_research_proposal_reviewed','admin',{'proposal_id':proposal_id,'decision':data.decision})
+    return {'id':proposal_id,'status':row['status'],'approval_scope':'research_only_no_trading_authority'}
 
 @app.post('/admin/api/wallets')
 async def add_wallet(data:WalletIn,request:Request):
