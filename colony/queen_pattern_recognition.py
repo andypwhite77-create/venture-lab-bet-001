@@ -12,7 +12,7 @@ from colony.queen_ecology import load as load_ecology, strategy as ecology_strat
 from colony.queen_mutation_credit import load as load_mutation_credit, save as save_mutation_credit, choose as choose_mutation_operator, record as record_mutation_credit, summarise as summarise_mutation_credit
 SENSORS={'price_change_m5':(-20,20),'price_change_h1':(-50,60),'volume_liquidity_m5':(.001,.8),'dex_buy_ratio_m5':(.2,.9),'buy_acceleration':(.3,7),'flow_ratio_15':(.1,8),'buy_wallets_30':(0,300),'buys_15':(0,500),'sells_15':(0,500),'buys_30':(0,800),'sells_30':(0,800),'liquidity_usd':(1000,600000),'volume_m5':(0,500000),'trend_alignment':(-1200,1800),'short_vs_hour':(-30,30),'flow_imbalance_15':(-1,1),'flow_imbalance_30':(-1,1),'flow_shift':(-2,2),'activity_30':(0,1600),'activity_h1':(0,5000),'flow_imbalance_h1':(-1,1),'buy_activity_change':(-1,12),'volume_liquidity_h1':(0,10),'fdv_liquidity_ratio':(0,1000),'marketcap_liquidity_ratio':(0,1000),'pair_age_hours':(0,10000),'advisor_reversal':(0,1),'advisor_momentum':(0,1),'advisor_order_flow':(0,1),'advisor_exhaustion':(0,1),'advisor_mean_reversion':(0,1),'advisor_count':(0,5),'live_signal_reversal':(0,1),'live_signal_exhaustion':(0,1),'live_signal_momentum':(0,1),'live_signal_order_flow':(0,1),'live_signal_wallet_convergence':(0,1),'live_signal_mean_reversion':(0,1),'live_signal_count':(0,6),'live_council_available':(0,1),'hist_context_available':(0,1),'hist_return_24h':(-100,500),'hist_return_7d':(-100,5000),'hist_volatility_24h':(0,300),'hist_volume_ratio_24h':(0,20),'hist_drawdown_7d_pct':(-100,0),'hist_position_7d':(0,1)}
 HOLDS=(5,10,15,30,45,60,240)
-METHODOLOGY_VERSION='queen-v10-missingness-safe-cross-wave'
+METHODOLOGY_VERSION='queen-v11-experiment-bounded-challengers'
 # Queen may evolve simple risk management; all decisions are fixed before sealed holdout.
 STOP_LOSSES=(None,-5,-8,-12,-18,-25)
 TAKE_PROFITS=(None,5,8,12,20,35,60)
@@ -219,6 +219,16 @@ def _freeze_exam_rows(rows):
  import hashlib
  return frozen,hashlib.sha256(payload.encode()).hexdigest()
 
+def targeted_loss_challenger(genome,rng):
+ # Research-only counterfactual. Bounded alternative exits; must still clear
+ # the identical train/validation, distinct-behaviour and sealed exam gates.
+ g=copy.deepcopy(genome)
+ g['species']='loss_tail_challenger'
+ g['parameters']['stop_loss_pct']=rng.choice((-5,-8,-12))
+ g['parameters']['take_profit_pct']=rng.choice((5,8,12,20))
+ g['parameters']['hold_minutes']=rng.choice((5,10,15,30))
+ return g
+
 async def run(conn,wave_size=None,waves=None,seed=300933,checkpoint='/data/queen_pattern_checkpoint.pkl'):
  wave_size=max(1000,int(wave_size if wave_size is not None else os.getenv('QUEEN_BATCH_SIZE','10000')))
  waves=max(1,int(waves if waves is not None else os.getenv('QUEEN_WAVES_PER_CAMPAIGN','2')))
@@ -231,6 +241,11 @@ async def run(conn,wave_size=None,waves=None,seed=300933,checkpoint='/data/queen
   memory['preferred_features']=focus+[k for k in memory.get('preferred_features',[]) if k not in focus]
   grave=eco_state.setdefault('graveyard',{})
   for sig in swarm_plan.get('avoid_niches',[]):grave.setdefault(sig,{'reason':'swarm_queen_soft_avoidance','revisitable':True})
+ # Research experiments can alter a bounded slice of candidates, but never
+ # scoring rules, known outcome labels, or live controls.
+ try:
+  active_experiment=await conn.fetchrow("SELECT id,kind FROM hive_experiments WHERE kind='live_loss_asymmetry' AND status='awaiting_prospective_test' ORDER BY id DESC LIMIT 1")
+ except Exception:active_experiment=None
  rows=await load_rows(conn)
  if swarm_plan:
   print(json.dumps({'event':'swarm_guidance_applied','plan':{k:swarm_plan.get(k) for k in ('exploit','adjacent_explore','wild_scouts','focus_sensors','avoid_niches','source')}}),flush=True)
@@ -288,6 +303,9 @@ async def run(conn,wave_size=None,waves=None,seed=300933,checkpoint='/data/queen
    gene_seed_n=min(wave_size,int(round(wave_size*seed_fraction)))
    fresh_n=wave_size-gene_seed_n
    pop=[random_genome(rng,memory,eco_plan,eco_state) for _ in range(fresh_n)]; provenance=[None]*len(pop)
+   if active_experiment:
+    for idx in rng.sample(range(len(pop)),min(len(pop),max(1,round(wave_size*.10)))):
+     pop[idx]=targeted_loss_challenger(pop[idx],rng)
    for _ in range(gene_seed_n):
     base=copy.deepcopy(rng.choice(templates));pop.append(mutate(base,rng,active_sensors,sensor_ranges));provenance.append(None)
   else:
@@ -299,6 +317,9 @@ async def run(conn,wave_size=None,waves=None,seed=300933,checkpoint='/data/queen
      pop.append(child);provenance.append((op,float(parent['selection_score']),parent['genome_id']))
     else:
      pop.append(random_genome(rng,memory,eco_plan,eco_state));provenance.append(None)
+  if active_experiment and parents:
+   for idx in rng.sample(range(len(pop)),min(len(pop),max(1,round(wave_size*.10)))):
+    pop[idx]=targeted_loss_challenger(pop[idx],rng)
   # Breeding never evaluates sealed holdout. Score train+validation only, in parallel.
   workers=max(1,min(int(os.getenv('QUEEN_EVAL_WORKERS','2')),os.cpu_count() or 1))
   if workers==1:
