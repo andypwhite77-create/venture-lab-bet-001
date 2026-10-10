@@ -147,6 +147,11 @@ async def run_research_cycle():
             created.append(item)
 
     trending = await fetch_trending_market_snapshots(limit=20)
+    if not trending:
+        try:
+            await capture('_feed_status','geckoterminal','trending_unavailable',{'ok':False,'reason':'empty_or_rate_limited','assets':0})
+        except Exception as ex:
+            log.warning('market_ingress_archive_error %s',type(ex).__name__)
     for mint, market in trending.items():
         try:
             await capture(mint,'geckoterminal','trending_seen_pre_filter',market)
