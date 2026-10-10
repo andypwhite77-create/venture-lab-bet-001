@@ -4,7 +4,15 @@ Role metadata is operational telemetry and a guardrail contract. It does not gra
 trading authority and deliberately keeps future multi-market expansion separate from
 today's SOL-only implementation.
 """
-ROLE_VERSION = "queen-roles-v2"
+ROLE_VERSION = "queen-roles-v3-meshed-colony"
+
+ORGANISM_DRIVE = ("Survive by generating durable net economic surplus. Breed diverse "
+  "strategies, compete on prospective evidence, map new crypto ecosystems, "
+  "and propose specialist colonies that mesh shared observations while "
+  "retaining independent risk containment. Expansion is earned by verified "
+  "risk-adjusted surplus, never by paper gains or mere activity. "
+  "Ambition is research personality, not permission to deploy money, "
+  "create credentials, spin up infrastructure, or evade safeguards.")
 
 BREEDING_QUEEN = {
     "id": "breeding_queen",
@@ -25,7 +33,8 @@ BREEDING_QUEEN = {
         "allocate_real_capital",
     ],
     "qualification_handoff": 5,
-    "operating_mode": "precision",
+    "operating_mode": "expansionist_evolution_under_economic_selection",
+    "organism_drive": ORGANISM_DRIVE,
     "batch_size": 10000,
     "waves_per_campaign": 2,
     "campaign_cooldown_hours": 24,
@@ -37,7 +46,8 @@ SWARM_QUEEN = {
     "title": "Swarm Queen",
     "authority": "research_director",
     "market_scope": ["solana_microcaps"],
-    "future_scope": "cross_market_research_director",
+    "future_scope": "meshed_cross_market_colony_research_director",
+    "organism_drive": ORGANISM_DRIVE,
     "responsibilities": [
         "diagnose_regimes_and_research_blind_spots",
         "set_bounded_research_priorities",
