@@ -87,9 +87,23 @@ async def learn(conn):
         seen.add(sig);parents.append({'family':c['family'],'genome_id':c['genome_id'],'experience_score':c['experience_score'],'events':c['unique_mints'],'mean_return_pct':c['mean_return_pct'],'genome':c['genome']})
         if len(parents)>=24:break
     reference=[c for c in careers if str(c.get('family','')).startswith('eve_reference:')]
+    # Closed live Canary outcomes inform diagnostic priorities, never parent selection
+    # or validation/Spartan labels. Rent released on token-account closure is excluded.
+    live=await conn.fetchrow("""SELECT count(*)::int trades,
+        count(*) FILTER(WHERE (execution->>'realized_market_pnl_after_network_fees_sol')::numeric>0)::int wins,
+        coalesce(sum((execution->>'realized_market_pnl_after_network_fees_sol')::numeric),0)::float8 net_sol,
+        coalesce(min((execution->>'realized_market_pnl_after_network_fees_sol')::numeric),0)::float8 worst_sol
+        FROM canary_trade_intents WHERE broadcast AND status='closed'
+        AND execution ? 'realized_market_pnl_after_network_fees_sol'
+        AND created_at>=now()-interval '7 days'""")
+    economic=dict(live)
+    failure={'source':'closed_broadcast_live_canary','period':'7_days','rent_recovery_excluded':True,
+      'economic_result':economic,'diagnosis':'negative_net_after_network_fees' if economic['net_sol']<0 else 'insufficient_or_nonnegative',
+      'research_priority':'investigate_loss_tail_entry_exit_and_liquidity_before_proposing_new_features' if economic['net_sol']<0 else 'continue_independent_prospective_validation',
+      'authority':'diagnosis_only_no_genome_promotion_or_live_capital_change'}
     out={'updated_at':time.time(),'observations':len(rows),'career_count':len(careers),'eligible_careers':len(eligible),
          'experienced_mints':sorted(experienced),'preferred_features':preferred,'feature_stats':feature,
-         'parent_templates':parents,'careers':[{k:v for k,v in c.items() if k!='genome'} for c in ranked[:50]],
+         'parent_templates':parents,'live_failure_diagnostic':failure,'careers':[{k:v for k,v in c.items() if k!='genome'} for c in ranked[:50]],
          'reference_careers':[{k:v for k,v in c.items() if k!='genome'} for c in reference],
          'reference_observations':sum(int(c.get('n') or 0) for c in reference),
          'reference_eligible_careers':sum(int(c.get('unique_mints') or 0)>=5 for c in reference)}
