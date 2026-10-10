@@ -514,6 +514,16 @@ async def command(action):
                 if await c.fetchval("SELECT count(*) FROM canary_trade_intents WHERE status IN ('claimed','open','submitting_entry','submitting_exit','uncertain')"):
                     raise ValueError('unresolved_position')
                 if action=='arm':
+                    # Independent governor's seven-day loss circuit breaker is
+                    # not cleared by a normal arm command; requires fresh evidence.
+                    from colony.hive_governor import verdict
+                    losses=await c.fetchrow("""SELECT count(*)::int trades,
+                      coalesce(sum((execution->>'realized_market_pnl_after_network_fees_sol')::numeric),0)::float8 net
+                      FROM canary_trade_intents WHERE status='closed' AND broadcast
+                      AND execution ? 'realized_market_pnl_after_network_fees_sol'
+                      AND created_at>=now()-interval '7 days'""")
+                    if verdict(int(losses['trades']),float(losses['net']))=='disarm_loss_limit':
+                        raise ValueError('governor_7d_realized_loss_limit')
                     if not await c.fetchval("SELECT 1 FROM canary_trade_intents WHERE status='closed' AND execution->>'mode'='dry' AND execution ? 'exit_quote' AND execution ? 'eligible_since' AND observed_at >= (execution->>'eligible_since')::timestamptz AND broadcast=false LIMIT 1"):
                         raise ValueError('completed_future_dry_run_required')
                     if wallet_address()!=EXPECTED: raise ValueError('wallet_mismatch')
