@@ -58,7 +58,7 @@ async def snapshot(conn):
  # No sealed examiner outcomes or private wallets sent to the model.
  return {'window':'last_7_days','canary_intents':dict(routes),
          'provider_health':[dict(p) for p in providers],
-         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,'graded_shared_findings':findings,'active_experiments':experiments,'research_urgency':urgency,
+         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,'graded_shared_findings':findings,'active_experiments':experiments,'research_urgency':urgency,'methodology_alarm':{'priority':'CRITICAL','finding':'forward_shadow horizon returns do not model stop_loss_pct or take_profit_pct; loss-tail hypothesis untested','evidence':'30-minute challengers return exactly unchanged control; 5- and 15-minute variants compare horizons, not enforced stops','next_action':'prepare independent time-path exit execution simulator, prove sensor coverage and friction; do not use Spartan answers or unpause broad breeding'},
          'shadow_filter':dict(shadow) if shadow else None,
          'source_tables':['canary_trade_intents','colony_market_ingress','capital_preservation_shadow_runs'],
          'note':'Observed records, not complete market coverage. No verified external major-asset evidence.'}
