@@ -274,9 +274,14 @@ async def active_shadow_candidates(max_age_minutes: int = 240):
             """
             SELECT id,mint,created_at,entry_price,strategy
             FROM research_candidates
-            WHERE shadow_trade=TRUE
-              AND entry_price IS NOT NULL
+            WHERE entry_price IS NOT NULL
               AND created_at >= NOW() - ($1 * INTERVAL '1 minute')
+              AND (shadow_trade=TRUE OR EXISTS (
+                  SELECT 1 FROM family_tournament_entries fe
+                  JOIN family_tournament_runs fr ON fr.run_id=fe.run_id
+                  WHERE fe.candidate_id=research_candidates.id
+                    AND fr.status='collecting'
+                    AND fr.config->>'mode'='forward_shadow_paired_frozen'))
             ORDER BY created_at ASC
             """,
             max_age_minutes,
