@@ -21,6 +21,15 @@ def save_state(x):
     os.makedirs(os.path.dirname(STATE),exist_ok=True)
     with open(STATE,'w') as f: json.dump(x,f,indent=2)
 
+def drought_research_gate(memory,override=False):
+    # Repeated failed qualified examinations require a research-method review.
+    # This uses coarse campaign pass/fail counts, never sealed examiner answers.
+    streak=int(memory.get('spartan_drought_campaigns',0) or 0)
+    if streak>=10 and not override:
+        return {'paused':True,'drought_campaigns':streak,'reason':'repeated_qualification_failure',
+                'action':'audit training coverage, cost realism, prospective paired controls and strategy diversity'}
+    return {'paused':False,'drought_campaigns':streak}
+
 async def main():
     await init_db(); campaign=int(load_memory().get('campaigns',0) or 0)
     # Preserve the campaign cooldown across container/process restarts.
@@ -36,6 +45,11 @@ async def main():
             print(json.dumps({'event':'breeding_cooldown_resumed','seconds':round(remaining,1),'campaign':int(previous.get('campaign',campaign) or campaign)}),flush=True)
             await asyncio.sleep(remaining)
     while True:
+        gate=drought_research_gate(load_memory(),os.getenv('QUEEN_ALLOW_DROUGHT_RESEARCH','0')=='1')
+        if gate['paused']:
+            print(json.dumps({'event':'breeding_research_pause',**gate,'live_authority':False}),flush=True)
+            await asyncio.sleep(3600)
+            continue
         campaign+=1
         async with connection() as c:
             experience=await learn_ant_experience(c)
