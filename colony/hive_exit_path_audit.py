@@ -52,11 +52,13 @@ async def run(limit=300):
      'control':row['baseline'],**result})
  return {'n':len(out),'observed':sum(x['status']=='observed_path' for x in out),
   'excluded':sum(x['status']!='observed_path' for x in out),
+  'distinct_candidates':len(set(x['candidate_id'] for x in out)),
+  'complete_candidates':len(set(x['candidate_id'] for x in out if x['status']=='observed_path')),
   'by_genome':{g:{'observed':sum(x['genome_id']==g and x['status']=='observed_path' for x in out),
     'stop':sum(x['genome_id']==g and x.get('exit_reason')=='stop' for x in out),
     'take':sum(x['genome_id']==g and x.get('exit_reason')=='take' for x in out)}
     for g in set(x['genome_id'] for x in out)},
   'coverage_pct':round(100*sum(x['status']=='observed_path' for x in out)/max(1,len(out)),2),
-  'warning':'INSUFFICIENT PRICE PATH COVERAGE: do not infer stop-loss strategy advantage' if sum(x['status']=='observed_path' for x in out)<30 else 'descriptive_paper_only',
+  'warning':'INSUFFICIENT INDEPENDENT PRICE PATH COVERAGE: no stop-loss qualification' if len(set(x['candidate_id'] for x in out if x['status']=='observed_path'))<30 else 'descriptive_paper_only',
   'authority':'diagnostic_only_no_promotions','sample_limit':limit}
 if __name__=='__main__':print(json.dumps(asyncio.run(run())))

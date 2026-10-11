@@ -12,7 +12,9 @@ async def sample_active_paths():
     rows = await active_shadow_candidates(max_age_minutes=240)
     if not rows:
         return {"active": 0, "recorded": 0, "missing": 0, "coverage_ratio": None}
-    prices = await fetch_prices([r["mint"] for r in rows])
+    # Unique mints reduce duplicate provider work and avoid exacerbating 429s.
+    mints=list(dict.fromkeys(r["mint"] for r in rows))
+    prices = await fetch_prices(mints)
     recorded = 0
     for row in rows:
         price = prices.get(row["mint"])
@@ -20,7 +22,7 @@ async def sample_active_paths():
             continue
         await record_price_path(row["id"], price)
         recorded += 1
-    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(set(x["mint"] for x in rows))}
+    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "missing_mints": [m for m in mints if m not in prices][:25]}
 
 
 async def path_sampler_loop(state):
