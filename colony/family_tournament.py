@@ -132,6 +132,12 @@ async def maybe_cull_all(conn):
     runs=await conn.fetch("SELECT * FROM family_tournament_runs WHERE status='collecting' ORDER BY created_at")
     results=[]
     for run in runs:
+        # Paired experiments must retain the unchanged control and all bounded
+        # challengers throughout prospective evidence collection.
+        cfg=run['config'];cfg=json.loads(cfg) if isinstance(cfg,str) else dict(cfg or {})
+        if cfg.get('mode')=='forward_shadow_paired_frozen':
+            results.append({'run':run['run_id'],'status':'protected_paired_cohort','culled':0})
+            continue
         idx=int(run['stage_index']); stage,min_n,target=STAGES[min(idx,len(STAGES)-1)]
         active=await conn.fetch('SELECT genome_id,baseline,cohort FROM family_tournament_ants WHERE run_id=$1 AND active=true',run['run_id'])
         recs=await metrics(conn,run['run_id'],run['stage_started_at'] if stage==5 else None)

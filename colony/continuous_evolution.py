@@ -57,6 +57,12 @@ async def enforce_elite_training_only(conn):
             events.append({'family':'reversal','deactivated':len(drop)})
     runs=await conn.fetch("SELECT * FROM family_tournament_runs WHERE status='collecting' ORDER BY created_at")
     for run in runs:
+        # Registered paired paper studies are deliberately frozen matched cohorts.
+        # Do not apply the ordinary historical-elite filter to experiment arms.
+        cfg=run['config'];cfg=json.loads(cfg) if isinstance(cfg,str) else dict(cfg or {})
+        if cfg.get('mode')=='forward_shadow_paired_frozen':
+            events.append({'run':run['run_id'],'status':'paired_cohort_preserved','deactivated':0})
+            continue
         rows=await conn.fetch("SELECT genome_id,baseline,cohort FROM family_tournament_ants WHERE run_id=$1 AND active=true",run['run_id'])
         drop=[r['genome_id'] for r in rows if not r['baseline'] and r['cohort']!='historical_qualified']
         if drop:

@@ -45,10 +45,20 @@ async def snapshot(conn):
  try:
   experiments=[dict(x) for x in await conn.fetch("SELECT id,kind,hypothesis,prediction,metric,status FROM hive_experiments ORDER BY id DESC LIMIT 5")]
  except Exception:experiments=[]
+ try:
+  paired=await conn.fetchrow("""SELECT count(*)::int active_challengers,
+    count(*) FILTER(WHERE NOT active)::int disabled_challengers FROM family_tournament_ants
+    WHERE run_id='hive-loss-tail-1' AND cohort='loss_tail_challenger'""")
+  matched=await conn.fetchval("SELECT count(DISTINCT opportunity_id) FROM hive_forward_pairs WHERE experiment_id=1")
+  urgency={'experiment':'live_loss_asymmetry','active_challengers':int(paired['active_challengers']-paired['disabled_challengers']),
+    'disabled_challengers':int(paired['disabled_challengers']),'matched_forward_evidence':int(matched or 0),
+    'priority':'HIGH: investigate stalled forward data and falsifiable challengers; no promotion without independent evidence',
+    'no_live_capital_expansion':True}
+ except Exception:urgency={}
  # No sealed examiner outcomes or private wallets sent to the model.
  return {'window':'last_7_days','canary_intents':dict(routes),
          'provider_health':[dict(p) for p in providers],
-         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,'graded_shared_findings':findings,'active_experiments':experiments,
+         'realized_canary_economics':dict(live),'rent_recovery_excluded':True,'graded_shared_findings':findings,'active_experiments':experiments,'research_urgency':urgency,
          'shadow_filter':dict(shadow) if shadow else None,
          'source_tables':['canary_trade_intents','colony_market_ingress','capital_preservation_shadow_runs'],
          'note':'Observed records, not complete market coverage. No verified external major-asset evidence.'}
