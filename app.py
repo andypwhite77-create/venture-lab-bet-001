@@ -214,6 +214,8 @@ async def health():
         "evaluator_ok": state["evaluator_ok"],
         "research_ok": state["research_ok"],
         "path_sampler_ok": state["path_sampler_ok"],
+        "last_path_sample": state.get("last_path_sample"),
+        "last_path_result": state.get("last_path_result"),
         "paper_trading_only": PAPER_TRADING_ONLY,
     }
 
