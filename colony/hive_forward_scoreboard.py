@@ -23,7 +23,9 @@ def assess(pairs,minimum=30):
  avg_ch=sum(ch)/len(ch);avg_co=sum(co)/len(co)
  tail_ch=min(ch);tail_co=min(co)
  good=avg_ch>0 and avg_ch>avg_co and tail_ch>tail_co
- bad=avg_ch<=avg_co or (avg_ch<=0 and tail_ch<=tail_co)
+ # Failing economic returns do not become 'inconclusive' just because the
+ # unchanged control lost even more. Both must stand on their own economics.
+ bad=avg_ch<=0 or avg_ch<=avg_co or tail_ch<=tail_co
  return {'status':'supported_paper' if good else ('failed_paper' if bad else 'inconclusive'),
  'pairs':len(pairs),'challenger_avg_net_pct':avg_ch,'control_avg_net_pct':avg_co,
  'challenger_worst_pct':tail_ch,'control_worst_pct':tail_co,
