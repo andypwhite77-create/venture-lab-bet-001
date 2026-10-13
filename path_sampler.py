@@ -9,6 +9,20 @@ from colony.sensors import birdeye_price,coingecko_price
 from research_db import active_shadow_candidates, record_price_path
 
 log = logging.getLogger("signal-engine.path-sampler")
+# Per-provider outage gates prevent one bad provider from receiving a burst of
+# redundant requests across missing tokens. This never substitutes prices.
+_PROVIDER_BLOCK_UNTIL={}
+def provider_allowed(provider,now=None):
+    current=time.monotonic() if now is None else now
+    return current>=_PROVIDER_BLOCK_UNTIL.get(provider,0)
+def provider_result(provider,result,now=None):
+    current=time.monotonic() if now is None else now
+    error=str(result.get('error','')).lower()
+    if '429' in error or 'rate_limit' in error:
+        _PROVIDER_BLOCK_UNTIL[provider]=current+300
+    elif result.get('ok'):
+        _PROVIDER_BLOCK_UNTIL.pop(provider,None)
+
 
 
 async def sample_active_paths():
@@ -28,7 +42,10 @@ async def sample_active_paths():
     for mint in mints:
         if mint in prices: continue
         for provider in (birdeye_price,coingecko_price):
+            pname=provider.__name__
+            if not provider_allowed(pname):continue
             result=await provider(mint)
+            provider_result(pname,result)
             if result.get('ok') and not result.get('cached',False) and result.get('price_usd') is not None:
                 try:
                     candidate=float(result['price_usd'])
@@ -44,7 +61,7 @@ async def sample_active_paths():
             continue
         await record_price_path(row["id"], price, fallback_sources.get(row["mint"],"geckoterminal"), "fresh_fetch")
         recorded += 1
-    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources}
+    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
 
 
 async def path_sampler_loop(state):
