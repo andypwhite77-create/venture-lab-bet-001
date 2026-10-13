@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 
 import marketdata
-from marketdata import fetch_prices
+from collector_fresh_prices import fetch as fetch_fresh_prices
 import time
 from colony.sensors import birdeye_price,coingecko_price
 from research_db import active_shadow_candidates, record_price_path
@@ -31,21 +31,28 @@ async def sample_active_paths():
         return {"active": 0, "recorded": 0, "missing": 0, "coverage_ratio": None}
     # Unique mints reduce duplicate provider work and avoid exacerbating 429s.
     mints=list(dict.fromkeys(r["mint"] for r in rows))
-    prices = await fetch_prices(mints)
-    gecko_cache=marketdata._GECKO_CACHE
+    # Snapshot caches are useful for discovery but cannot represent new ticks.
+    # Clear expired Gecko entries before collection so each cycle seeks a real quote.
+    prices, gecko_error = await fetch_fresh_prices(mints)
+    gecko_cache={} # fresh-only endpoint bypasses discovery cache
     # A cached API response is not a new price tick. Anything older than five
     # seconds is routed to independent fallback, never relabelled fresh.
     stale_gecko={m for m in prices if m in gecko_cache and time.time()-gecko_cache[m][0]>5}
     for mint in stale_gecko:prices.pop(mint,None)
     # Provider fallback is for missing mints only. Never synthesize or reuse stale prices.
     fallback_sources={}
+    failures={}
     for mint in mints:
         if mint in prices: continue
         for provider in (birdeye_price,coingecko_price):
             pname=provider.__name__
-            if not provider_allowed(pname):continue
+            if not provider_allowed(pname):
+                failures.setdefault(mint,[]).append(pname+':cooldown')
+                continue
             result=await provider(mint)
             provider_result(pname,result)
+            if not result.get('ok'):
+                failures.setdefault(mint,[]).append(pname+':'+str(result.get('error','unavailable')))
             if result.get('ok') and not result.get('cached',False) and result.get('price_usd') is not None:
                 try:
                     candidate=float(result['price_usd'])
@@ -61,7 +68,7 @@ async def sample_active_paths():
             continue
         await record_price_path(row["id"], price, fallback_sources.get(row["mint"],"geckoterminal"), "fresh_fetch")
         recorded += 1
-    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
+    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources, "provider_failures":failures, "gecko_error":gecko_error, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
 
 
 async def path_sampler_loop(state):
