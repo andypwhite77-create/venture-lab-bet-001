@@ -34,6 +34,8 @@ async def coingecko_price(mint):
     try:
         x=await asyncio.to_thread(_get_json,url,{'x-cg-demo-api-key':key})
         d=x.get(mint) or x.get(mint.lower()) or {}; return {'provider':'coingecko','ok':bool(d),'price_usd':d.get('usd'),'raw':d}
+    except urllib.error.HTTPError as e:
+        return {'provider':'coingecko','ok':False,'error':f'HTTP_{e.code}'}
     except Exception as e:return {'provider':'coingecko','ok':False,'error':type(e).__name__}
 
 async def snapshot(mint):

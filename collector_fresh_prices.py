@@ -21,7 +21,7 @@ async def fetch(mints):
     if price is not None and math.isfinite(float(price)) and float(price)>0:
      found[mint]=float(price)
   except Exception as exc:
-   if '429' in str(exc):_BLOCKED_UNTIL=time.monotonic()+300
+   if '429' in str(exc):_BLOCKED_UNTIL=time.monotonic()+900
    log.warning('fresh Gecko token request failed: %s',type(exc).__name__)
    return found,type(exc).__name__
  return found,None

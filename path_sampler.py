@@ -19,7 +19,11 @@ def provider_result(provider,result,now=None):
     current=time.monotonic() if now is None else now
     error=str(result.get('error','')).lower()
     if '429' in error or 'rate_limit' in error:
-        _PROVIDER_BLOCK_UNTIL[provider]=current+300
+        _PROVIDER_BLOCK_UNTIL[provider]=current+900
+    elif '400' in error or '401' in error or '403' in error:
+        _PROVIDER_BLOCK_UNTIL[provider]=current+1800
+    elif error in ('no_key',):
+        _PROVIDER_BLOCK_UNTIL[provider]=current+3600
     elif result.get('ok'):
         _PROVIDER_BLOCK_UNTIL.pop(provider,None)
 

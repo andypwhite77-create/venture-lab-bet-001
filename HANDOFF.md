@@ -357,3 +357,6 @@ Collector cycles now include `required_mints` for exact per-token observation ac
 
 ## Swarm Queen reliability context — 13 Oct 2026
 Swarm Queen wake now reads the 24-hour market reliability report, adds a compact market_data_quality summary to its journal input and published briefing, and includes it in optional executive prompt. It is advisory only; research allocation, Spartan, breeding and live trading permissions are unchanged. Report failures degrade to an explicit unavailable status. After swarm-queen container redeploy first review showed 0.7358 weighted coverage, 6 token-scoring cycles, 0 reliably evidenced tokens, incomplete 24h gate. 202 tests pass. Canary remains disarmed.
+
+## Price-provider outage hardening — 13 Oct 2026
+After repeated Gecko HTTP 429 and zero-observation cycles, extended Gecko 429 cooldown to 15m; fallback provider 429 cooldown to 15m, HTTP 400/401/403 to 30m and no-key to 60m. CoinGecko HTTP errors now retain actual status codes rather than generic HTTPError, enabling its rate-limit gate. 202 tests pass. Market-data rebuilt and restarted. First post-restart cycle captured 27/27 fresh observations; this is not proof of sustained recovery, and restart resets in-memory cooldowns. Canary and breeding untouched.
