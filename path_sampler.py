@@ -2,7 +2,9 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
+import marketdata
 from marketdata import fetch_prices
+import time
 from colony.sensors import birdeye_price,coingecko_price
 from research_db import active_shadow_candidates, record_price_path
 
@@ -16,13 +18,18 @@ async def sample_active_paths():
     # Unique mints reduce duplicate provider work and avoid exacerbating 429s.
     mints=list(dict.fromkeys(r["mint"] for r in rows))
     prices = await fetch_prices(mints)
+    gecko_cache=marketdata._GECKO_CACHE
+    # A cached API response is not a new price tick. Anything older than five
+    # seconds is routed to independent fallback, never relabelled fresh.
+    stale_gecko={m for m in prices if m in gecko_cache and time.time()-gecko_cache[m][0]>5}
+    for mint in stale_gecko:prices.pop(mint,None)
     # Provider fallback is for missing mints only. Never synthesize or reuse stale prices.
     fallback_sources={}
     for mint in mints:
         if mint in prices: continue
         for provider in (birdeye_price,coingecko_price):
             result=await provider(mint)
-            if result.get('ok') and result.get('price_usd') is not None:
+            if result.get('ok') and not result.get('cached',False) and result.get('price_usd') is not None:
                 try:
                     candidate=float(result['price_usd'])
                     if not 0 < candidate < float('inf'):continue
@@ -35,7 +42,7 @@ async def sample_active_paths():
         price = prices.get(row["mint"])
         if price is None:
             continue
-        await record_price_path(row["id"], price)
+        await record_price_path(row["id"], price, fallback_sources.get(row["mint"],"geckoterminal"), "fresh_fetch")
         recorded += 1
     return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources}
 

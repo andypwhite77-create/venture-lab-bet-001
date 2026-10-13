@@ -53,8 +53,14 @@ CREATE TABLE IF NOT EXISTS research_price_path (
     id BIGSERIAL PRIMARY KEY,
     candidate_id BIGINT NOT NULL REFERENCES research_candidates(id) ON DELETE CASCADE,
     observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    price DOUBLE PRECISION NOT NULL
+    price DOUBLE PRECISION NOT NULL,
+    provider TEXT,
+    quality TEXT NOT NULL DEFAULT 'legacy_unknown',
+    source_observed_at TIMESTAMPTZ
 );
+ALTER TABLE research_price_path ADD COLUMN IF NOT EXISTS provider TEXT;
+ALTER TABLE research_price_path ADD COLUMN IF NOT EXISTS quality TEXT NOT NULL DEFAULT 'legacy_unknown';
+ALTER TABLE research_price_path ADD COLUMN IF NOT EXISTS source_observed_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_research_price_path_candidate_time
     ON research_price_path(candidate_id, observed_at ASC);
 
@@ -289,11 +295,11 @@ async def active_shadow_candidates(max_age_minutes: int = 240):
     return [dict(r) for r in rows]
 
 
-async def record_price_path(candidate_id: int, price: float):
+async def record_price_path(candidate_id: int, price: float, provider: str = "unknown", quality: str = "fresh_fetch"):
     async with connection() as conn:
         await conn.execute(
-            "INSERT INTO research_price_path(candidate_id,price) VALUES($1,$2)",
-            candidate_id, float(price),
+            "INSERT INTO research_price_path(candidate_id,price,provider,quality,source_observed_at) VALUES($1,$2,$3,$4,now())",
+            candidate_id, float(price), provider, quality,
         )
 
 
