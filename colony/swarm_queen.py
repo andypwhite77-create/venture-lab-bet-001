@@ -199,7 +199,7 @@ async def evidence(c):
                             'current_market_scope':SWARM_QUEEN['market_scope'],'future_scope':SWARM_QUEEN['future_scope']}}
 
 def prompt(e):
-    compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','live_economic_failure','roster','challenger_queue','providers','constitution')}
+    compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','live_economic_failure','roster','challenger_queue','providers','constitution','market_data_quality')}
     return ("You are Swarm Queen, research director for an evolutionary trading research system. "+HIVE_CREED+" "
             "Breeding Queen alone creates and mutates genomes. You never spawn ants, trade, promote challengers, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite genomes. "
             "You are an ambitious financial organism navigating a hostile adaptive market. Assume each coin may conceal traps: examine liquidity, execution routes, adverse selection and regime changes as hostile conditions. To beat the market is to produce legitimate evidence-backed net surplus, never to control prices or interfere with others. Evolve competing research lineages, preserve capital, and propose expansion only when performance justifies resources. You cannot deploy funds or infrastructure. "
@@ -212,6 +212,20 @@ def prompt(e):
 async def wake(executive_inference=False):
     async with connection() as c:
         await ensure_schema(c); e=await evidence(c)
+    try:
+        from colony.market_reliability_report import run as reliability_report
+        report = await reliability_report(hours=24)
+        e['market_data_quality'] = {
+            'window_complete': report['window_complete'],
+            'coverage_target_met': report['coverage_target_met'],
+            'weighted_coverage': report['weighted_coverage'],
+            'token_scoring_cycles': report['token_scoring_cycles'],
+            'reliable_token_count': sum(t['reliable_95pct'] for t in report['tokens']),
+            'authority': 'advisory_only_no_breeding_no_spartan_no_live',
+        }
+    except Exception as exc:
+        e['market_data_quality'] = {'status': 'unavailable', 'error_type': type(exc).__name__,
+                                    'authority': 'advisory_only_no_breeding_no_spartan_no_live'}
     safe_plan=_bounded_research_plan({},e)
     b={'status':'healthy','summary':'Research-safe Swarm research-director plan ready.',
        'role_version':ROLE_VERSION,'role':SWARM_QUEEN,'material_changes':[],'colony_notes':{},'recommendations':[],'research_plan':safe_plan}
@@ -235,6 +249,7 @@ async def wake(executive_inference=False):
             state='inference_error'; b['status']='warning'; b['material_changes']=[repr(ex)[:180]]
             b['recommendations']=(b.get('recommendations') or [])[:2]+['Research-safe deterministic Swarm guidance remains active.']
     b['research_plan']=safe_plan
+    b['market_data_quality']=e['market_data_quality']
     async with connection() as c:
         await c.execute("UPDATE swarm_queen_journal SET status=$1,briefing=$2::jsonb WHERE id=$3",state,json.dumps(b),row_id)
     return {'model':MODEL,'seconds':round(time.time()-started,2),'briefing':b}
