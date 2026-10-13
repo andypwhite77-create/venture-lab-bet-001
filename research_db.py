@@ -64,6 +64,16 @@ ALTER TABLE research_price_path ADD COLUMN IF NOT EXISTS source_observed_at TIME
 CREATE INDEX IF NOT EXISTS idx_research_price_path_candidate_time
     ON research_price_path(candidate_id, observed_at ASC);
 
+CREATE TABLE IF NOT EXISTS market_data_cycles (
+ id BIGSERIAL PRIMARY KEY,
+ completed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ active INTEGER NOT NULL,
+ recorded INTEGER NOT NULL,
+ missing INTEGER NOT NULL,
+ coverage_ratio DOUBLE PRECISION,
+ details JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_market_data_cycles_time ON market_data_cycles(completed_at DESC);
 CREATE TABLE IF NOT EXISTS market_price_history (
     id BIGSERIAL PRIMARY KEY,
     mint TEXT NOT NULL,

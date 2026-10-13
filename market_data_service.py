@@ -23,6 +23,8 @@ async def main():
    result=await sample_active_paths()
    archived=await archive_recent()
    result["history_archive"]=archived
+   async with connection() as c:
+    await c.execute("INSERT INTO market_data_cycles(active,recorded,missing,coverage_ratio,details) VALUES($1,$2,$3,$4,$5::jsonb)",result['active'],result['recorded'],result['missing'],result['coverage_ratio'],json.dumps(result))
    log.info('price_cycle %s',json.dumps(result))
   except Exception:
    log.exception('price_cycle_failed')

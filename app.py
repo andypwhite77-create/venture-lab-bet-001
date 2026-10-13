@@ -213,8 +213,20 @@ async def health():
     except Exception:
         pass
     market_fresh = market_age_seconds is not None and float(market_age_seconds) < 180
+    cycle = None
+    try:
+        async with connection() as conn:
+            cycle = await conn.fetchrow("SELECT active,recorded,missing,coverage_ratio,EXTRACT(EPOCH FROM now()-completed_at) age FROM market_data_cycles ORDER BY id DESC LIMIT 1")
+    except Exception:
+        pass
+    cycle_fresh = cycle is not None and float(cycle['age']) < 180
+    cycle_complete = cycle_fresh and (cycle['active']==0 or cycle['recorded']==cycle['active'])
+    research_ready = bool(market_fresh and cycle_complete)
     return {
         "ok": ok,
+        "research_data_ready": research_ready,
+        "market_data_cycle_fresh": cycle_fresh,
+        "market_data_cycle": dict(cycle) if cycle else None,
         "market_data_fresh": market_fresh,
         "market_data_latest_age_seconds": round(float(market_age_seconds),1) if market_age_seconds is not None else None,
         "rpc_ok": state["rpc_ok"],
@@ -223,7 +235,7 @@ async def health():
         "signal_scanner_ok": state["signal_scanner_ok"],
         "evaluator_ok": state["evaluator_ok"],
         "research_ok": state["research_ok"],
-        "path_sampler_ok": None,  # moved to dedicated market-data service
+        "path_sampler_ok": cycle_complete,  # sourced from independent collector heartbeat
         "market_data_service": "separate",
         "last_path_sample": state.get("last_path_sample"),
         "last_path_result": state.get("last_path_result"),
