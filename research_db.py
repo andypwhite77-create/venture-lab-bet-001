@@ -64,6 +64,19 @@ ALTER TABLE research_price_path ADD COLUMN IF NOT EXISTS source_observed_at TIME
 CREATE INDEX IF NOT EXISTS idx_research_price_path_candidate_time
     ON research_price_path(candidate_id, observed_at ASC);
 
+CREATE TABLE IF NOT EXISTS market_price_history (
+    id BIGSERIAL PRIMARY KEY,
+    mint TEXT NOT NULL,
+    collected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    price DOUBLE PRECISION NOT NULL CHECK(price>0),
+    provider TEXT NOT NULL,
+    quality TEXT NOT NULL,
+    source_observed_at TIMESTAMPTZ,
+    source_path_id BIGINT UNIQUE
+);
+CREATE INDEX IF NOT EXISTS idx_market_price_history_mint_time
+    ON market_price_history(mint,collected_at DESC);
+
 CREATE TABLE IF NOT EXISTS market_snapshots (
     id BIGSERIAL PRIMARY KEY,
     observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

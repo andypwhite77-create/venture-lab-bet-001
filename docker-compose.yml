@@ -85,6 +85,22 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  market-data:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "market_data_service"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://venturelab:${POSTGRES_PASSWORD}@postgres:5432/venturelab
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   paper:
     build: .
     restart: unless-stopped

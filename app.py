@@ -186,7 +186,7 @@ async def startup_event():
     asyncio.create_task(signal_loop())
     asyncio.create_task(evaluator_loop(state))
     asyncio.create_task(research_loop(state))
-    asyncio.create_task(path_sampler_loop(state))
+    # Price sampling is owned by the dedicated market-data service.
     asyncio.create_task(monitoring_loop())
     from colony.dashboard_api import warm_loop as dashboard_warm_loop
     asyncio.create_task(dashboard_warm_loop())
@@ -203,17 +203,28 @@ async def startup_event():
 async def health():
     ok = all(state[k] for k in (
         "rpc_ok", "db_ok", "collector_ok", "signal_scanner_ok",
-        "evaluator_ok", "research_ok", "path_sampler_ok",
+        "evaluator_ok", "research_ok",
     ))
+    from db import connection
+    market_age_seconds = None
+    try:
+        async with connection() as conn:
+            market_age_seconds = await conn.fetchval("SELECT EXTRACT(EPOCH FROM (now()-max(collected_at))) FROM market_price_history")
+    except Exception:
+        pass
+    market_fresh = market_age_seconds is not None and float(market_age_seconds) < 180
     return {
         "ok": ok,
+        "market_data_fresh": market_fresh,
+        "market_data_latest_age_seconds": round(float(market_age_seconds),1) if market_age_seconds is not None else None,
         "rpc_ok": state["rpc_ok"],
         "db_ok": state["db_ok"],
         "collector_ok": state["collector_ok"],
         "signal_scanner_ok": state["signal_scanner_ok"],
         "evaluator_ok": state["evaluator_ok"],
         "research_ok": state["research_ok"],
-        "path_sampler_ok": state["path_sampler_ok"],
+        "path_sampler_ok": None,  # moved to dedicated market-data service
+        "market_data_service": "separate",
         "last_path_sample": state.get("last_path_sample"),
         "last_path_result": state.get("last_path_result"),
         "paper_trading_only": PAPER_TRADING_ONLY,
