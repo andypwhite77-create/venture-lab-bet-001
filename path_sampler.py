@@ -68,7 +68,7 @@ async def sample_active_paths():
             continue
         await record_price_path(row["id"], price, fallback_sources.get(row["mint"],"geckoterminal"), "fresh_fetch")
         recorded += 1
-    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources, "provider_failures":failures, "gecko_error":gecko_error, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
+    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "required_mints":mints, "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources, "provider_failures":failures, "gecko_error":gecko_error, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
 
 
 async def path_sampler_loop(state):
