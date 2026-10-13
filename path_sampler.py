@@ -45,7 +45,7 @@ async def path_sampler_loop(state):
     while True:
         try:
             result = await sample_active_paths()
-            state["path_sampler_ok"] = result["active"] == 0 or result["recorded"] > 0
+            state["path_sampler_ok"] = result["active"] == 0 or result["recorded"] == result["active"]
             state["last_path_sample"] = datetime.now(timezone.utc).isoformat()
             state["last_path_result"] = result
         except Exception as exc:
