@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import marketdata
 from collector_fresh_prices import fetch as fetch_fresh_prices
+from collector_dexscreener import fetch as fetch_dexscreener
 import time
 from colony.sensors import birdeye_price,coingecko_price
 from research_db import active_shadow_candidates, record_price_path
@@ -46,9 +47,17 @@ async def sample_active_paths():
     # Provider fallback is for missing mints only. Never synthesize or reuse stale prices.
     fallback_sources={}
     failures={}
+    dex_error=None
+    missing=[mint for mint in mints if mint not in prices]
+    if missing and gecko_error is not None and provider_allowed('dexscreener'):
+        dex_prices,dex_error=await fetch_dexscreener(missing)
+        provider_result('dexscreener',{'ok':dex_error is None,'error':dex_error or ''})
+        prices.update(dex_prices)
+        fallback_sources.update({mint:'dexscreener' for mint in dex_prices})
     for mint in mints:
         if mint in prices: continue
-        for provider in (birdeye_price,coingecko_price):
+        # CoinGecko credit allowance exhausted; exclude from collection entirely.
+        for provider in (birdeye_price,):
             pname=provider.__name__
             if not provider_allowed(pname):
                 failures.setdefault(mint,[]).append(pname+':cooldown')
@@ -72,7 +81,7 @@ async def sample_active_paths():
             continue
         await record_price_path(row["id"], price, fallback_sources.get(row["mint"],"geckoterminal"), "fresh_fetch")
         recorded += 1
-    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "required_mints":mints, "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources, "provider_failures":failures, "gecko_error":gecko_error, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
+    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "required_mints":mints, "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources, "provider_failures":failures, "gecko_error":gecko_error, "dex_error":dex_error, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
 
 
 async def path_sampler_loop(state):
