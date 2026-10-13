@@ -298,7 +298,7 @@ async def active_shadow_candidates(max_age_minutes: int = 240):
 async def record_price_path(candidate_id: int, price: float, provider: str = "unknown", quality: str = "fresh_fetch"):
     async with connection() as conn:
         await conn.execute(
-            "INSERT INTO research_price_path(candidate_id,price,provider,quality,source_observed_at) VALUES($1,$2,$3,$4,now())",
+            "INSERT INTO research_price_path(candidate_id,price,provider,quality,source_observed_at) VALUES($1,$2,$3,$4,NULL)",
             candidate_id, float(price), provider, quality,
         )
 
