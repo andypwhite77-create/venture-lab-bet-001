@@ -43,7 +43,7 @@ async def run(limit=500):
         await c.execute(SCHEMA)
         entries=await c.fetch("""SELECT DISTINCT ON (e.candidate_id) e.candidate_id,e.observed_at,e.hold_minutes,r.entry_price
           FROM family_tournament_entries e JOIN research_candidates r ON r.id=e.candidate_id
-          WHERE e.run_id='hive-loss-tail-1' ORDER BY e.candidate_id,e.observed_at LIMIT $1""",limit)
+          WHERE e.run_id='hive-loss-tail-1' ORDER BY e.candidate_id DESC,e.observed_at LIMIT $1""",limit)
         ids=[x['candidate_id'] for x in entries]
         samples=await c.fetch("""SELECT candidate_id,observed_at,price FROM research_price_path
             WHERE candidate_id=ANY($1::bigint[]) ORDER BY candidate_id,observed_at""",ids) if ids else []
