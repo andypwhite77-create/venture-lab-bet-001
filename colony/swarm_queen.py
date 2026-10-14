@@ -199,7 +199,7 @@ async def evidence(c):
                             'current_market_scope':SWARM_QUEEN['market_scope'],'future_scope':SWARM_QUEEN['future_scope']}}
 
 def prompt(e):
-    compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','live_economic_failure','roster','challenger_queue','providers','constitution','market_data_quality','controlled_paper_evidence','controlled_paper_assessment')}
+    compact={k:e.get(k) for k in ('queen_research','reference_baseline','performance','live_economic_failure','roster','challenger_queue','providers','constitution','market_data_quality','controlled_paper_evidence','controlled_paper_assessment','paired_exit_comparison')}
     return ("You are Swarm Queen, research director for an evolutionary trading research system. "+HIVE_CREED+" "
             "Breeding Queen alone creates and mutates genomes. You never spawn ants, trade, promote challengers, alter Spartan, lower evidence gates, use sealed holdout answers, or rewrite genomes. "
             "You are an ambitious financial organism navigating a hostile adaptive market. Assume each coin may conceal traps: examine liquidity, execution routes, adverse selection and regime changes as hostile conditions. To beat the market is to produce legitimate evidence-backed net surplus, never to control prices or interfere with others. Evolve competing research lineages, preserve capital, and propose expansion only when performance justifies resources. You cannot deploy funds or infrastructure. "
@@ -232,6 +232,17 @@ async def wake(executive_inference=False):
     from colony.controlled_paper_assessment import snapshot as assessment_snapshot
     async with connection() as c:
         e["controlled_paper_assessment"] = await assessment_snapshot(c)
+    # Persisted paired-exit comparisons are advisory observations, never promotion gates.
+    try:
+        async with connection() as c:
+            prior=await c.fetchrow('SELECT id,created_at,report FROM queen_exit_research_runs ORDER BY id DESC LIMIT 1')
+        if prior:
+            report=prior['report']; report=json.loads(report) if isinstance(report,str) else report
+            e['paired_exit_comparison']={'run_id':prior['id'],'created_at':prior['created_at'].isoformat(),
+                'input_candidates':report.get('input_candidates'), 'policies':report.get('policies'),
+                'authority':'advisory_only_no_breeding_no_spartan_no_live'}
+    except Exception as exc:
+        e['paired_exit_comparison']={'status':'unavailable','error_type':type(exc).__name__}
     safe_plan=_bounded_research_plan({},e)
     b={'status':'healthy','summary':'Research-safe Swarm research-director plan ready.',
        'role_version':ROLE_VERSION,'role':SWARM_QUEEN,'material_changes':[],'colony_notes':{},'recommendations':[],'research_plan':safe_plan}
@@ -257,6 +268,7 @@ async def wake(executive_inference=False):
     b['research_plan']=safe_plan
     b['market_data_quality']=e['market_data_quality']
     b['controlled_paper_assessment']=e['controlled_paper_assessment']
+    b['paired_exit_comparison']=e.get('paired_exit_comparison',{'status':'unavailable'})
     async with connection() as c:
         await c.execute("UPDATE swarm_queen_journal SET status=$1,briefing=$2::jsonb WHERE id=$3",state,json.dumps(b),row_id)
     return {'model':MODEL,'seconds':round(time.time()-started,2),'briefing':b}
