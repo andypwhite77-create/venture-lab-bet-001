@@ -1,7 +1,7 @@
 """Paired, read-only exit-policy experiment on observed candidate price paths.
 No fills, promotion, parameter mutation, breeding or trade permissions.
 """
-import asyncio, json, statistics
+import asyncio, json, statistics, hashlib
 from db import init_db, connection
 from colony.hive_exit_path_audit import simulate
 
@@ -56,8 +56,12 @@ async def run(limit=500):
             for name,(stop,take) in POLICIES.items():
                 result[name]=simulate(a,p,path,hold,stop_pct=stop,take_pct=take)
             evaluated.append(result)
-        report={'experiment':'fixed_exit_policy_pairs_v1','input_candidates':len(entries),
+        evidence_fingerprint=hashlib.sha256(json.dumps([(r['candidate_id'],r['control'].get('exit_at'),r['control'].get('net_pct'),[(name,r[name].get('net_pct'),r[name].get('exit_at')) for name in POLICIES]) for r in evaluated],default=str).encode()).hexdigest()
+        report={'experiment':'fixed_exit_policy_pairs_v1','evidence_fingerprint':evidence_fingerprint,'input_candidates':len(entries),
                 'authority':'observation_only_no_breeding_no_spartan_no_live',**compare(evaluated)}
+        previous=await c.fetchval("SELECT report->>'evidence_fingerprint' FROM queen_exit_research_runs ORDER BY id DESC LIMIT 1")
+        if previous==evidence_fingerprint:
+            return {'status':'unchanged_no_new_run','evidence_fingerprint':evidence_fingerprint,'input_candidates':len(entries)}
         rid=await c.fetchval('INSERT INTO queen_exit_research_runs(report) VALUES($1::jsonb) RETURNING id',json.dumps(report))
         return {'id':rid,**report}
 if __name__=='__main__':print(json.dumps(asyncio.run(run())))
