@@ -1,0 +1,16 @@
+import unittest
+from datetime import datetime,timedelta,timezone
+from colony.ant_plasticity_shadow import evaluate
+class Tests(unittest.TestCase):
+ def test_future_outcomes_cannot_affect_previous_decision(self):
+  t=datetime(2026,1,1,tzinfo=timezone.utc)
+  entries=[{'entry_id':i,'genome_id':'A','observed_at':t+timedelta(minutes=i)} for i in range(1,7)]
+  marks={'A':[{'entry_id':i,'outcome_at':t+timedelta(minutes=i,seconds=1),'net_pct':-12} for i in range(1,5)]}
+  r=evaluate(entries,marks)
+  self.assertEqual(r[0]['shadow_action'],'follow_dna')
+  self.assertEqual(r[4]['shadow_action'],'abstain')
+ def test_positive_history_leaves_dna_untouched(self):
+  t=datetime(2026,1,1,tzinfo=timezone.utc)
+  entries=[{'entry_id':9,'genome_id':'A','observed_at':t+timedelta(hours=2)}]
+  marks={'A':[{'entry_id':i,'outcome_at':t+timedelta(minutes=i),'net_pct':2} for i in range(5)]}
+  self.assertEqual(evaluate(entries,marks)[0]['shadow_action'],'follow_dna')
