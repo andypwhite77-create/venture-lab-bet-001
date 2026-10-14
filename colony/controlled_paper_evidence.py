@@ -7,6 +7,8 @@ async def snapshot(conn):
    round(avg(l.net_return_pct)::numeric,3) mean_net_pct,
    round(min(l.net_return_pct)::numeric,3) worst_net_pct,
    round(sum(l.paper_pnl_gbp)::numeric,3) net_paper_gbp,
+   count(l.entry_id) FILTER (WHERE l.net_return_pct < -20)::int severe_losses,
+   count(l.entry_id) FILTER (WHERE l.net_return_pct > 30)::int extreme_winners,
    count(e.id)::int entries
    FROM controlled_paper_cohort c
    LEFT JOIN eve_reference_paper_entries e
@@ -20,7 +22,9 @@ async def snapshot(conn):
       'pending':r['entries']-r['completed'],'wins':r['wins'],
       'mean_net_pct':float(r['mean_net_pct']) if r['mean_net_pct'] is not None else None,
       'worst_net_pct':float(r['worst_net_pct']) if r['worst_net_pct'] is not None else None,
-      'paper_pnl_gbp':float(r['net_paper_gbp']) if r['net_paper_gbp'] is not None else None} for r in rows]}
+      'paper_pnl_gbp':float(r['net_paper_gbp']) if r['net_paper_gbp'] is not None else None,
+      'severe_losses':r['severe_losses'],'extreme_winners':r['extreme_winners'],
+      'research_priority':'audit_outlier_prices_and_execution' if r['extreme_winners'] else ('reduce_loss_tails' if r['severe_losses'] else 'collect_more_forward_evidence')} for r in rows]}
  except Exception as exc:
   return {'status':'unavailable','error_type':type(exc).__name__,
     'authority':'advisory_only_no_breeding_no_spartan_no_live'}
