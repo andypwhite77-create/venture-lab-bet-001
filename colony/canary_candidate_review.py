@@ -13,9 +13,9 @@ SQL="""WITH source AS (
  SELECT DISTINCT ON(source,genome_id,mint) * FROM source
  ORDER BY source,genome_id,mint,observed_at,candidate_id
 ), observed AS (
- SELECT f.*,o.net_return_pct, o.measured_at FROM first_signal f
+ SELECT f.*,o.net_return_pct,o.raw_return_pct, o.measured_at FROM first_signal f
  LEFT JOIN LATERAL (
- SELECT net_return_pct,measured_at FROM research_outcomes o
+ SELECT net_return_pct,raw_return_pct,measured_at FROM research_outcomes o
  WHERE o.candidate_id=f.candidate_id AND o.horizon_minutes=f.hold_minutes
  AND o.measured_at>=f.observed_at+f.hold_minutes*interval '1 minute'
  AND o.net_return_pct IS NOT NULL ORDER BY o.measured_at ASC,o.id ASC LIMIT 1
@@ -29,7 +29,8 @@ SELECT source,genome_id,count(*)::int distinct_mints,
  round(min(net_return_pct)::numeric,3) worst_mark_pct,
  count(*) FILTER (WHERE net_return_pct < -20)::int severe_losses,
  count(*) FILTER (WHERE net_return_pct>0)::int wins,
- count(*) FILTER (WHERE net_return_pct < -100 OR net_return_pct > 500)::int suspect_marks,
+ count(*) FILTER (WHERE raw_return_pct < -100 OR raw_return_pct > 500)::int suspect_marks,
+ count(*) FILTER (WHERE net_return_pct < -100)::int fee_exceeds_stake_marks,
  max(observed_at) newest_signal
 FROM observed GROUP BY source,genome_id ORDER BY completed DESC"""
 
@@ -41,7 +42,7 @@ def assess(r):
  if mean<=1: blockers.append('insufficient_mean_margin_for_execution_uncertainty')
  if median<=0:blockers.append('nonpositive_median')
  if worst < -20 or loss:blockers.append('severe_loss_tail')
- if r['suspect_marks']:blockers.append('invalid_or_extreme_return_marks')
+ if r['suspect_marks']:blockers.append('implausible_raw_return_requires_quote_audit')
  blockers.append('no_independent_executable_forward_validation')
  return {**dict(r),'mean_mark_pct':mean,'median_mark_pct':median,'worst_mark_pct':worst,
   'tier':('research_shortlist' if len(blockers)==1 else 'research_repair'),
@@ -56,6 +57,6 @@ async def run():
  near=sorted([x for x in out if x['completed']>=25],key=lambda x:(x['mean_mark_pct'],x['median_mark_pct']),reverse=True)
  return {'surveyed_genomes':len(out),'research_shortlist_count':len(shortlist),'research_shortlist':shortlist[:12],
   'top_25_mint_diagnostics':near[:12], 'minimum_unique_mints':25,
-  'integrity_policy':'Reject physically impossible unleveraged returns below -100%; quarantine implausible extreme positive marks until audited. Do not silently discard failed trades.',
+  'integrity_policy':'Raw unleveraged returns below -100% are invalid. Net returns below -100% can arise after external fees and indicate economic catastrophe, not necessarily corruption. Independently audit extreme positive raw prices.',
   'rule':'Never promote from this review: sampled market marks are not executable fills, and qualification requires separate forward stress/Spartan checks.'}
 if __name__=='__main__':print(json.dumps(asyncio.run(run()),default=str))

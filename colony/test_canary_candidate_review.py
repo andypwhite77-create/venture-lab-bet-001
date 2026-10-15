@@ -2,7 +2,7 @@ import unittest
 from colony.canary_candidate_review import assess
 class CanaryReviewTests(unittest.TestCase):
  def row(self,**changes):
-  r=dict(source='champion_paper',genome_id='test',distinct_mints=30,completed=30,pending=0,mean_mark_pct=2,median_mark_pct=1,worst_mark_pct=-5,severe_losses=0,wins=20,suspect_marks=0,newest_signal=None)
+  r=dict(source='champion_paper',genome_id='test',distinct_mints=30,completed=30,pending=0,mean_mark_pct=2,median_mark_pct=1,worst_mark_pct=-5,severe_losses=0,wins=20,suspect_marks=0,fee_exceeds_stake_marks=0,newest_signal=None)
   r.update(changes);return r
  def test_clean_paper_is_never_promoted(self):
   x=assess(self.row());self.assertEqual(x['tier'],'research_shortlist');self.assertIn('no_independent_executable_forward_validation',x['blockers'])
