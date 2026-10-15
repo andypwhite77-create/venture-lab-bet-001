@@ -31,7 +31,7 @@ async def run():
     AND e.observed_at>=$1 ORDER BY e.observed_at,e.id""",trial['started_at'])
   marked=await c.fetch("""SELECT l.entry_id,l.genome_id,l.outcome_at,l.net_return_pct net_pct
     FROM controlled_paper_trade_ledger l JOIN controlled_paper_cohort cohort ON cohort.genome_id=l.genome_id
-    WHERE cohort.status='observation_only' AND l.outcome_at<now() ORDER BY l.outcome_at,l.entry_id""")
+    WHERE cohort.status='observation_only' AND l.outcome_at<now() AND l.captured_at<=l.outcome_at + interval '10 minutes' ORDER BY l.outcome_at,l.entry_id""")
   by={}
   for x in marked:by.setdefault(x['genome_id'],[]).append(dict(x))
   decided=evaluate([dict(x) for x in entries],by,**{k:v for k,v in policy.items() if k!='version'})
