@@ -25,6 +25,7 @@ SELECT source,genome_id,count(*)::int distinct_mints,
  count(net_return_pct)::int completed,
  count(*) FILTER (WHERE net_return_pct IS NULL)::int pending,
  round(avg(net_return_pct)::numeric,3) mean_mark_pct,
+ round(avg(least(net_return_pct,30))::numeric,3) capped_mean_pct,
  round(percentile_cont(0.5) WITHIN GROUP (ORDER BY net_return_pct)::numeric,3) median_mark_pct,
  round(min(net_return_pct)::numeric,3) worst_mark_pct,
  count(*) FILTER (WHERE net_return_pct < -20)::int severe_losses,
@@ -40,11 +41,12 @@ def assess(r):
  blockers=[]
  if n<25:blockers.append('less_than_25_distinct_completed_mints')
  if mean<=1: blockers.append('insufficient_mean_margin_for_execution_uncertainty')
+ if float(r['capped_mean_pct'] or 0)<=1: blockers.append('capped_return_not_economically_positive')
  if median<=0:blockers.append('nonpositive_median')
  if worst < -20 or loss:blockers.append('severe_loss_tail')
  if r['suspect_marks']:blockers.append('implausible_raw_return_requires_quote_audit')
  blockers.append('no_independent_executable_forward_validation')
- return {**dict(r),'mean_mark_pct':mean,'median_mark_pct':median,'worst_mark_pct':worst,
+ return {**dict(r),'mean_mark_pct':mean,'capped_mean_pct':float(r['capped_mean_pct'] or 0),'median_mark_pct':median,'worst_mark_pct':worst,
   'tier':('research_shortlist' if len(blockers)==1 else 'research_repair'),
   'blockers':blockers,'authority':'read_only_no_promotion'}
 
@@ -54,7 +56,7 @@ async def run():
   rows=await c.fetch(SQL)
  out=[assess(x) for x in rows]
  shortlist=sorted([x for x in out if x['tier']=='research_shortlist'],key=lambda x:(x['mean_mark_pct'],x['completed']),reverse=True)
- near=sorted([x for x in out if x['completed']>=25],key=lambda x:(x['mean_mark_pct'],x['median_mark_pct']),reverse=True)
+ near=sorted([x for x in out if x['completed']>=25],key=lambda x:(x['capped_mean_pct'],x['median_mark_pct']),reverse=True)
  return {'surveyed_genomes':len(out),'research_shortlist_count':len(shortlist),'research_shortlist':shortlist[:12],
   'top_25_mint_diagnostics':near[:12], 'minimum_unique_mints':25,
   'integrity_policy':'Raw unleveraged returns below -100% are invalid. Net returns below -100% can arise after external fees and indicate economic catastrophe, not necessarily corruption. Independently audit extreme positive raw prices.',
