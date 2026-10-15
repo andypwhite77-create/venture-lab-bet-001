@@ -45,6 +45,21 @@ async def run():
  await init_db()
  async with connection() as c:
   await ensure_timing_columns(c)
+  from colony.candidate_birth_quotes import SCHEMA as BIRTH_SCHEMA
+  await c.execute(BIRTH_SCHEMA)
+  # Reuse actual at-birth quotes for multiple paper genomes seeing the SAME candidate.
+  # Preserve original quote clock and flag independent opportunity at candidate level.
+  await c.execute("""INSERT INTO canary_forward_quote_observations
+    (entry_id,phase,observed_at,due_at,quote,status,reason,latency_seconds,
+     request_started_at,response_at,request_duration_ms)
+    SELECT e.id,'entry',b.response_at,e.observed_at,b.quote,b.status,b.reason,
+           b.latency_seconds,b.request_started_at,b.response_at,b.request_duration_ms
+    FROM eve_reference_paper_entries e
+    JOIN research_candidate_birth_quotes b ON b.candidate_id=e.candidate_id
+    JOIN controlled_paper_cohort cohort ON cohort.genome_id=e.genome_id
+    WHERE cohort.status='observation_only' AND e.observed_at>=cohort.started_at
+      AND b.latency_seconds BETWEEN 0 AND 120
+    ON CONFLICT DO NOTHING""")
   records=await c.fetch("""SELECT e.id,e.mint,e.observed_at,e.hold_minutes,e.stake_gbp,
     e.observed_at+e.hold_minutes*interval '1 minute' exit_due,
     q.quote entry_quote FROM eve_reference_paper_entries e
