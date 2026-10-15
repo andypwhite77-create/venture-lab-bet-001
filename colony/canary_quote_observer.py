@@ -9,11 +9,11 @@ SCHEMA="""CREATE TABLE IF NOT EXISTS canary_forward_quote_observations(
  entry_id bigint not null references eve_reference_paper_entries(id),
  phase text not null check(phase in ('entry','exit')),
  observed_at timestamptz not null default now(), due_at timestamptz not null,
- quote jsonb, status text not null, reason text, latency_seconds double precision, request_started_at timestamptz, response_at timestamptz, request_duration_ms double precision,
+ quote jsonb, status text not null, reason text, latency_seconds double precision, request_started_at timestamptz, response_at timestamptz, request_duration_ms double precision, observation_source text,
  primary key(entry_id,phase));"""
 async def ensure_timing_columns(conn):
  await conn.execute(SCHEMA)
- for name,typ in [('request_started_at','timestamptz'),('response_at','timestamptz'),('request_duration_ms','double precision')]:
+ for name,typ in [('request_started_at','timestamptz'),('response_at','timestamptz'),('request_duration_ms','double precision'),('observation_source','text')]:
   await conn.execute(f'ALTER TABLE canary_forward_quote_observations ADD COLUMN IF NOT EXISTS {name} {typ}')
 
 async def observe_fresh_entries(conn, keys):
@@ -34,8 +34,8 @@ async def observe_fresh_entries(conn, keys):
   responded=datetime.now(timezone.utc);duration=(time.monotonic()-clock)*1000
   latency=(responded-e['observed_at']).total_seconds()
   await conn.execute("""INSERT INTO canary_forward_quote_observations
-    (entry_id,phase,due_at,quote,status,reason,latency_seconds,request_started_at,response_at,request_duration_ms)
-    VALUES($1,'entry',$2,$3::jsonb,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING""",
+    (entry_id,phase,due_at,quote,status,reason,latency_seconds,request_started_at,response_at,request_duration_ms,observation_source)
+    VALUES($1,'entry',$2,$3::jsonb,$4,$5,$6,$7,$8,$9,'direct_paper_entry') ON CONFLICT DO NOTHING""",
     e['id'],e['observed_at'],json.dumps(q) if q else None,
     'quoted' if q else 'unavailable',reason,latency,started,responded,duration)
   recorded+=1
@@ -51,9 +51,9 @@ async def run():
   # Preserve original quote clock and flag independent opportunity at candidate level.
   await c.execute("""INSERT INTO canary_forward_quote_observations
     (entry_id,phase,observed_at,due_at,quote,status,reason,latency_seconds,
-     request_started_at,response_at,request_duration_ms)
+     request_started_at,response_at,request_duration_ms,observation_source)
     SELECT e.id,'entry',b.response_at,e.observed_at,b.quote,b.status,b.reason,
-           b.latency_seconds,b.request_started_at,b.response_at,b.request_duration_ms
+           b.latency_seconds,b.request_started_at,b.response_at,b.request_duration_ms,'candidate_birth'
     FROM eve_reference_paper_entries e
     JOIN research_candidate_birth_quotes b ON b.candidate_id=e.candidate_id
     JOIN controlled_paper_cohort cohort ON cohort.genome_id=e.genome_id
@@ -94,7 +94,7 @@ async def run():
     responded=datetime.now(timezone.utc);duration=(time.monotonic()-clock)*1000
     latency=(responded-due).total_seconds()
     await c.execute("""INSERT INTO canary_forward_quote_observations
-      (entry_id,phase,due_at,quote,status,reason,latency_seconds,request_started_at,response_at,request_duration_ms) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING""",
+      (entry_id,phase,due_at,quote,status,reason,latency_seconds,request_started_at,response_at,request_duration_ms,observation_source) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,'minute_fallback') ON CONFLICT DO NOTHING""",
       e['id'],phase,due,json.dumps(q) if q else None,status,reason,latency,started,responded,duration)
     count+=1
   return {'processed':count,'quotes':successes,'authority':'read_only_no_live','note':'Quote evidence only; no fills and no guaranteed execution.'}

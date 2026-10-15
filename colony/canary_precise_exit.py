@@ -28,8 +28,8 @@ async def poll():
    responded=datetime.now(timezone.utc);latency=(responded-r['due']).total_seconds()
    async with connection() as c:
     await c.execute('''INSERT INTO canary_forward_quote_observations
-      (entry_id,phase,observed_at,due_at,quote,status,reason,latency_seconds,request_started_at,response_at,request_duration_ms)
-      VALUES($1,'exit',$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING''',
+      (entry_id,phase,observed_at,due_at,quote,status,reason,latency_seconds,request_started_at,response_at,request_duration_ms,observation_source)
+      VALUES($1,'exit',$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,'precise_exit') ON CONFLICT DO NOTHING''',
       r['id'],responded,r['due'],json.dumps(q) if q else None,'quoted' if q else 'unavailable',reason,
       latency,started,responded,(time.monotonic()-clock)*1000)
  return len(rows)
