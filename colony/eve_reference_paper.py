@@ -61,7 +61,7 @@ async def run_once(conn, limit=1000):
         await conn.execute('UPDATE eve_reference_paper_progress SET last_candidate_id=$1,initialized_at=now(),updated_at=now() WHERE id=1',last)
     rows=await conn.fetch("""SELECT id,created_at,mint,features,market FROM research_candidates
       WHERE id>$1 AND created_at>=to_timestamp($2) ORDER BY id LIMIT $3""",last,cutoff,int(limit))
-    inserted=0; hits={a['genome_id']:0 for a in ants}
+    inserted=0; hits={a['genome_id']:0 for a in ants}; fresh_entries=[]
     latest={}
     if rows:
         prev=await conn.fetch("""SELECT DISTINCT ON(genome_id,mint) genome_id,mint,observed_at
@@ -85,8 +85,18 @@ async def run_once(conn, limit=1000):
               a['id'],a['genome_id'],a['family'],a['species'],rr['mint'],rr['id'],rr['created_at'],hold,TARGET_STAKE_GBP)
             if res.endswith('1'):
                 inserted+=1;hits[a['genome_id']]+=1;latest[(a['genome_id'],rr['mint'])]=rr['created_at']
+                fresh_entries.append((a['genome_id'],rr['id']))
     if rows:
         await conn.execute('UPDATE eve_reference_paper_progress SET last_candidate_id=$1,updated_at=now() WHERE id=1',rows[-1]['id'])
+    # A bounded, best-effort immediate quote attempt after recording new paper
+    # entries. Failures never prevent reference-paper ingestion or grant authority.
+    if fresh_entries:
+        try:
+            from colony.canary_quote_observer import observe_fresh_entries
+            await observe_fresh_entries(conn, fresh_entries[-8:])
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('reference_immediate_quote_observation_failed')
     return {'ants':len(ants),'candidates':len(rows),'entries':inserted,'hits':hits,'last_candidate_id':rows[-1]['id'] if rows else last}
 
 async def stats(conn):
