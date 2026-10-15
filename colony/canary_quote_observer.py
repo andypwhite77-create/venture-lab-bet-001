@@ -1,7 +1,7 @@
 """Bounded read-only forward Jupiter observations for fixed reference paper entries.
 Never signs, trades, or treats a delayed quote as contemporaneous evidence.
 """
-import asyncio,json
+import asyncio,json,time
 from datetime import datetime,timezone
 from db import init_db,connection
 from colony.jupiter_quotes import quote,SOL
@@ -9,12 +9,16 @@ SCHEMA="""CREATE TABLE IF NOT EXISTS canary_forward_quote_observations(
  entry_id bigint not null references eve_reference_paper_entries(id),
  phase text not null check(phase in ('entry','exit')),
  observed_at timestamptz not null default now(), due_at timestamptz not null,
- quote jsonb, status text not null, reason text, latency_seconds double precision,
+ quote jsonb, status text not null, reason text, latency_seconds double precision, request_started_at timestamptz, response_at timestamptz, request_duration_ms double precision,
  primary key(entry_id,phase));"""
+async def ensure_timing_columns(conn):
+ await conn.execute(SCHEMA)
+ for name,typ in [('request_started_at','timestamptz'),('response_at','timestamptz'),('request_duration_ms','double precision')]:
+  await conn.execute(f'ALTER TABLE canary_forward_quote_observations ADD COLUMN IF NOT EXISTS {name} {typ}')
+
 async def observe_fresh_entries(conn, keys):
  """Capture quotes at the reference-entry creation site, with a strict lateness veto."""
- await conn.execute(SCHEMA)
- await conn.execute('ALTER TABLE canary_forward_quote_observations ADD COLUMN IF NOT EXISTS latency_seconds double precision')
+ await ensure_timing_columns(conn)
  recorded=0
  for genome_id,candidate_id in keys:
   e=await conn.fetchrow("""SELECT e.id,e.mint,e.observed_at FROM eve_reference_paper_entries e
@@ -24,23 +28,23 @@ async def observe_fresh_entries(conn, keys):
   if age<0 or age>120:continue
   exists=await conn.fetchval("SELECT 1 FROM canary_forward_quote_observations WHERE entry_id=$1 AND phase='entry'",e['id'])
   if exists:continue
-  q=None;reason=None
+  q=None;reason=None;started=datetime.now(timezone.utc);clock=time.monotonic()
   try:q=await asyncio.to_thread(quote,SOL,e['mint'],10000000,100,3)
   except Exception as exc:reason=type(exc).__name__
-  latency=(datetime.now(timezone.utc)-e['observed_at']).total_seconds()
+  responded=datetime.now(timezone.utc);duration=(time.monotonic()-clock)*1000
+  latency=(responded-e['observed_at']).total_seconds()
   await conn.execute("""INSERT INTO canary_forward_quote_observations
-    (entry_id,phase,due_at,quote,status,reason,latency_seconds)
-    VALUES($1,'entry',$2,$3::jsonb,$4,$5,$6) ON CONFLICT DO NOTHING""",
+    (entry_id,phase,due_at,quote,status,reason,latency_seconds,request_started_at,response_at,request_duration_ms)
+    VALUES($1,'entry',$2,$3::jsonb,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING""",
     e['id'],e['observed_at'],json.dumps(q) if q else None,
-    'quoted' if q else 'unavailable',reason,latency)
+    'quoted' if q else 'unavailable',reason,latency,started,responded,duration)
   recorded+=1
  return recorded
 
 async def run():
  await init_db()
  async with connection() as c:
-  await c.execute(SCHEMA)
-  await c.execute("ALTER TABLE canary_forward_quote_observations ADD COLUMN IF NOT EXISTS latency_seconds double precision")
+  await ensure_timing_columns(c)
   records=await c.fetch("""SELECT e.id,e.mint,e.observed_at,e.hold_minutes,e.stake_gbp,
     e.observed_at+e.hold_minutes*interval '1 minute' exit_due,
     q.quote entry_quote FROM eve_reference_paper_entries e
@@ -58,7 +62,7 @@ async def run():
     if age<0 or age>120:continue
     exists=await c.fetchval('SELECT 1 FROM canary_forward_quote_observations WHERE entry_id=$1 AND phase=$2',e['id'],phase)
     if exists:continue
-    status='unavailable';reason=None;q=None
+    status='unavailable';reason=None;q=None;started=datetime.now(timezone.utc);clock=time.monotonic()
     try:
      if phase=='entry':
       # Fixed small reference size, no price conversion used for execution.
@@ -70,10 +74,11 @@ async def run():
       else:q=await asyncio.to_thread(quote,e['mint'],SOL,int(entry['out_amount']),100,4)
      if q:status='quoted';successes+=1
     except Exception as exc:reason=type(exc).__name__
-    latency=(datetime.now(timezone.utc)-due).total_seconds()
+    responded=datetime.now(timezone.utc);duration=(time.monotonic()-clock)*1000
+    latency=(responded-due).total_seconds()
     await c.execute("""INSERT INTO canary_forward_quote_observations
-      (entry_id,phase,due_at,quote,status,reason,latency_seconds) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7) ON CONFLICT DO NOTHING""",
-      e['id'],phase,due,json.dumps(q) if q else None,status,reason,latency)
+      (entry_id,phase,due_at,quote,status,reason,latency_seconds,request_started_at,response_at,request_duration_ms) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING""",
+      e['id'],phase,due,json.dumps(q) if q else None,status,reason,latency,started,responded,duration)
     count+=1
   return {'processed':count,'quotes':successes,'authority':'read_only_no_live','note':'Quote evidence only; no fills and no guaranteed execution.'}
 if __name__=='__main__':print(json.dumps(asyncio.run(run())))
