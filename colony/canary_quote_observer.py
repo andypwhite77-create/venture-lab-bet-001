@@ -75,6 +75,8 @@ async def run():
    for phase,due in (('entry',e['observed_at']),('exit',e['exit_due'])):
     age=(now-due).total_seconds()
     if age<0 or age>120:continue
+    # Give the precise exit observer first opportunity; cron is late fallback.
+    if phase=='exit' and age<12:continue
     exists=await c.fetchval('SELECT 1 FROM canary_forward_quote_observations WHERE entry_id=$1 AND phase=$2',e['id'],phase)
     if exists:continue
     status='unavailable';reason=None;q=None;started=datetime.now(timezone.utc);clock=time.monotonic()

@@ -15,6 +15,7 @@ async def poll():
       WHERE x.entry_id IS NULL AND e.observed_at>=cohort.started_at
       AND e.observed_at+e.hold_minutes*interval '1 minute' BETWEEN now()-interval '5 seconds' AND now()+interval '7 seconds'
       ORDER BY due LIMIT 15''')
+  # Batch candidate lookups, but only quotes with actual due times are sampled.
   for r in rows:
    delay=(r['due']-datetime.now(timezone.utc)).total_seconds()
    if delay>0:await asyncio.sleep(delay)
@@ -34,7 +35,10 @@ async def poll():
  return len(rows)
 async def main():
  await init_db()
- async with connection() as c:await ensure_timing_columns(c)
+ async with connection() as c:
+  await ensure_timing_columns(c)
+  await c.execute("CREATE INDEX IF NOT EXISTS eve_reference_observed_hold_idx ON eve_reference_paper_entries (observed_at,hold_minutes)")
+  await c.execute("CREATE INDEX IF NOT EXISTS canary_quote_phase_entry_idx ON canary_forward_quote_observations(entry_id,phase,status)")
  while True:
   try:await poll()
   except Exception:log.exception('precise_exit_poll_failure')
