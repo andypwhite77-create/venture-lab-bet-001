@@ -26,4 +26,4 @@ class RegimeTests(unittest.TestCase):
   t=datetime(2026,1,3,tzinfo=timezone.utc)
   marks={'A':[{'entry_id':i,'outcome_at':t-timedelta(hours=100-i),'net_pct':-7} for i in range(5)]}
   entry=[{'entry_id':10,'genome_id':'A','observed_at':t,'features':{'liquidity_usd':100000,'price_change_m5':1}}]
-  self.assertEqual(evaluate(entry,marks)[0]['shadow_action'],'abstain')
+  self.assertEqual(evaluate(entry,marks)[0]['shadow_action'],'follow_dna')

@@ -39,12 +39,14 @@ def evaluate(entries, marks, window=8, min_history=4, cooldown_losses=3, half_li
         for m in reversed(recent):
             if m['net_pct']<0:losing_streak+=1
             else:break
-        # Regime shifts add caution only after meaningful prior individual evidence.
-        regime_caution=band=='thin_liquidity' and len(recent)>=min_history and mean is not None and mean<0
-        abstain=len(recent)>=min_history and (losing_streak>=cooldown_losses or (mean is not None and mean < -5) or regime_caution)
+        # Stale outcomes lose decision authority even if their signed mean remains negative.
+        effective_marks=sum(w for _,w in weighted)
+        enough=len(recent)>=min_history and effective_marks>=1.5
+        regime_caution=band=='thin_liquidity' and enough and mean is not None and mean<0
+        abstain=enough and (losing_streak>=cooldown_losses or (mean is not None and mean < -5) or regime_caution)
         output.append({'entry_id':e['entry_id'],'genome_id':aid,'observed_at':t,
                        'shadow_action':'abstain' if abstain else 'follow_dna','regime':band,
-                       'known_marks':len(recent),'recent_mean':round(mean,3) if mean is not None else None,
+                       'known_marks':len(recent),'effective_marks':round(effective_marks,3),'recent_mean':round(mean,3) if mean is not None else None,
                        'loss_streak':losing_streak})
     return output
 
