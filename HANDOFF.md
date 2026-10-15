@@ -363,3 +363,7 @@ After repeated Gecko HTTP 429 and zero-observation cycles, extended Gecko 429 co
 
 ## Independent fallback — 13 Oct 2026
 CoinGecko credits exhausted: collector no longer calls CoinGecko. Added `collector_dexscreener.py` using live DexScreener Solana token endpoint, batching <=30 and selecting highest-liquidity pair with valid USD price for each mint. Invoked only when Gecko fresh fetch reports failure/cooldown; results have provider `dexscreener` and normal research-only price-path provenance. Provider error recorded as `dex_error` and circuit-breaker shared with fallback logic. Market-data container rebuilt/restarted; first post-restart cycle 23/23 via Gecko, independent DexScreener SOL connectivity test returned valid price. 202 tests passed. NOTE: no upstream quote timestamp; HTTP fresh response does not prove provider quote freshness. New fallback has not yet been observed recovering an actual Gecko outage. Canary disarmed and breeding paused.
+
+
+## Status update — 15 October 2026
+See docs/SPRINT_STATUS_2026-10-15.md for the full 14–15 October plasticity, historical replay, prospective trial, Canary candidate audit and read-only Jupiter quote-observation handoff. Zero Spartan qualifications; 309 genomes screened with no preliminary research shortlist. Canary disarmed; no promotion permission changed.

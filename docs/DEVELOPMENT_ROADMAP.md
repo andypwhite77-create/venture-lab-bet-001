@@ -38,3 +38,7 @@ Likely long-term shape: lightweight, boring live-trading node separated from a h
 
 ## 8. Live progression
 Let the current Canary compound its tiny bankroll under the ants' existing trading rules. If it remains consistently positive over several weeks and a meaningful number of genuine round trips, graduate the proven Elite pool to permanent live status. Canary then remains the proving ground for new ants, plasticity, strategy changes and new coins.
+
+
+## 15 October 2026 — execution-aware candidate promotion research
+See SPRINT_STATUS_2026-10-15.md. Implemented plasticity V2 (shadow only), prospective matched policy tracking, eligible-history backtesting, conservative Canary ranking with severe-tail and median vetoes, 177 extreme-winner observations audited (zero verified exit quotes), and read-only forward Jupiter quote observer. No verified live profitability or promotion eligibility. Remaining priorities: paired valid quotes, cost/capacity modelling, independent forward qualification, and universal historical replay gate.
