@@ -113,6 +113,12 @@ async def _record(strategy, mint, score, tier, shadow_trade, features, market, c
         shadow_trade=shadow_trade, entry_price=entry_price,
         features=features, market=market or {}, assumed_cost_bps=80.0,
     )
+    # Schedule a read-only quote at signal creation; never hold up research discovery.
+    try:
+        from colony.candidate_birth_quotes import start_candidate_capture
+        start_candidate_capture(candidate_id,mint)
+    except Exception:
+        log.exception('candidate_quote_schedule_failed')
     return {
         "id": candidate_id, "strategy": strategy, "mint": mint,
         "score": round(score, 3), "tier": tier,
