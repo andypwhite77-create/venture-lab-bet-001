@@ -54,10 +54,20 @@ async def run():
  await init_db()
  async with connection() as c:
   rows=await c.fetch(SQL)
+  try:
+   q=await c.fetchrow("""SELECT count(DISTINCT entry_id)::int observed_entries,
+    count(DISTINCT entry_id) FILTER (WHERE phase='entry' AND status='quoted')::int quoted_entries,
+    count(DISTINCT entry_id) FILTER (WHERE phase='exit' AND status='quoted')::int quoted_exits
+    FROM canary_forward_quote_observations""")
+   complete=await c.fetchval("""SELECT count(*) FROM canary_forward_quote_observations a
+    JOIN canary_forward_quote_observations b ON a.entry_id=b.entry_id
+    WHERE a.phase='entry' AND b.phase='exit' AND a.status='quoted' AND b.status='quoted'""")
+   quote_coverage={**dict(q),'paired_entry_exit_quotes':int(complete or 0)}
+  except Exception:quote_coverage={'status':'not_available'}
  out=[assess(x) for x in rows]
  shortlist=sorted([x for x in out if x['tier']=='research_shortlist'],key=lambda x:(x['mean_mark_pct'],x['completed']),reverse=True)
  near=sorted([x for x in out if x['completed']>=25],key=lambda x:(x['capped_mean_pct'],x['median_mark_pct']),reverse=True)
- return {'surveyed_genomes':len(out),'research_shortlist_count':len(shortlist),'research_shortlist':shortlist[:12],
+ return {'forward_quote_coverage':quote_coverage,'surveyed_genomes':len(out),'research_shortlist_count':len(shortlist),'research_shortlist':shortlist[:12],
   'top_25_mint_diagnostics':near[:12], 'minimum_unique_mints':25,
   'integrity_policy':'Raw unleveraged returns below -100% are invalid. Net returns below -100% can arise after external fees and indicate economic catastrophe, not necessarily corruption. Independently audit extreme positive raw prices.',
   'rule':'Never promote from this review: sampled market marks are not executable fills, and qualification requires separate forward stress/Spartan checks.'}
