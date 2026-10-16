@@ -51,8 +51,18 @@ def simulate(rows,start_gbp=125,per_trade_gbp=25,friction_pct=1,as_of=None):
     'unresolved':{'pending':len(pending),'overdue':sum(p['state']=='overdue_unpriced' for p in pending),'locked_gbp':round(sum(p['stake_gbp'] for p in pending),3),'positions':[{**p,'entry_at':p['entry_at'].isoformat()} for p in pending]}}
  return {'shared_start_gbp':start_gbp,'stake_cap_gbp':per_trade_gbp,'results':result,
   'authority':'research_only_not_executable','caveat':'Paper marks and candidate deduplication only. Unpriced capital is locked; its liquidation value is unknown.'}
-async def run():
+async def run(start_at=None):
  await init_db()
  async with connection() as c:rows=await c.fetch(SQL)
- return simulate(rows)
-if __name__=='__main__':print(json.dumps(asyncio.run(run())))
+ if start_at:
+  # This is a genuinely prospective replay: historical positions remain in
+  # the original report but never contaminate the newly funded research wallet.
+  rows=[r for r in rows if r['entry_at']>=start_at]
+ output=simulate(rows)
+ if start_at:output['cohort_started_at']=start_at.isoformat()
+ return output
+if __name__=='__main__':
+ import os
+ start=os.getenv('SHARED_WALLET_COHORT_START_UTC')
+ start_at=datetime.fromisoformat(start.replace('Z','+00:00')) if start else None
+ print(json.dumps(asyncio.run(run(start_at))))

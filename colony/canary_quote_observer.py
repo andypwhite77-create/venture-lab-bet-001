@@ -75,6 +75,9 @@ async def run():
    for phase,due in (('entry',e['observed_at']),('exit',e['exit_due'])):
     age=(now-due).total_seconds()
     if age<0 or age>120:continue
+    # Give candidate-birth capture time to persist before requesting the same
+    # entry quote again; this avoids avoidable calls during provider 429s.
+    if phase=='entry' and age<12:continue
     # Give the precise exit observer first opportunity; cron is late fallback.
     if phase=='exit' and age<12:continue
     exists=await c.fetchval('SELECT 1 FROM canary_forward_quote_observations WHERE entry_id=$1 AND phase=$2',e['id'],phase)
