@@ -16,3 +16,12 @@ class CapitalTests(unittest.TestCase):
  def test_negative_cash_prevented(self):
   x=replay([row(1,0,-200)])['arms']['fixed_dna'];self.assertGreaterEqual(x['per_genome'][0]['cash_gbp'],0)
 if __name__=='__main__':unittest.main()
+
+class ReinvestmentInvariantTests(unittest.TestCase):
+ def test_winnings_can_fund_multiple_open_stakes(self):
+  rows=[row(1,0,400),row(2,20,None),row(3,21,None)]
+  p=replay(rows)['arms']['fixed_dna']['per_genome'][0]
+  self.assertEqual(p['locked_unmarked_gbp'],50)
+  self.assertGreaterEqual(p['cash_gbp'],0)
+  self.assertEqual(p['accounting_delta_gbp'],0)
+  self.assertEqual(p['book_equity_gbp'],p['cash_gbp']+p['locked_unmarked_gbp'])

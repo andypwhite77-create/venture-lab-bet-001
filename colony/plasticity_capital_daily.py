@@ -17,11 +17,11 @@ def replay(rows,initial_gbp=25,extra_friction_pct=1):
  for arm in ('fixed_dna','plasticity'):
   days=defaultdict(float);per=[]
   for genome,entries in by.items():
-   cash=float(initial_gbp);locked=0.;openq=[];skipped=0;abstained=0;trades=0
+   cash=float(initial_gbp);locked=0.;openq=[];skipped=0;abstained=0;trades=0;realized=0.
    def close_due(at):
-    nonlocal cash,locked
+    nonlocal cash,locked,realized
     while openq and openq[0][0]<=at:
-     _,_,stake,pnl=heapq.heappop(openq);locked-=stake;cash+=stake+pnl
+     _,_,stake,pnl=heapq.heappop(openq);locked-=stake;cash+=stake+pnl;realized+=pnl
    for row in sorted(entries,key=lambda v:(v['entry_at'],v['entry_id'])):
     close_due(row['entry_at'])
     if arm=='plasticity' and row['action']!='follow_dna':abstained+=1;continue
@@ -36,7 +36,9 @@ def replay(rows,initial_gbp=25,extra_friction_pct=1):
     days[closing.astimezone(timezone.utc).date().isoformat()]+=pnl
    close_due(max((x[0] for x in openq),default=entries[-1]['entry_at']))
    per.append({'genome_id':genome,'cash_gbp':round(cash,3),'locked_unmarked_gbp':round(locked,3),
-    'completed':trades,'no_cash':skipped,'abstained':abstained})
+    'completed':trades,'no_cash':skipped,'abstained':abstained,
+    'realized_pnl_gbp':round(realized,3),'book_equity_gbp':round(cash+locked,3),
+    'accounting_delta_gbp':round(cash+locked-initial_gbp-realized,8)})
   result[arm]={'per_genome':per,'daily_pnl_gbp':{k:round(v,3) for k,v in sorted(days.items())},
    'profitable_days':sum(v>0 for v in days.values()),'losing_days':sum(v<0 for v in days.values()),
    'total_closed_pnl_gbp':round(sum(days.values()),3),'worst_day_gbp':round(min(days.values()),3) if days else None}
