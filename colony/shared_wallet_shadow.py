@@ -48,7 +48,7 @@ def simulate(rows,start_gbp=125,per_trade_gbp=25,friction_pct=1,as_of=None):
    p['state']='overdue_unpriced' if p['entry_at']+timedelta(minutes=60)<as_of and p['state']=='unpriced' else p['state']
   result[arm]={'cash_gbp':round(cash,3),'locked_gbp':round(locked,3),'closed_pnl_gbp':round(pnl,3),'book_equity_gbp':round(cash+locked,3),
     'accounting_delta_gbp':round(cash+locked-start_gbp-pnl,8),'counts':dict(counts),'daily_closed_pnl_gbp':{k:round(v,3) for k,v in sorted(daily.items())},
-    'unresolved':{'pending':len(pending),'overdue':sum(p['state']=='overdue_unpriced' for p in pending),'locked_gbp':round(sum(p['stake_gbp'] for p in pending),3)}}
+    'unresolved':{'pending':len(pending),'overdue':sum(p['state']=='overdue_unpriced' for p in pending),'locked_gbp':round(sum(p['stake_gbp'] for p in pending),3),'positions':[{**p,'entry_at':p['entry_at'].isoformat()} for p in pending]}}
  return {'shared_start_gbp':start_gbp,'stake_cap_gbp':per_trade_gbp,'results':result,
   'authority':'research_only_not_executable','caveat':'Paper marks and candidate deduplication only. Unpriced capital is locked; its liquidation value is unknown.'}
 async def run():
