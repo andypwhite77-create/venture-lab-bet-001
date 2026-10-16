@@ -26,7 +26,7 @@ async def capture_candidate(candidate_id,mint):
    if (started-created).total_seconds()>10:return
    timer=time.monotonic();result=None;reason=None
    try:result=await asyncio.to_thread(quote,SOL,mint,10000000,100,3)
-   except Exception as ex:reason=type(ex).__name__
+   except Exception as ex:reason=str(ex)[:220] if hasattr(ex,'attempts') else type(ex).__name__
    ended=datetime.now(timezone.utc)
    await c.execute('''INSERT INTO research_candidate_birth_quotes
      (candidate_id,request_started_at,response_at,latency_seconds,request_duration_ms,quote,status,reason)

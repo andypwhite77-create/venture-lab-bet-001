@@ -30,7 +30,7 @@ async def observe_fresh_entries(conn, keys):
   if exists:continue
   q=None;reason=None;started=datetime.now(timezone.utc);clock=time.monotonic()
   try:q=await asyncio.to_thread(quote,SOL,e['mint'],10000000,100,3)
-  except Exception as exc:reason=type(exc).__name__
+  except Exception as exc:reason=str(exc)[:220] if hasattr(exc,'attempts') else type(exc).__name__
   responded=datetime.now(timezone.utc);duration=(time.monotonic()-clock)*1000
   latency=(responded-e['observed_at']).total_seconds()
   await conn.execute("""INSERT INTO canary_forward_quote_observations
@@ -90,7 +90,7 @@ async def run():
        reason='missing_contemporaneous_entry_quote'
       else:q=await asyncio.to_thread(quote,e['mint'],SOL,int(entry['out_amount']),100,4)
      if q:status='quoted';successes+=1
-    except Exception as exc:reason=type(exc).__name__
+    except Exception as exc:reason=str(exc)[:220] if hasattr(exc,'attempts') else type(exc).__name__
     responded=datetime.now(timezone.utc);duration=(time.monotonic()-clock)*1000
     latency=(responded-due).total_seconds()
     await c.execute("""INSERT INTO canary_forward_quote_observations

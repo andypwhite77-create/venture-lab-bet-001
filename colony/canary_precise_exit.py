@@ -24,7 +24,7 @@ async def poll():
    try:
     if not e or not int(e.get('out_amount') or 0):reason='missing_contemporaneous_entry_quote'
     else:q=await asyncio.to_thread(quote,r['mint'],SOL,int(e['out_amount']),100,3)
-   except Exception as ex:reason=type(ex).__name__
+   except Exception as ex:reason=str(ex)[:220] if hasattr(ex,'attempts') else type(ex).__name__
    responded=datetime.now(timezone.utc);latency=(responded-r['due']).total_seconds()
    async with connection() as c:
     await c.execute('''INSERT INTO canary_forward_quote_observations
