@@ -59,7 +59,7 @@ async def run_once(conn, limit=1000):
     if not progress['initialized_at']:
         last=int(await conn.fetchval("SELECT coalesce(max(id),0) FROM research_candidates WHERE created_at < to_timestamp($1)",cutoff) or 0)
         await conn.execute('UPDATE eve_reference_paper_progress SET last_candidate_id=$1,initialized_at=now(),updated_at=now() WHERE id=1',last)
-    rows=await conn.fetch("""SELECT id,created_at,mint,features,market FROM research_candidates
+    rows=await conn.fetch("""SELECT id,created_at,mint,features,market,entry_price FROM research_candidates
       WHERE id>$1 AND created_at>=to_timestamp($2) ORDER BY id LIMIT $3""",last,cutoff,int(limit))
     inserted=0; hits={a['genome_id']:0 for a in ants}; fresh_entries=[]
     latest={}
@@ -67,7 +67,13 @@ async def run_once(conn, limit=1000):
         prev=await conn.fetch("""SELECT DISTINCT ON(genome_id,mint) genome_id,mint,observed_at
           FROM eve_reference_paper_entries ORDER BY genome_id,mint,observed_at DESC""")
         latest={(r['genome_id'],r['mint']):r['observed_at'] for r in prev}
+    unpriced_candidates=0
     for row in rows:
+        # Forward-only: never create a nominal paper position without an observed entry price.
+        # Maintain the candidate cursor even when the candidate is ineligible.
+        if row['entry_price'] is None or not (0 < float(row['entry_price']) < float('inf')):
+            unpriced_candidates+=1
+            continue
         rr=dict(row)
         for a in ants:
             if rr['created_at'].timestamp() < a['prospective_after']:
@@ -97,7 +103,7 @@ async def run_once(conn, limit=1000):
         except Exception:
             import logging
             logging.getLogger(__name__).exception('reference_immediate_quote_observation_failed')
-    return {'ants':len(ants),'candidates':len(rows),'entries':inserted,'hits':hits,'last_candidate_id':rows[-1]['id'] if rows else last}
+    return {'ants':len(ants),'candidates':len(rows),'entries':inserted,'skipped_unpriced_candidates':unpriced_candidates,'hits':hits,'last_candidate_id':rows[-1]['id'] if rows else last}
 
 async def stats(conn):
     await ensure_schema(conn)
