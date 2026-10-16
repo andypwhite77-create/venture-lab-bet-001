@@ -1,11 +1,13 @@
 import asyncio
 import logging
+import math
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from marketdata import fetch_market_snapshots, fetch_trending_market_snapshots
 from colony.market_ingress import capture
 from research_db import candidate_exists_recently, create_candidate, recent_token_events, save_market_snapshot
+from db import connection
 
 log = logging.getLogger("signal-engine.research")
 
@@ -98,6 +100,19 @@ def _dex_buy_ratio(market):
     return buys / max(1, buys + sells)
 
 
+async def _fresh_archived_entry_price(mint):
+    """Use independently fetched, same-mint observation only if <=30s old."""
+    async with connection() as conn:
+        row = await conn.fetchrow("""SELECT price,provider,collected_at,source_observed_at FROM market_price_history
+            WHERE mint=$1 AND quality='fresh_fetch' AND price>0
+            AND collected_at BETWEEN now()-interval '30 seconds' AND now()
+            AND (source_observed_at IS NULL OR source_observed_at BETWEEN now()-interval '30 seconds' AND now())
+            ORDER BY collected_at DESC LIMIT 1""", mint)
+    if not row or not math.isfinite(float(row['price'])):return None
+    return {'price_usd':float(row['price']),'source':'independent_fresh_history',
+            'price_provider':row['provider'],'price_observed_at':row['collected_at'].isoformat()}
+
+
 async def _record(strategy, mint, score, tier, shadow_trade, features, market, cooldown=30):
     # Persist the observed market evidence even when candidate cooldown suppresses
     # a duplicate trading/research signal. Snapshots are append-only observations,
@@ -106,7 +121,15 @@ async def _record(strategy, mint, score, tier, shadow_trade, features, market, c
         await save_market_snapshot(mint, strategy, market)
     if await candidate_exists_recently(strategy, mint, cooldown, tier=tier):
         return None
-    entry_price = market.get("price_usd") if market else None
+    market = dict(market or {})
+    entry_price = market.get("price_usd")
+    if not isinstance(entry_price,(int,float)) or not math.isfinite(float(entry_price)) or entry_price<=0:
+        fallback = await _fresh_archived_entry_price(mint)
+        if fallback:
+            market.update(fallback)
+            entry_price=fallback['price_usd']
+            # Source is explicit; no pool liquidity, volume, or momentum invented.
+        else:entry_price=None
     shadow_trade = bool(shadow_trade and entry_price and entry_price > 0)
     candidate_id = await create_candidate(
         strategy=strategy, mint=mint, direction="long", score=score, tier=tier,
