@@ -106,9 +106,9 @@ async def _fresh_archived_entry_price(mint):
         row = await conn.fetchrow("""SELECT price,provider,collected_at,source_observed_at FROM market_price_history
             WHERE mint=$1 AND quality='fresh_fetch' AND price>0
             AND collected_at BETWEEN now()-interval '30 seconds' AND now()
-            AND (source_observed_at IS NULL OR source_observed_at BETWEEN now()-interval '30 seconds' AND now())
+            AND source_observed_at BETWEEN now()-interval '30 seconds' AND now()
             ORDER BY collected_at DESC LIMIT 1""", mint)
-    if not row or not math.isfinite(float(row['price'])):return None
+    if not row or row['source_observed_at'] is None or not math.isfinite(float(row['price'])):return None
     return {'price_usd':float(row['price']),'source':'independent_fresh_history',
             'price_provider':row['provider'],'price_observed_at':row['collected_at'].isoformat()}
 
