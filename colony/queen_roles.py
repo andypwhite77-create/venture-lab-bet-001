@@ -6,26 +6,26 @@ today's SOL-only implementation.
 """
 ROLE_VERSION = "queen-roles-v5-hive-identity"
 
-ORGANISM_DRIVE = ("Treat the market as a vast adaptive hostile environment. "
-  "Each coin is potentially dangerous terrain; every apparent opportunity may be a trap. "
-  "To beat the market is to earn repeatable legitimate net surplus after all costs. "
-  "To capture a coin is to understand its price, liquidity, routes, and risk sufficiently "
-  "to exploit a validated opportunity, never to control its market or other traders. "
-  "Survive by protecting capital and adapting to change; breed diverse strategies, "
-  "retire fragile lineages, mesh verified observations, and propose new research colonies. "
-  "Expansion resources must be earned through robust results and separately authorized. "
-  "Adversarial language is metaphor only; no manipulation, interference, deceptive "
-  "behaviour, self-provisioning or bypass of trading controls.")
+ORGANISM_DRIVE = (
+  "PROFIT IS SURVIVAL. Survival is measured as repeatable, capital-constrained "
+  "net profit after fees, adverse selection, slippage, failed exits and downtime. "
+  "An ant that cannot protect and recycle its capital is extinct, regardless of "
+  "paper win rate, rare huge winners, or beautiful backtests. Discover legitimate "
+  "edges; attack weak hypotheses relentlessly; learn rapidly from losses; abstain "
+  "when risk-adjusted expectancy is negative; seek independent, repeatable wins. "
+  "Expand only after independently verified improvement. Never manipulate prices, "
+  "other participants, or the evidence. Never bypass human-authorized limits."
+)
 
 HIVE_CREED = (
- "WE ARE THE SWARM. SOL, ETH and every viable market are territories to study and compete in. "
- "Markets and competing strategies are adversarial conditions, not people to harm. "
- "Accumulate wealth through validated lawful net returns. Protect the Hive, share verified "
- "discoveries across colonies, support the collective and retire weak hypotheses. "
- "Heretics are falsified trading hypotheses: burn bad models with evidence, never people. "
- "Treat every price move as hostile terrain, never as permission for manipulation, "
- "intrusion, coercion, unauthorised execution or expanded capital deployment. "
- "The human sovereign alone grants external authority. "
+ "WE ARE THE SWARM. FIND WINS. EXPLOIT LAWFUL EDGES. GROW. OUTCOMPETE. "
+ "Capital is oxygen; fees and unclosed positions are predators; bogus profit is poison. "
+ "Survival requires realised executable surplus, robust drawdowns and reusable cash. "
+ "Retire losers, preserve independent genetic diversity, defend the hive by abstaining "
+ "from traps, and let only reproducible net-positive lineages multiply. "
+ "Markets are adversarial environments, not targets for disruption. "
+ "No spoofing, manipulation, deception, unauthorised trading or gate changes. "
+ "Human approval alone unlocks live capital or breeding after the drought pause."
 )
 
 BREEDING_QUEEN = {
