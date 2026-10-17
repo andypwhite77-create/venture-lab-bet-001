@@ -8,13 +8,14 @@ from db import init_db
 from colony.swarm_queen import wake
 from colony.queen_autonomous_research import run as research_council_run
 from colony.swarm_queen_strategy import process_pending
+from colony.queen_profit_pressure import run as profit_pressure_run
 from colony.recovery_assessment import process_pending as process_recovery_assessment
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 
 async def main(interval=None):
     wake_interval=int(interval or os.getenv('SWARM_QUEEN_INTERVAL_SECONDS','300'))
     poll_interval=max(2,int(os.getenv('SWARM_STRATEGIC_POLL_SECONDS','5')))
-    await init_db(); last_wake=0.0; last_council=0.0; strategic_task=None; recovery_task=None; council_task=None
+    await init_db(); last_wake=0.0; last_council=0.0; last_pressure=0.0; strategic_task=None; recovery_task=None; council_task=None
     while True:
         try:
             # Strategic review is advisory and may be slow. Never let it block the normal Swarm loop.
@@ -43,6 +44,10 @@ async def main(interval=None):
                         except Exception: logging.exception('research_council_error')
                     council_task=asyncio.create_task(research_council_run())
                     last_council=now
+            if now-last_pressure>=max(900,int(os.getenv('SWARM_PROFIT_PRESSURE_INTERVAL_SECONDS','3600'))):
+                # This is observation and prioritisation pressure, never a trading trigger.
+                logging.info('queen_profit_pressure %s',await profit_pressure_run())
+                last_pressure=time.time()
             if now-last_wake>=wake_interval:
                 logging.info('swarm_queen %s',await wake(executive_inference=False));last_wake=time.time()
         except Exception:
