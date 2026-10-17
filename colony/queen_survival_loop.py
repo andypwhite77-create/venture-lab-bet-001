@@ -14,6 +14,8 @@ from colony.queen_ecology import learn as ecology_learn,strategy as ecology_stra
 from colony.queen_experience import learn as learn_ant_experience
 from colony.spartan_hall_of_fame import archive_exam
 from colony.queen_roles import BREEDING_QUEEN, ROLE_VERSION
+from colony.quote_to_quote_ledger import run as quote_ledger_run
+from colony.quote_survival_gate import verdict as quote_gate_verdict
 
 STATE='/data/queen_survival_state.json'
 
@@ -65,10 +67,16 @@ async def main():
             hall=await archive_exam(c,'queen_pattern',campaign,audit)
             print(json.dumps({'event':'spartan_hall_of_fame',**hall}),flush=True)
             passed=[x for x in audit['results'] if x.get('qualification_pass')]
+            # Spartan alone never authorises economic advancement. Require a
+            # matching prospective, solvent, net-positive quote cohort as well.
+            quote_report=await quote_ledger_run()
+            quote_books=quote_report.get('genomes',{})
+            execution_eligible=[x for x in passed if quote_gate_verdict(x.get('genome_id'),quote_books)['eligible']]
+            print(json.dumps({'event':'execution_evidence_gate','spartan_passed':len(passed),'quote_gate_passed':len(execution_eligible),'authority':'research_only_no_live'}),flush=True)
             distinct={x.get('behaviour_id') or str(tuple(x['events'])) for x in passed}
             evaluable=[x for x in audit['results'] if x.get('evidence_sufficient') and x.get('behavioural_representative')]
             public={'campaign':campaign,'tested':summary['tested'],'finalists':summary['finalists'],
-                    'holdout_positive':summary['holdout_positive'],'spartan_survivors':len(passed),
+                    'holdout_positive':summary['holdout_positive'],'spartan_survivors':len(passed),'execution_quote_eligible':len(execution_eligible),
                     'distinct_survivor_behaviours':len(distinct),'spartan_evaluable_behaviours':len(evaluable),
                     'exam_inconclusive':len(evaluable)==0,'completed_at':time.time(),
                     'queen_role':BREEDING_QUEEN['authority'],'role_version':ROLE_VERSION,
@@ -77,8 +85,8 @@ async def main():
             # Queen receives only coarse ecological outcome, never examiner thresholds or answers.
             if public['exam_inconclusive']:
                 print(json.dumps({'event':'spartan_exam_inconclusive','evaluable_behaviours':0,'action':'do not count as drought; gather independent sensor-complete evidence'}),flush=True)
-            elif passed and distinct:
-                print(json.dumps({'event':'soldiers_found','count':len(passed),'distinct':len(distinct),'action':'continue breeding challengers'}),flush=True)
+            elif execution_eligible:
+                print(json.dumps({'event':'research_quote_survivors','count':len(execution_eligible),'authority':'research_only_no_live','action':'independent holdout still required'}),flush=True)
             else:
                 print(json.dumps({'event':'extinction_pressure','evaluable_behaviours':len(evaluable),'action':'new independent campaign; preserve negative knowledge'}),flush=True)
         # At campaign boundaries the separate Swarm research director may review research-safe
