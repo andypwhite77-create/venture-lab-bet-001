@@ -91,6 +91,7 @@ def snapshot():
         "version": ROLE_VERSION,
         "breeding_queen": BREEDING_QUEEN,
         "swarm_queen": SWARM_QUEEN,
-        "current_markets": ["solana_microcaps"],
+        "current_markets": ["solana_microcaps", "ethereum_paper"],
+        "market_hierarchy": {"swarm_queen": "research_director", "solana": "breeding_queen_plus_strategy_queens", "ethereum": "independent_paper_research_queen"},
         "next_market_candidate": "ethereum",
     }
