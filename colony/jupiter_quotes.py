@@ -6,20 +6,25 @@ SOL='So11111111111111111111111111111111111111112'
 USDC='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 _CACHE={}
 _BACKOFF_UNTIL=0
+_LITE_BACKOFF_UNTIL=0
+# Per-process safeguards; never substitute stale quotes for a missing observation.
+LITE_COOLDOWN_SECONDS=180
 class QuoteTransportError(RuntimeError):
  def __init__(self,attempts):
   self.attempts=tuple(attempts)
   super().__init__('jupiter_transport:'+','.join(attempts))
 def quote(input_mint,output_mint,amount,slippage_bps=100,timeout=10):
- global _BACKOFF_UNTIL
+ global _BACKOFF_UNTIL,_LITE_BACKOFF_UNTIL
  ck=(input_mint,output_mint,int(amount),int(slippage_bps)); now=time.time()
  cached=_CACHE.get(ck)
  if cached and now-cached[0] < 2.0:return cached[1]
  q=urllib.parse.urlencode({'inputMint':input_mint,'outputMint':output_mint,'amount':int(amount),'slippageBps':int(slippage_bps)})
  headers=({'x-api-key':KEY} if KEY else {})
- bases=[BASE]
- if KEY and now < _BACKOFF_UNTIL:bases=['https://lite-api.jup.ag/swap/v1/quote']
- elif KEY:bases.append('https://lite-api.jup.ag/swap/v1/quote')
+ lite='https://lite-api.jup.ag/swap/v1/quote'
+ bases=([BASE] if KEY and now>=_BACKOFF_UNTIL else [])
+ if now>=_LITE_BACKOFF_UNTIL:bases.append(lite)
+ if not KEY and now<_LITE_BACKOFF_UNTIL:raise QuoteTransportError(['lite:cooldown_429'])
+ if KEY and not bases:raise QuoteTransportError(['primary:cooldown_429','lite:cooldown_429'])
  data=None;attempts=[];deadline=time.monotonic()+max(0.2,float(timeout))
  for base in bases:
   # A single quote observation has a bounded total network budget, including
@@ -31,9 +36,12 @@ def quote(input_mint,output_mint,amount,slippage_bps=100,timeout=10):
    with urllib.request.urlopen(req,timeout=remaining) as r:data=json.loads(r.read())
    break
   except urllib.error.HTTPError as e:
-   attempts.append(f'{"primary" if base==BASE else "lite"}:http_{e.code}')
-   if base==BASE and e.code in (429,500,502,503,504):
-    if e.code==429:_BACKOFF_UNTIL=time.time()+60
+   is_primary=bool(KEY) and base==BASE
+   attempts.append(f'{"primary" if is_primary else "lite"}:http_{e.code}')
+   if e.code==429:
+    if is_primary:_BACKOFF_UNTIL=time.time()+60
+    else:_LITE_BACKOFF_UNTIL=time.time()+LITE_COOLDOWN_SECONDS
+   if is_primary and e.code in (429,500,502,503,504):
     continue
    raise QuoteTransportError(attempts) from e
   except (urllib.error.URLError,TimeoutError,ConnectionError) as e:
