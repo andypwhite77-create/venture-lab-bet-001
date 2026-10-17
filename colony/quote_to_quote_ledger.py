@@ -58,7 +58,7 @@ async def run():
     JOIN controlled_paper_cohort cc ON cc.genome_id=e.genome_id AND cc.status='observation_only' AND e.observed_at>=cc.started_at
     LEFT JOIN canary_forward_quote_observations a ON a.entry_id=e.id AND a.phase='entry'
     LEFT JOIN canary_forward_quote_observations x ON x.entry_id=e.id AND x.phase='exit'
-    WHERE e.observed_at>=now()-interval '24 hours' ORDER BY e.genome_id,e.observed_at,e.id''')
+    ORDER BY e.genome_id,e.observed_at,e.id''')
   report=assess(rows)
   await c.execute('INSERT INTO quote_to_quote_reviews(report) VALUES($1::jsonb)',json.dumps(report))
  return report

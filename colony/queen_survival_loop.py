@@ -16,6 +16,7 @@ from colony.spartan_hall_of_fame import archive_exam
 from colony.queen_roles import BREEDING_QUEEN, ROLE_VERSION
 from colony.quote_to_quote_ledger import run as quote_ledger_run
 from colony.quote_survival_gate import verdict as quote_gate_verdict
+from colony.finalist_probation import admit as admit_finalists
 
 STATE='/data/queen_survival_state.json'
 
@@ -67,6 +68,8 @@ async def main():
             hall=await archive_exam(c,'queen_pattern',campaign,audit)
             print(json.dumps({'event':'spartan_hall_of_fame',**hall}),flush=True)
             passed=[x for x in audit['results'] if x.get('qualification_pass')]
+            probation=await admit_finalists(c,campaign,finalists,audit['results'])
+            print(json.dumps({'event':'finalist_probation_registry',**probation}),flush=True)
             # Spartan alone never authorises economic advancement. Require a
             # matching prospective, solvent, net-positive quote cohort as well.
             quote_report=await quote_ledger_run()
