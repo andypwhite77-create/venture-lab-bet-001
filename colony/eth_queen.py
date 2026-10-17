@@ -4,6 +4,7 @@
 import asyncio,json,logging,time
 from datetime import datetime,timezone
 import httpx
+from colony.eth_opportunity_scout import observe as scout_opportunities
 from db import init_db,connection
 from colony.eth_evolution import seeds,signal_genome,child_of
 log=logging.getLogger(__name__)
@@ -40,6 +41,7 @@ async def cycle():
  async with connection() as c:
   await c.execute(SCHEMA)
   await c.execute(EVOLUTION_SCHEMA)
+  scouting=await scout_opportunities(c,closed)
   for gid,direction,lookback,threshold in seeds():
    await c.execute('INSERT INTO eth_evolution_genomes(id,direction,lookback,threshold) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',gid,direction,lookback,threshold)
   await c.execute('''UPDATE eth_evolution_paper SET exit_usd=$1,net_pnl_usd=25*(($1/entry_usd-1)-0.004),status='closed' WHERE status='open' AND candle_time<$2''',float(closed[-1][4]),int(closed[-1][0]))
@@ -72,7 +74,7 @@ async def cycle():
    if allocated and cash>=STAKE_USD and signal(name,closed):
     await c.execute('''INSERT INTO eth_queen_paper(candle_time,strategy,entry_usd,status) VALUES($1,$2,$3,'open') ON CONFLICT DO NOTHING''',int(closed[-1][0]),name,float(closed[-1][4]))
   open_count=await c.fetchval("SELECT count(*) FROM eth_queen_paper WHERE status='open'")
- return {'source':'Kraken closed ETH/USD 5m OHLC','strategy_preference':preferred,'research_pnl':stats,'open_paper_positions':open_count,'authority':'paper_only_no_wallet_no_signer','cost_pct':ROUND_TRIP_COST_PCT}
+ return {'source':'Kraken closed ETH/USD 5m OHLC','strategy_preference':preferred,'research_pnl':stats,'open_paper_positions':open_count,'authority':'paper_only_no_wallet_no_signer','cost_pct':ROUND_TRIP_COST_PCT,'swing_scout':scouting}
 
 async def main():
  logging.basicConfig(level=logging.INFO)
