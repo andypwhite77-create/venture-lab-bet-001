@@ -5,6 +5,7 @@ import asyncio,json,logging,time
 from datetime import datetime,timezone
 import httpx
 from db import init_db,connection
+from colony.eth_evolution import seeds,signal_genome,child_of
 log=logging.getLogger(__name__)
 URL='https://api.kraken.com/0/public/OHLC?pair=ETHUSD&interval=5'
 SCHEMA='''CREATE TABLE IF NOT EXISTS eth_queen_paper(
@@ -12,6 +13,7 @@ SCHEMA='''CREATE TABLE IF NOT EXISTS eth_queen_paper(
  exit_usd double precision,net_pnl_usd double precision,status text NOT NULL,
  observed_at timestamptz NOT NULL DEFAULT now(),closed_at timestamptz,
  PRIMARY KEY(candle_time,strategy));'''
+EVOLUTION_SCHEMA='''CREATE TABLE IF NOT EXISTS eth_evolution_genomes(id text PRIMARY KEY,direction text NOT NULL,lookback int NOT NULL,threshold double precision NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),parent_id text,status text NOT NULL DEFAULT 'research'); CREATE TABLE IF NOT EXISTS eth_evolution_paper(candle_time bigint NOT NULL,genome_id text NOT NULL,entry_usd double precision NOT NULL,exit_usd double precision,net_pnl_usd double precision,status text NOT NULL DEFAULT 'open',PRIMARY KEY(candle_time,genome_id));'''
 STRATEGIES=('momentum','reversal')
 START_USD=125.0
 STAKE_USD=25.0
@@ -37,6 +39,22 @@ async def cycle():
  if len(closed)<4:raise ValueError('insufficient_closed_ohlc')
  async with connection() as c:
   await c.execute(SCHEMA)
+  await c.execute(EVOLUTION_SCHEMA)
+  for gid,direction,lookback,threshold in seeds():
+   await c.execute('INSERT INTO eth_evolution_genomes(id,direction,lookback,threshold) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',gid,direction,lookback,threshold)
+  await c.execute('''UPDATE eth_evolution_paper SET exit_usd=$1,net_pnl_usd=25*(($1/entry_usd-1)-0.004),status='closed' WHERE status='open' AND candle_time<$2''',float(closed[-1][4]),int(closed[-1][0]))
+  genomes=await c.fetch('SELECT id,direction,lookback,threshold FROM eth_evolution_genomes WHERE status=$1 ORDER BY created_at LIMIT 20','research')
+  for g in genomes:
+   n,pnl=await c.fetchrow('SELECT count(*) n,coalesce(sum(net_pnl_usd),0) pnl FROM eth_evolution_paper WHERE genome_id=$1 AND status=$2',g['id'],'closed')
+   active=await c.fetchval('SELECT count(*) FROM eth_evolution_paper WHERE genome_id=$1 AND status=$2',g['id'],'open')
+   if n>=25 and pnl<=0:
+    await c.execute('UPDATE eth_evolution_genomes SET status=$2 WHERE id=$1',g['id'],'research_retired')
+    continue
+   if n>=25 and pnl>0:
+    child=child_of((g['id'],g['direction'],g['lookback'],g['threshold']),int(n))
+    await c.execute('INSERT INTO eth_evolution_genomes(id,direction,lookback,threshold,parent_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',*child,g['id'])
+   if 125+float(pnl)-25*active>=25 and signal_genome(g['direction'],g['lookback'],g['threshold'],closed):
+    await c.execute('INSERT INTO eth_evolution_paper(candle_time,genome_id,entry_usd) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',int(closed[-1][0]),g['id'],float(closed[-1][4]))
   await c.execute('''UPDATE eth_queen_paper SET exit_usd=$1,net_pnl_usd=25*(($1/entry_usd-1)-0.004),status='closed',closed_at=now()
     WHERE status='open' AND candle_time<$2''',float(closed[-1][4]),int(closed[-1][0]))
   latest=await c.fetch('''SELECT strategy,count(*) n,coalesce(sum(net_pnl_usd),0) pnl FROM eth_queen_paper WHERE status='closed' GROUP BY strategy''')
