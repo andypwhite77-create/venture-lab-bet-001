@@ -33,6 +33,13 @@ Treasury costs are not yet populated. CPU snapshots do not determine billed host
 
 Audit restart idempotence, durable logs, cron overlap, queue starvation, metrics staleness, backup restoration, and sandbox-vs-production secrets. Inject transport errors, API 429s, missing quote data and duplicate rows into tests.
 
+## Later runtime findings (17 October)
+
+- ETH evolutionary paper database: 112 closed observations across six seeded genomes, combined mark P/L -$11.4628. Two genomes retired after 25 losing marks; four are still gathering observations. Sum of independent paper arms is not a real wallet loss.
+- Recent GeckoTerminal requests frequently hit a provider cooldown; DexScreener supplies much of the fallback. Cycle coverage near 100% must not be reported as independent-source redundancy or verified quote executability.
+- `queen_survival_loop.py` currently reports quote-gate eligibility after Spartan but does not provide a verified automatic enrolment path to collect prospective quotes for those new finalist genome IDs. Treat the gate as a fail-closed diagnostic until the pipeline is completed, not proof that candidate promotion is end-to-end functional.
+- `quote_to_quote_ledger.py` looks back only 24 hours when reconstructing simulated book cash. Thus its reported balance is a rolling-window reconstruction, NOT a durable wallet NAV; older exposure can fall out of the window. Move to an append-only event ledger with an initial bankroll and time-consistent liquidation rules before allowing it to govern financial comparisons.
+
 ## Recommended sequencing
 
 1. Add an immutable prospective finalist-to-cohort admission process with explicit probation status; never use previously observed outcomes to qualify newly admitted genomes.
