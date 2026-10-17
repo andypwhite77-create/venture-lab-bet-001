@@ -11,6 +11,7 @@ from colony.swarm_queen_strategy import process_pending
 from colony.queen_profit_pressure import run as profit_pressure_run
 from colony.survival_floor import run as survival_floor_run
 from colony.wallet_survival_review import run as wallet_survival_run
+from colony.eth_queen_scoreboard import run as eth_scoreboard_run
 from colony.recovery_assessment import process_pending as process_recovery_assessment
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 
@@ -51,6 +52,7 @@ async def main(interval=None):
                 logging.info('queen_profit_pressure %s',await profit_pressure_run())
                 logging.info('queen_survival_floor %s',await survival_floor_run())
                 logging.info('wallet_survival_review %s',await wallet_survival_run())
+                logging.info('eth_queen_scoreboard %s',await eth_scoreboard_run())
                 last_pressure=time.time()
             if now-last_wake>=wake_interval:
                 logging.info('swarm_queen %s',await wake(executive_inference=False));last_wake=time.time()
