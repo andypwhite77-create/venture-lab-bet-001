@@ -6,6 +6,7 @@ from collections import defaultdict
 from db import init_db,connection
 from colony.queen_research_incentives import grade
 from colony.queen_funded_attribution import audit
+from colony.queen_economic_feedback import explain
 from datetime import datetime,timezone
 START=0.1
 STAKE=0.01
@@ -58,5 +59,6 @@ async def run():
   entries=await c.fetch('SELECT DISTINCT genome_id,family FROM eve_reference_paper_entries')
  report=evaluate(confirmations,observations,history)
  report['funded_paper_attribution']=audit(events,genomes,datetime.now(timezone.utc),cohorts,entries)
+ report['family_research_feedback']=explain(report['funded_paper_attribution'])
  return report
 if __name__=='__main__':print(json.dumps(asyncio.run(run())))
