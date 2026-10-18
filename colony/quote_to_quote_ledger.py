@@ -68,6 +68,8 @@ async def run():
   report['cash_event_reconciliation']=await capital_reconcile(c)
   for gid,book in report['genomes'].items():
    capital=report['cash_event_reconciliation'].get(gid)
+   # Legacy reconciliation never grants prospective funding authority.
+   book['funded_forward_ledger_verified']=False
    book['capital_reconciled']=capital is not None
    book['cash_event_rejections']=capital['rejected_events'] if capital else None
   await c.execute('INSERT INTO quote_to_quote_reviews(report) VALUES($1::jsonb)',json.dumps(report))
