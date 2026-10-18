@@ -18,6 +18,9 @@ def quote(input_mint,output_mint,amount,slippage_bps=100,timeout=10):
  ck=(input_mint,output_mint,int(amount),int(slippage_bps)); now=time.time()
  cached=_CACHE.get(ck)
  if cached and now-cached[0] < 2.0:return cached[1]
+ if os.getenv('JUPITER_SHARED_BUDGET_ENABLED','0')=='1':
+  from colony.jupiter_shared_budget import acquire
+  if not acquire():raise QuoteTransportError(['shared_budget_unavailable_or_busy'])
  q=urllib.parse.urlencode({'inputMint':input_mint,'outputMint':output_mint,'amount':int(amount),'slippageBps':int(slippage_bps)})
  headers=({'x-api-key':KEY} if KEY else {})
  lite='https://lite-api.jup.ag/swap/v1/quote'
