@@ -49,7 +49,7 @@ async def sample_active_paths():
     failures={}
     dex_error=None
     missing=[mint for mint in mints if mint not in prices]
-    if missing and gecko_error is not None and provider_allowed('dexscreener'):
+    if missing and provider_allowed('dexscreener'):
         dex_prices,dex_error=await fetch_dexscreener(missing)
         provider_result('dexscreener',{'ok':dex_error is None,'error':dex_error or ''})
         prices.update(dex_prices)
