@@ -71,7 +71,8 @@ async def run_once(conn, limit=1000):
     for row in rows:
         # Forward-only: never create a nominal paper position without an observed entry price.
         # Maintain the candidate cursor even when the candidate is ineligible.
-        if row['entry_price'] is None or not (0 < float(row['entry_price']) < float('inf')):
+        market_info=_json(row['market'])
+        if market_info.get('price_evidence')=='discovery_only_no_provider_tick_timestamp' or row['entry_price'] is None or not (0 < float(row['entry_price']) < float('inf')):
             unpriced_candidates+=1
             continue
         rr=dict(row)

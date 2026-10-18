@@ -129,8 +129,14 @@ async def _record(strategy, mint, score, tier, shadow_trade, features, market, c
             market.update(fallback)
             entry_price=fallback['price_usd']
             # Source is explicit; no pool liquidity, volume, or momentum invented.
-        else:entry_price=None
-    shadow_trade = bool(shadow_trade and entry_price and entry_price > 0)
+        else:
+            entry_price=None
+            from colony.birth_reference_price import capture as capture_birth_price
+            direct=await capture_birth_price(mint)
+            if direct:
+                market.update(direct)
+                entry_price=direct['price_usd']
+    shadow_trade = bool(shadow_trade and entry_price and entry_price > 0 and market.get('price_evidence') != 'discovery_only_no_provider_tick_timestamp')
     candidate_id = await create_candidate(
         strategy=strategy, mint=mint, direction="long", score=score, tier=tier,
         shadow_trade=shadow_trade, entry_price=entry_price,
