@@ -1,0 +1,5 @@
+#!/bin/bash
+set -eu
+export HOME=/home/deploy
+if /usr/bin/curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:11434/api/tags >/dev/null; then exit 0; fi
+/usr/bin/flock -n /tmp/venture-ollama-start.lock /bin/bash -c 'nohup /home/deploy/ollama/bin/ollama serve >> /home/deploy/ollama-serve.log 2>&1 < /dev/null &'

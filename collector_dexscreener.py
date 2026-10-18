@@ -4,6 +4,7 @@ import json
 import math
 import urllib.request
 import urllib.error
+from colony.provider_request_budget import reserve as reserve_request
 
 URL='https://api.dexscreener.com/tokens/v1/solana/'
 
@@ -16,6 +17,7 @@ async def fetch(mints):
     prices={}
     for start in range(0,len(mints),30):
         batch=mints[start:start+30]
+        if not await reserve_request('dexscreener_token',80):return prices,'shared_request_budget_exhausted_or_unavailable'
         try:
             pairs=await asyncio.to_thread(_request,batch)
             if not isinstance(pairs,list):return prices,'invalid_payload'
