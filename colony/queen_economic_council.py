@@ -5,6 +5,8 @@ import asyncio,json,statistics
 from collections import defaultdict
 from db import init_db,connection
 from colony.queen_research_incentives import grade
+from colony.queen_funded_attribution import audit
+from datetime import datetime,timezone
 START=0.1
 STAKE=0.01
 BASE_BUDGET=2
@@ -50,5 +52,9 @@ async def run():
   confirmations=await c.fetch('SELECT id,queen FROM queen_forward_confirmations')
   observations=await c.fetch('SELECT confirmation_id,candidate_id,observed_at,selected,net_pct FROM queen_forward_confirmation_results')
   history=await c.fetch('SELECT queen,result FROM queen_historical_hypotheses')
- return evaluate(confirmations,observations,history)
+  events=await c.fetch('SELECT source_event_id,genome_id,source_entry_id,action,amount_lamports,accepted,decided_at FROM funded_paper_event_decisions ORDER BY source_event_id')
+  genomes=await c.fetch('SELECT genome_id,family FROM colony_genomes')
+ report=evaluate(confirmations,observations,history)
+ report['funded_paper_attribution']=audit(events,genomes,datetime.now(timezone.utc))
+ return report
 if __name__=='__main__':print(json.dumps(asyncio.run(run())))
