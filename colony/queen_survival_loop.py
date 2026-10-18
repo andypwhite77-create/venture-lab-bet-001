@@ -17,6 +17,7 @@ from colony.queen_roles import BREEDING_QUEEN, ROLE_VERSION
 from colony.quote_to_quote_ledger import run as quote_ledger_run
 from colony.quote_survival_gate import verdict as quote_gate_verdict
 from colony.finalist_probation import admit as admit_finalists, ensure_schema as ensure_probation_schema
+from colony.probation_forward_enrol import run as enrol_probation
 
 STATE='/data/queen_survival_state.json'
 
@@ -35,7 +36,9 @@ def drought_research_gate(memory,override=False):
 
 async def main():
     await init_db()
-    async with connection() as c:await ensure_probation_schema(c)
+    async with connection() as c:
+        await ensure_probation_schema(c)
+        print(json.dumps({'event':'prospective_probation_enrolment',**(await enrol_probation(c))}),flush=True)
     campaign=int(load_memory().get('campaigns',0) or 0)
     # Preserve the campaign cooldown across container/process restarts.
     cooldown=max(300,int(os.getenv('QUEEN_CAMPAIGN_COOLDOWN_SECONDS','86400')))
@@ -71,6 +74,8 @@ async def main():
             print(json.dumps({'event':'spartan_hall_of_fame',**hall}),flush=True)
             passed=[x for x in audit['results'] if x.get('qualification_pass')]
             probation=await admit_finalists(c,campaign,finalists,audit['results'])
+            enrolled=await enrol_probation(c)
+            print(json.dumps({'event':'prospective_probation_enrolment',**enrolled}),flush=True)
             print(json.dumps({'event':'finalist_probation_registry',**probation}),flush=True)
             # Spartan alone never authorises economic advancement. Require a
             # matching prospective, solvent, net-positive quote cohort as well.

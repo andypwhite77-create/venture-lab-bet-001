@@ -39,7 +39,7 @@ def _json(v):
 
 async def _ants(conn):
     rows=await conn.fetch("""SELECT id,genome_id,family,species,genome,notes
-      FROM live_ant_registry WHERE source='eve_reference' AND live_candidate=true
+      FROM live_ant_registry WHERE source IN ('eve_reference','probation_forward') AND live_candidate=true AND live_authorized=false
       ORDER BY id""")
     out=[]
     for r in rows:
