@@ -53,6 +53,8 @@ async def run():
  async with connection() as c:
   await c.execute(SCHEMA)
   await journal_ingest(c)
+  from colony.paper_cash_events import ingest as cash_event_ingest
+  await cash_event_ingest(c)
   rows=await c.fetch('''SELECT e.id,e.genome_id,e.observed_at,e.observed_at+e.hold_minutes*interval '1 minute' exit_due,
     a.quote entry_quote,a.status entry_status,a.latency_seconds entry_latency,
     x.quote exit_quote,x.status exit_status,x.latency_seconds exit_latency
