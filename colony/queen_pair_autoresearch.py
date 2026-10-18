@@ -5,6 +5,7 @@ from colony.entry_failure_lab import FIELDS
 from colony.queen_autonomous_research import _inference
 from colony.queen_pair_hypothesis import run
 from colony.queen_historical_autoresearch import QUEENS
+from colony.queen_research_objectives import family_objective,objective_prompt
 
 def canonical(f1,d1,f2,d2):
  if f1 not in FIELDS or f2 not in FIELDS or f1==f2 or d1 not in ('high','low') or d2 not in ('high','low'):return None
@@ -15,7 +16,8 @@ async def propose(queen):
  async with connection() as c:
   await c.execute('''CREATE TABLE IF NOT EXISTS queen_pair_hypotheses(id bigserial PRIMARY KEY,queen text NOT NULL,created_at timestamptz NOT NULL DEFAULT clock_timestamp(),pair_key text NOT NULL UNIQUE,result jsonb NOT NULL)''')
   existing={r['pair_key'] for r in await c.fetch('SELECT pair_key FROM queen_pair_hypotheses')}
- prompt=('You are the '+queen+' Queen. Propose one novel entry-filter hypothesis using two DISTINCT features from '+','.join(FIELDS)+'. '
+ objective=await family_objective(queen)
+ prompt=('You are the '+queen+' Queen. '+objective_prompt(objective)+' Propose one novel entry-filter hypothesis using two DISTINCT features from '+','.join(FIELDS)+'. '
   'Each feature must have direction high or low. Avoid existing pairs: '+json.dumps(sorted(existing))[:1300]+'. '
   'JSON keys feature1,direction1,feature2,direction2,rationale. No commands. Research only.')
  answer=await _inference(prompt,200)
