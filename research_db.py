@@ -306,6 +306,10 @@ async def active_shadow_candidates(max_age_minutes: int = 240):
             WHERE entry_price IS NOT NULL
               AND created_at >= NOW() - ($1 * INTERVAL '1 minute')
               AND (shadow_trade=TRUE OR EXISTS (
+                  SELECT 1 FROM prospective_exit_trials t
+                  WHERE research_candidates.created_at >= t.started_at
+                    AND research_candidates.created_at < t.started_at + interval '30 days'
+              ) OR EXISTS (
                   SELECT 1 FROM family_tournament_entries fe
                   JOIN family_tournament_runs fr ON fr.run_id=fe.run_id
                   WHERE fe.candidate_id=research_candidates.id
