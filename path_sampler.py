@@ -13,6 +13,27 @@ log = logging.getLogger("signal-engine.path-sampler")
 # Per-provider outage gates prevent one bad provider from receiving a burst of
 # redundant requests across missing tokens. This never substitutes prices.
 _PROVIDER_BLOCK_UNTIL={}
+_MINT_MISS_STREAK={}
+_MINT_BIRDEYE_PROBE_AFTER={}
+
+def update_mint_misses(mints,prices,now=None):
+    current=time.monotonic() if now is None else now
+    missing=[]
+    for mint in mints:
+        if mint in prices:
+            _MINT_MISS_STREAK.pop(mint,None)
+            _MINT_BIRDEYE_PROBE_AFTER.pop(mint,None)
+        else:
+            count=_MINT_MISS_STREAK.get(mint,0)+1
+            _MINT_MISS_STREAK[mint]=count
+            missing.append(mint)
+            if count>=5 and mint not in _MINT_BIRDEYE_PROBE_AFTER:
+                _MINT_BIRDEYE_PROBE_AFTER[mint]=current+600
+    for mint in list(_MINT_MISS_STREAK):
+        if mint not in mints:
+            _MINT_MISS_STREAK.pop(mint,None)
+            _MINT_BIRDEYE_PROBE_AFTER.pop(mint,None)
+    return missing
 def provider_allowed(provider,now=None):
     current=time.monotonic() if now is None else now
     return current>=_PROVIDER_BLOCK_UNTIL.get(provider,0)
@@ -59,6 +80,11 @@ async def sample_active_paths():
         # CoinGecko credit allowance exhausted; exclude from collection entirely.
         for provider in (birdeye_price,):
             pname=provider.__name__
+            if pname=='birdeye_price' and time.monotonic()<_MINT_BIRDEYE_PROBE_AFTER.get(mint,0):
+                failures.setdefault(mint,[]).append('birdeye_price:mint_probe_backoff')
+                continue
+            if pname=='birdeye_price' and mint in _MINT_BIRDEYE_PROBE_AFTER:
+                _MINT_BIRDEYE_PROBE_AFTER[mint]=time.monotonic()+600
             if not provider_allowed(pname):
                 failures.setdefault(mint,[]).append(pname+':cooldown')
                 continue
@@ -74,6 +100,7 @@ async def sample_active_paths():
                 prices[mint]=candidate
                 fallback_sources[mint]=result.get('provider',provider.__name__)
                 break
+    unresolved_mints=update_mint_misses(mints,prices)
     recorded = 0
     for row in rows:
         price = prices.get(row["mint"])
@@ -81,7 +108,7 @@ async def sample_active_paths():
             continue
         await record_price_path(row["id"], price, fallback_sources.get(row["mint"],"geckoterminal"), "fresh_fetch")
         recorded += 1
-    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "required_mints":mints, "missing_mints": [m for m in mints if m not in prices][:25], "fallback_mints":fallback_sources, "provider_failures":failures, "gecko_error":gecko_error, "dex_error":dex_error, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
+    return {"active": len(rows), "recorded": recorded, "missing": len(rows)-recorded, "coverage_ratio": round(recorded/len(rows),4), "distinct_mints": len(mints), "required_mints":mints, "missing_mints": unresolved_mints[:25], "mint_failure_streaks": {m:_MINT_MISS_STREAK[m] for m in unresolved_mints[:25]}, "birdeye_backoff_mints": [m for m in unresolved_mints if m in _MINT_BIRDEYE_PROBE_AFTER][:25], "fallback_mints":fallback_sources, "provider_failures":failures, "gecko_error":gecko_error, "dex_error":dex_error, "blocked_providers":[name for name in ("birdeye_price","coingecko_price") if not provider_allowed(name)]}
 
 
 async def path_sampler_loop(state):
