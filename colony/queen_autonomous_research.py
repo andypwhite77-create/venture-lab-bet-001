@@ -55,8 +55,25 @@ async def snapshot(conn):
     'priority':'HIGH: investigate stalled forward data and falsifiable challengers; no promotion without independent evidence',
     'no_live_capital_expansion':True}
  except Exception:urgency={}
+ # Historical inventory only: no Spartan answers or sealed holdout labels.
+ try:
+  history=await conn.fetchrow('''SELECT count(*)::int observations,count(DISTINCT mint)::int distinct_mints,
+    min(collected_at) oldest,max(collected_at) newest
+    FROM market_price_history WHERE quality='fresh_fetch' ''')
+  outcomes=await conn.fetchrow('''SELECT count(*)::int observed_outcomes,
+    count(DISTINCT candidate_id)::int distinct_candidates FROM research_outcomes
+    WHERE net_return_pct IS NOT NULL''')
+  historical_research={'archived_fresh_price_observations':history['observations'],
+    'distinct_fresh_mints':history['distinct_mints'],
+    'oldest':history['oldest'].isoformat() if history['oldest'] else None,
+    'newest':history['newest'].isoformat() if history['newest'] else None,
+    'historical_outcomes':outcomes['observed_outcomes'],
+    'candidate_count':outcomes['distinct_candidates'],
+    'research_interface':'colony.historical_nursery.load_rows / run_family',
+    'evidence_class':'discovery_only_no_exam_holdout_or_promotion'}
+ except Exception:historical_research={'status':'unavailable_no_inferred_coverage'}
  # No sealed examiner outcomes or private wallets sent to the model.
- return {'window':'last_7_days','canary_intents':dict(routes),
+ return {'historical_research':historical_research,'window':'last_7_days','canary_intents':dict(routes),
          'provider_health':[dict(p) for p in providers],
          'realized_canary_economics':dict(live),'rent_recovery_excluded':True,'graded_shared_findings':findings,'active_experiments':experiments,'research_urgency':urgency,'methodology_alarm':{'priority':'CRITICAL','finding':'forward_shadow horizon returns do not model stop_loss_pct or take_profit_pct; loss-tail hypothesis untested','evidence':'30-minute challengers return exactly unchanged control; 5- and 15-minute variants compare horizons, not enforced stops','next_action':'prepare independent time-path exit execution simulator, prove sensor coverage and friction; do not use Spartan answers or unpause broad breeding'},
          'shadow_filter':dict(shadow) if shadow else None,
