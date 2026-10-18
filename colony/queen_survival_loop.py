@@ -16,7 +16,7 @@ from colony.spartan_hall_of_fame import archive_exam
 from colony.queen_roles import BREEDING_QUEEN, ROLE_VERSION
 from colony.quote_to_quote_ledger import run as quote_ledger_run
 from colony.quote_survival_gate import verdict as quote_gate_verdict
-from colony.finalist_probation import admit as admit_finalists
+from colony.finalist_probation import admit as admit_finalists, ensure_schema as ensure_probation_schema
 
 STATE='/data/queen_survival_state.json'
 
@@ -34,7 +34,9 @@ def drought_research_gate(memory,override=False):
     return {'paused':False,'drought_campaigns':streak}
 
 async def main():
-    await init_db(); campaign=int(load_memory().get('campaigns',0) or 0)
+    await init_db()
+    async with connection() as c:await ensure_probation_schema(c)
+    campaign=int(load_memory().get('campaigns',0) or 0)
     # Preserve the campaign cooldown across container/process restarts.
     cooldown=max(300,int(os.getenv('QUEEN_CAMPAIGN_COOLDOWN_SECONDS','86400')))
     try:

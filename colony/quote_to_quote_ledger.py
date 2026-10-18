@@ -5,6 +5,7 @@ own hypothetical 0.1 SOL and independently reserves 0.01 SOL per position.
 import asyncio,json
 from collections import defaultdict
 from db import init_db,connection
+from colony.paper_event_journal import ingest as journal_ingest
 SCHEMA='''CREATE TABLE IF NOT EXISTS quote_to_quote_reviews(id bigserial PRIMARY KEY,reviewed_at timestamptz NOT NULL DEFAULT now(),report jsonb NOT NULL);'''
 START_SOL=0.1
 EXTRA_EXIT_FRICTION=0.002
@@ -51,6 +52,7 @@ async def run():
  await init_db()
  async with connection() as c:
   await c.execute(SCHEMA)
+  await journal_ingest(c)
   rows=await c.fetch('''SELECT e.id,e.genome_id,e.observed_at,e.observed_at+e.hold_minutes*interval '1 minute' exit_due,
     a.quote entry_quote,a.status entry_status,a.latency_seconds entry_latency,
     x.quote exit_quote,x.status exit_status,x.latency_seconds exit_latency

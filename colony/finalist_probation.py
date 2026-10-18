@@ -7,8 +7,11 @@ SCHEMA='''CREATE TABLE IF NOT EXISTS finalist_probation(
  status text NOT NULL DEFAULT 'awaiting_prospective_engine', genome jsonb,
  family text NOT NULL DEFAULT 'queen_pattern',
  PRIMARY KEY(genome_id,campaign));'''
-async def admit(conn,campaign,finalists,spartan_results):
+async def ensure_schema(conn):
  await conn.execute(SCHEMA)
+
+async def admit(conn,campaign,finalists,spartan_results):
+ await ensure_schema(conn)
  passed={r.get('genome_id') for r in spartan_results if r.get('qualification_pass') and r.get('genome_id')}
  admitted=0
  for f in finalists:
