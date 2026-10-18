@@ -90,7 +90,8 @@ async def run():
      else:
       entry=e['entry_quote'];entry=json.loads(entry) if isinstance(entry,str) else entry
       if not entry or not entry.get('out_amount'):
-       reason='missing_contemporaneous_entry_quote'
+       # Leave the exit slot unconsumed when required evidence is absent.
+       continue
       else:q=await asyncio.to_thread(quote,e['mint'],SOL,int(entry['out_amount']),100,4)
      if q:status='quoted';successes+=1
     except Exception as exc:reason=str(exc)[:220] if hasattr(exc,'attempts') else type(exc).__name__

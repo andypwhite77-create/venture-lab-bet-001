@@ -21,9 +21,12 @@ async def poll():
    if delay>0:await asyncio.sleep(delay)
    started=datetime.now(timezone.utc);clock=time.monotonic();q=None;reason=None
    e=r['entry_quote'];e=json.loads(e) if isinstance(e,str) else e
+   # Missing entry evidence must not permanently consume the exit slot.
+   # The minute fallback can retry if genuine entry evidence arrives in time.
+   if not e or not int(e.get('out_amount') or 0):
+    continue
    try:
-    if not e or not int(e.get('out_amount') or 0):reason='missing_contemporaneous_entry_quote'
-    else:q=await asyncio.to_thread(quote,r['mint'],SOL,int(e['out_amount']),100,3)
+    q=await asyncio.to_thread(quote,r['mint'],SOL,int(e['out_amount']),100,3)
    except Exception as ex:reason=str(ex)[:220] if hasattr(ex,'attempts') else type(ex).__name__
    responded=datetime.now(timezone.utc);latency=(responded-r['due']).total_seconds()
    async with connection() as c:
