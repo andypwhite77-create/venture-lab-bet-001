@@ -64,6 +64,12 @@ async def run():
     LEFT JOIN canary_forward_quote_observations x ON x.entry_id=e.id AND x.phase='exit'
     ORDER BY e.genome_id,e.observed_at,e.id''')
   report=assess(rows)
+  from colony.capital_reconciliation import run as capital_reconcile
+  report['cash_event_reconciliation']=await capital_reconcile(c)
+  for gid,book in report['genomes'].items():
+   capital=report['cash_event_reconciliation'].get(gid)
+   book['capital_reconciled']=capital is not None
+   book['cash_event_rejections']=capital['rejected_events'] if capital else None
   await c.execute('INSERT INTO quote_to_quote_reviews(report) VALUES($1::jsonb)',json.dumps(report))
  return report
 if __name__=='__main__':print(json.dumps(asyncio.run(run())))
