@@ -54,7 +54,9 @@ async def run():
   history=await c.fetch('SELECT queen,result FROM queen_historical_hypotheses')
   events=await c.fetch('SELECT source_event_id,genome_id,source_entry_id,action,amount_lamports,accepted,decided_at FROM funded_paper_event_decisions ORDER BY source_event_id')
   genomes=await c.fetch('SELECT genome_id,family FROM colony_genomes')
+  cohorts=await c.fetch('SELECT genome_id,family FROM controlled_paper_cohort')
+  entries=await c.fetch('SELECT DISTINCT genome_id,family FROM eve_reference_paper_entries')
  report=evaluate(confirmations,observations,history)
- report['funded_paper_attribution']=audit(events,genomes,datetime.now(timezone.utc))
+ report['funded_paper_attribution']=audit(events,genomes,datetime.now(timezone.utc),cohorts,entries)
  return report
 if __name__=='__main__':print(json.dumps(asyncio.run(run())))
