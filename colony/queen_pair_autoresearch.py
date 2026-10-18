@@ -1,0 +1,31 @@
+"""Bounded two-signal Queen research with duplicate rejection, no promotions."""
+import asyncio,json
+from db import init_db,connection
+from colony.entry_failure_lab import FIELDS
+from colony.queen_autonomous_research import _inference
+from colony.queen_pair_hypothesis import run
+from colony.queen_historical_autoresearch import QUEENS
+
+def canonical(f1,d1,f2,d2):
+ if f1 not in FIELDS or f2 not in FIELDS or f1==f2 or d1 not in ('high','low') or d2 not in ('high','low'):return None
+ return '|'.join(sum(([f,d] for f,d in sorted(((f1,d1),(f2,d2)))),[]))
+async def propose(queen):
+ if queen not in QUEENS:raise ValueError('unknown queen')
+ await init_db()
+ async with connection() as c:
+  await c.execute('''CREATE TABLE IF NOT EXISTS queen_pair_hypotheses(id bigserial PRIMARY KEY,queen text NOT NULL,created_at timestamptz NOT NULL DEFAULT clock_timestamp(),pair_key text NOT NULL UNIQUE,result jsonb NOT NULL)''')
+  existing={r['pair_key'] for r in await c.fetch('SELECT pair_key FROM queen_pair_hypotheses')}
+ prompt=('You are the '+queen+' Queen. Propose one novel entry-filter hypothesis using two DISTINCT features from '+','.join(FIELDS)+'. '
+  'Each feature must have direction high or low. Avoid existing pairs: '+json.dumps(sorted(existing))[:1300]+'. '
+  'JSON keys feature1,direction1,feature2,direction2,rationale. No commands. Research only.')
+ answer=await _inference(prompt,200)
+ f1,d1,f2,d2=(answer.get(k) for k in ('feature1','direction1','feature2','direction2'))
+ key=canonical(f1,d1,f2,d2)
+ if key is None or key in existing:return {'status':'rejected_duplicate_or_unapproved','queen':queen,'promotion_allowed':False}
+ ((a,b),(c,d))=sorted(((f1,d1),(f2,d2)))
+ evidence=await run(queen,a,b,c,d)
+ return {'status':'tested' if evidence['stored'] else 'duplicate','queen':queen,'pair_key':key,'result':evidence,'promotion_allowed':False}
+if __name__=='__main__':
+ import sys
+ if len(sys.argv)!=2:raise SystemExit('usage QUEEN')
+ print(json.dumps(asyncio.run(propose(sys.argv[1]))))
