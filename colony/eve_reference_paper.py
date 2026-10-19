@@ -7,6 +7,7 @@ the same mints are excluded from Queen validation/holdout by queen_experience.
 from __future__ import annotations
 import json
 from colony.forward import eligible
+from colony.paper_admission_gate import assess
 from colony.paper_economics import TARGET_STAKE_GBP, adjusted_return_pct, measured_roundtrip_network_fee_sol, sol_gbp_rate
 
 async def ensure_schema(conn):
@@ -38,13 +39,15 @@ def _json(v):
     return dict(v or {})
 
 async def _ants(conn):
-    rows=await conn.fetch("""SELECT id,genome_id,family,species,genome,notes
+    rows=await conn.fetch("""SELECT id,genome_id,family,species,genome,notes,spartan_passed
       FROM live_ant_registry WHERE source IN ('eve_reference','probation_forward') AND live_candidate=true AND live_authorized=false
       ORDER BY id""")
     out=[]
     for r in rows:
         g=_json(r['genome']); notes=_json(r['notes'])
         if (g.get('species') or r['species'])=='control_buy_all': continue
+        passed,_=assess({'spartan_passed':r['spartan_passed'],'notes':notes})
+        if not passed:continue
         out.append({'id':r['id'],'genome_id':r['genome_id'],'family':r['family'],'species':r['species'],
                     'genome':g,'prospective_after':float(notes.get('prospective_after') or 0)})
     return out
