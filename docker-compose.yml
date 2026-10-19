@@ -115,6 +115,7 @@ services:
         max-file: "3"
 
   paper:
+    profiles: ["paper-trading"]
     build: .
     restart: unless-stopped
     command: ["python", "-m", "colony.paper_daemon"]
@@ -153,6 +154,7 @@ services:
         max-file: "3"
 
   eth-queen:
+    profiles: ["paper-trading"]
     build: .
     restart: unless-stopped
     command: ["python", "-m", "colony.eth_queen"]
@@ -290,7 +292,7 @@ services:
       QUEEN_WAVES_PER_CAMPAIGN: "1"
       QUEEN_ALLOW_DROUGHT_RESEARCH: "1"
       QUEEN_GENE_SEED_FRACTION: "0.20"
-      QUEEN_CAMPAIGN_COOLDOWN_SECONDS: "86400"
+      QUEEN_CAMPAIGN_COOLDOWN_SECONDS: "10800"
       SWARM_STRATEGIC_EVERY_CAMPAIGNS: "1"
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
