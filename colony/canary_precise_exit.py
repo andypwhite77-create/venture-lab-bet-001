@@ -28,6 +28,9 @@ async def poll():
    try:
     q=await asyncio.to_thread(quote,r['mint'],SOL,int(e['out_amount']),100,3)
    except Exception as ex:reason=str(ex)[:220] if hasattr(ex,'attempts') else type(ex).__name__
+   # Budget denial is not a completed observation. Keep slot open for the
+   # bounded fallback rather than permanently recording an unavailable exit.
+   if reason and 'shared_budget_unavailable_or_busy' in reason:continue
    responded=datetime.now(timezone.utc);latency=(responded-r['due']).total_seconds()
    async with connection() as c:
     await c.execute('''INSERT INTO canary_forward_quote_observations

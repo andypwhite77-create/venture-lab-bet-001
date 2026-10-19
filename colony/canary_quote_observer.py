@@ -95,6 +95,7 @@ async def run():
       else:q=await asyncio.to_thread(quote,e['mint'],SOL,int(entry['out_amount']),100,4)
      if q:status='quoted';successes+=1
     except Exception as exc:reason=str(exc)[:220] if hasattr(exc,'attempts') else type(exc).__name__
+    if reason and 'shared_budget_unavailable_or_busy' in reason:continue
     responded=datetime.now(timezone.utc);duration=(time.monotonic()-clock)*1000
     latency=(responded-due).total_seconds()
     await c.execute("""INSERT INTO canary_forward_quote_observations
