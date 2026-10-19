@@ -3,6 +3,7 @@ from datetime import datetime,timezone
 from db import connection
 from colony.queen_funded_attribution import audit
 from colony.queen_economic_feedback import explain
+from colony.queen_capture_doctrine import capture_prompt
 
 async def family_objective(queen):
  async with connection() as c:
@@ -16,9 +17,9 @@ async def family_objective(queen):
 
 def objective_prompt(data):
  feedback=data.get('feedback')
- if not feedback:return 'No attributed funded-paper feedback available. Propose a falsifiable entry hypothesis; do not infer profitability.'
+ if not feedback:return capture_prompt(None) + ' Propose a falsifiable entry hypothesis; do not infer profitability.'
  tags=feedback.get('research_priorities',[])
- return ('Economic diagnostic priorities: '+', '.join(tags or ['collect_independent_forward_evidence'])+'. '
+ return (capture_prompt(feedback)+' Economic diagnostic priorities: '+ ', '.join(tags or ['collect_independent_forward_evidence'])+'. '
   'Hypothetical net SOL: '+str(feedback['hypothetical_net_sol'])+'. Pending: '+str(feedback['pending'])+'. '
   'Choose a falsifiable entry hypothesis plausibly related to one priority; do not claim an entry filter can repair execution or locked capital. '
   'These are symptoms from quote evidence, NOT proven causes or real earnings.')
