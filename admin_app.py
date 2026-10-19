@@ -225,6 +225,28 @@ async def api_state(request:Request):
     queen={'campaign':qsurv.get('campaign'),'tested':qsurv.get('tested'),'finalists':qsurv.get('finalists'),'holdout_positive':qsurv.get('holdout_positive'),'spartan_survivors':qsurv.get('spartan_survivors'),'memory_campaigns':qmem.get('campaigns'),'preferred_features':(qmem.get('preferred_features') or [])[:6],'role':roles['breeding_queen']}
     return {'wallets':wallets,'components':components,'control':control,'elite_control':elite_control,'elite_roster':elite_roster,'qualification_top':qualification_top,'qualification_corpus':qualification_corpus,'canary':dict(canary) if canary else None,'canary_counts':canary_counts,'latest_intent':dict(latest_intent) if latest_intent else None,'queen':queen,'swarm_queen':swarm,'queen_roles':roles,'queen_proposals':queen_proposals,'experiments':experiments,'forward_scores':forward_scores,'governor':dict(governor) if governor else None,'paper_colonies':paper_colonies,'findings':findings,'live_ants':live_ants,'treasury':treasury,'audit':audit_rows}
 
+@app.get('/admin/api/research-readiness')
+async def research_readiness(request:Request):
+    auth(request)
+    from colony.queen_funded_attribution import audit as attribution_audit
+    from colony.queen_economic_feedback import explain
+    from colony.paper_admission_gate import assess
+    from datetime import datetime,timezone
+    async with connection() as c:
+        events=await c.fetch('SELECT source_event_id,genome_id,source_entry_id,action,amount_lamports,accepted,decided_at FROM funded_paper_event_decisions ORDER BY source_event_id')
+        genomes=await c.fetch('SELECT genome_id,family FROM colony_genomes')
+        cohorts=await c.fetch('SELECT genome_id,family FROM controlled_paper_cohort')
+        entries=await c.fetch('SELECT DISTINCT genome_id,family FROM eve_reference_paper_entries')
+        ants=await c.fetch("SELECT r.genome_id,r.family,r.spartan_passed,r.notes FROM live_ant_registry r WHERE r.source IN ('eve_reference','probation_forward') AND r.live_candidate=true")
+        cycles=await c.fetch('SELECT queen,started_at,status FROM queen_self_directed_cycles ORDER BY id DESC LIMIT 5')
+    funded=attribution_audit(events,genomes,datetime.now(timezone.utc),cohorts,entries)
+    readiness=[]
+    for a in ants:
+        note=a['notes'] or {}
+        eligible,reason=assess({'spartan_passed':a['spartan_passed'],'notes':note})
+        readiness.append({'family':a['family'],'genome_id':a['genome_id'],'eligible':eligible,'reason':reason})
+    return {'as_of':datetime.now(timezone.utc).isoformat(),'admission':readiness,'families':explain(funded)['families'],'unmapped':funded['unmapped_count'],'recent_cycles':[dict(x) for x in cycles],'authority':'observation_only_not_executable','notice':'Hypothetical quote returns, not real trades; historical positions remain in ledger.'}
+
 @app.get('/admin/api/analytics')
 async def api_analytics(request:Request,window:str='24h'):
     auth(request)
