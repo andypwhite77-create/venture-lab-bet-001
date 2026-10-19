@@ -151,6 +151,10 @@ def selection_fitness(parts,genome=None):
  # Hard economic gate: consistency may reward profitable robustness, but can never
  # rescue a strategy that loses money on either breeding-visible partition.
  if float(t.get('avg_net_gbp',-1e9))<=0 or float(v.get('avg_net_gbp',-1e9))<=0:return -999.0
+ # Reject lucky averages: profitable typical trades and capped realised downside
+ # must both survive train AND chronological validation after existing fee model.
+ if min(float(t.get('median_return_pct',-1e9)),float(v.get('median_return_pct',-1e9)))<=0:return -999.0
+ if min(float(t.get('worst_return_pct',-1e9)),float(v.get('worst_return_pct',-1e9))) < -25:return -999.0
  # Queen knows the game, not Spartan's hidden cutoffs: reward breadth, survival and distributed contribution.
  breadth=(min(1.0,t['n']/90.0)*min(1.0,v['n']/45.0))**0.5
  # Keep rewarding safety margin well beyond the viability floor; do not let evolution camp on it.
@@ -174,7 +178,11 @@ def selection_fitness(parts,genome=None):
  # merely by shrinking the opportunity set around a few historical winners.
  predicate_n=len((genome or {}).get('predicates',{}))
  complexity_penalty=.06*max(0,predicate_n-2)
- return (base*breadth_pressure*(.45+.55*coverage) + .22*breadth_margin + .12*consistency
+ # Selection pressure toward repeatable NET capital capture per unit of holding
+ # time, rather than high percentage results that trap funds indefinitely.
+ hold=max(5,int((genome or {}).get('parameters',{}).get('hold_minutes',15)))
+ hourly_capture=min(0.35,max(0.0,min(float(t['avg_net_gbp']),float(v['avg_net_gbp']))*60/hold/25))
+ return (hourly_capture + base*breadth_pressure*(.45+.55*coverage) + .22*breadth_margin + .12*consistency
          + reliability_bonus - tail_penalty - max(0,concentration-.28)*1.25
          - fragility_penalty - complexity_penalty)
 
