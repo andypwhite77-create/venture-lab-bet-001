@@ -4,6 +4,7 @@ No examination data, fills, promotions, or trading authority.
 import asyncio,json,statistics
 from db import init_db,connection
 from colony.entry_failure_lab import FIELDS,_obj,_num
+from colony.simple_killer_gate import assess as simple_screen
 
 def evaluate(rows,f1,d1,f2,d2):
  if f1 not in FIELDS or f2 not in FIELDS or f1==f2 or d1 not in ('high','low') or d2 not in ('high','low'):raise ValueError('unapproved_pair')
@@ -23,9 +24,10 @@ def evaluate(rows,f1,d1,f2,d2):
     passes=(a>cut1 if d1=='high' else a<=cut1) and (b>cut2 if d2=='high' else b<=cut2)
     if passes:selected.append(y);selected_mints.add(mint)
     else:other.append(y)
-  return {'selected_n':len(selected),'other_n':len(other),'selected_mints':len(selected_mints),'selected_mean_pct':round(statistics.mean(selected),4) if selected else None,'other_mean_pct':round(statistics.mean(other),4) if other else None}
+  return {'selected_n':len(selected),'other_n':len(other),'selected_mints':len(selected_mints),'selected_mean_pct':round(statistics.mean(selected),4) if selected else None,'other_mean_pct':round(statistics.mean(other),4) if other else None,
+          'economic_screen':simple_screen(selected,selected+other,len(selected_mints))}
  training=metric(mints[:n]);later=metric(mints[n:])
- status='exploratory_only' if min(training['selected_mints'],later['selected_mints'])>=5 and min(training['selected_n'],later['selected_n'])>=10 else 'insufficient_pair_coverage'
+ status='research_screen_passed_not_independent' if training['economic_screen']['passes_screen'] and later['economic_screen']['passes_screen'] else 'economically_rejected'
  return {'status':status,'features':[f1,f2],'directions':[d1,d2],'training_mints':n,'later_mints':len(mints)-n,'training_thresholds':[cut1,cut2],'training':training,'later':later,'promotion_allowed':False,'warning':'Historical holdout reused by research; not independent proof.'}
 async def run(queen,f1,d1,f2,d2):
  if not queen or len(queen)>80:raise ValueError('bad_queen')
