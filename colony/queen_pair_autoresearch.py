@@ -23,7 +23,13 @@ async def propose(queen):
  answer=await _inference(prompt,200)
  f1,d1,f2,d2=(answer.get(k) for k in ('feature1','direction1','feature2','direction2'))
  key=canonical(f1,d1,f2,d2)
- if key is None or key in existing:return {'status':'rejected_duplicate_or_unapproved','queen':queen,'promotion_allowed':False}
+ if key is None or key in existing:
+  # A duplicate model answer must not waste the entire autonomous research slot.
+  # Deterministic, allowlisted exploration only; never change evidence or gates.
+  alternatives=(canonical(a,da,b,db) for i,a in enumerate(FIELDS) for b in FIELDS[i+1:] for da in ('high','low') for db in ('high','low'))
+  key=next((k for k in alternatives if k and k not in existing),None)
+  if key is None:return {'status':'research_space_exhausted','queen':queen,'promotion_allowed':False}
+  f1,d1,f2,d2=key.split('|')
  ((a,b),(c,d))=sorted(((f1,d1),(f2,d2)))
  evidence=await run(queen,a,b,c,d)
  return {'status':'tested' if evidence['stored'] else 'duplicate','queen':queen,'pair_key':key,'result':evidence,'promotion_allowed':False}
