@@ -25,8 +25,11 @@ async def run():
  async with connection() as c:
   await c.execute(SCHEMA)
   last=await c.fetchval("SELECT started_at FROM queen_self_directed_cycles ORDER BY id DESC LIMIT 1")
-  if last and (await c.fetchval('SELECT clock_timestamp()'))-last < __import__('datetime').timedelta(hours=20):return {'status':'daily_cooldown','promotion_allowed':False}
-  queen=choose(rows)
+  if last and (await c.fetchval('SELECT clock_timestamp()'))-last < __import__('datetime').timedelta(hours=2):return {'status':'research_cooldown','promotion_allowed':False}
+  recent=await c.fetch('SELECT queen,count(*) AS n FROM (SELECT queen FROM queen_self_directed_cycles ORDER BY id DESC LIMIT 8) x GROUP BY queen')
+  counts={r['queen']:r['n'] for r in recent}
+  candidates=[r for r in rows if r['queen'] in QUEENS and r.get('feedback') and r['feedback'].get('research_priorities')]
+  queen=min((r['queen'] for r in candidates),key=lambda q:(counts.get(q,0),q)) if candidates else None
   if not queen:return {'status':'no_supported_priority','promotion_allowed':False}
   rec=await c.fetchval("INSERT INTO queen_self_directed_cycles(queen,status) VALUES($1,'running') RETURNING id",queen)
  try:out=await propose(queen);status=out['status']

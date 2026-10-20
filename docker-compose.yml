@@ -277,6 +277,7 @@ services:
 
 
   queen-survival:
+    profiles: ["breeding"]
     build: .
     restart: unless-stopped
     command: ["python", "-m", "colony.queen_survival_loop"]
