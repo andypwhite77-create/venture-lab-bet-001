@@ -15,10 +15,12 @@ async def propose(queen):
  await init_db()
  async with connection() as c:
   await c.execute('''CREATE TABLE IF NOT EXISTS queen_pair_hypotheses(id bigserial PRIMARY KEY,queen text NOT NULL,created_at timestamptz NOT NULL DEFAULT clock_timestamp(),pair_key text NOT NULL UNIQUE,result jsonb NOT NULL)''')
+  history=await c.fetch('SELECT queen,pair_key,result FROM queen_pair_hypotheses ORDER BY id DESC LIMIT 30')
   existing={r['pair_key'] for r in await c.fetch('SELECT pair_key FROM queen_pair_hypotheses')}
+  previous=[{'features':r['pair_key'],'status':(r['result'] if isinstance(r['result'],dict) else json.loads(r['result'])).get('status')} for r in history if r['queen']==queen][:8]
  objective=await family_objective(queen)
  prompt=('You are the '+queen+' Queen. '+objective_prompt(objective)+' Propose one novel entry-filter hypothesis using two DISTINCT features from '+','.join(FIELDS)+'. '
-  'Each feature must have direction high or low. Avoid existing pairs: '+json.dumps(sorted(existing))[:1300]+'. '
+  'Each feature must have direction high or low. Learn from these prior tests (not independent validation): '+json.dumps(previous)[:1100]+'. Avoid existing pairs: '+json.dumps(sorted(existing))[:700]+'. '
   'JSON keys feature1,direction1,feature2,direction2,rationale. No commands. Research only.')
  answer=await _inference(prompt,200)
  f1,d1,f2,d2=(answer.get(k) for k in ('feature1','direction1','feature2','direction2'))
@@ -27,7 +29,11 @@ async def propose(queen):
   # A duplicate model answer must not waste the entire autonomous research slot.
   # Deterministic, allowlisted exploration only; never change evidence or gates.
   alternatives=(canonical(a,da,b,db) for i,a in enumerate(FIELDS) for b in FIELDS[i+1:] for da in ('high','low') for db in ('high','low'))
-  key=next((k for k in alternatives if k and k not in existing),None)
+  pool=sorted(k for k in alternatives if k and k not in existing)
+  # Rotate fallback over the unused space rather than always starting alphabetically.
+  import hashlib
+  offset=int(hashlib.sha256((queen+':'+str(len(existing))).encode()).hexdigest()[:8],16)
+  key=pool[offset%len(pool)] if pool else None
   if key is None:return {'status':'research_space_exhausted','queen':queen,'promotion_allowed':False}
   f1,d1,f2,d2=key.split('|')
  ((a,b),(c,d))=sorted(((f1,d1),(f2,d2)))
