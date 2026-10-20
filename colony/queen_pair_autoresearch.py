@@ -19,7 +19,14 @@ async def propose(queen):
   existing={r['pair_key'] for r in await c.fetch('SELECT pair_key FROM queen_pair_hypotheses')}
   previous=[{'features':r['pair_key'],'status':(r['result'] if isinstance(r['result'],dict) else json.loads(r['result'])).get('status')} for r in history if r['queen']==queen][:8]
  objective=await family_objective(queen)
- prompt=('You are the '+queen+' Queen. '+objective_prompt(objective)+' Propose one novel entry-filter hypothesis using two DISTINCT features from '+','.join(FIELDS)+'. '
+ async with connection() as c:
+  try: latest=await c.fetchval('SELECT report FROM queen_research_director_decisions ORDER BY id DESC LIMIT 1')
+  except Exception: latest=None
+ if isinstance(latest,str):latest=json.loads(latest)
+ target='wallet_convergence' if queen=='pattern_recognition' else queen
+ guidance=next((x for x in (latest or {}).get('allocations',[]) if x['family']==target),None)
+ direction=(' Director evidence: '+json.dumps(guidance)[:500]+'. Investigate the suspected failure, not arbitrary signals. ') if guidance else ''
+ prompt=('You are the '+queen+' Queen. '+objective_prompt(objective)+direction+' Propose one novel entry-filter hypothesis using two DISTINCT features from '+','.join(FIELDS)+'. '
   'Each feature must have direction high or low. Learn from these prior tests (not independent validation): '+json.dumps(previous)[:1100]+'. Avoid existing pairs: '+json.dumps(sorted(existing))[:700]+'. '
   'JSON keys feature1,direction1,feature2,direction2,rationale. No commands. Research only.')
  answer=await _inference(prompt,200)
