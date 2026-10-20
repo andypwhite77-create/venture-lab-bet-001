@@ -36,7 +36,7 @@ def learn(finalists,summary,campaign):
         z['campaigns']+=1; z['count']+=cnt; z['last_seen']=now
         if z['campaigns']>=2 and z['count']>=20:
             e['graveyard'][sig]={"reason":"repeated breeding-visible failure","at":now,"revisitable":True,"campaigns":z['campaigns'],"count":z['count']}
-    e["opportunity_map"]={"underexplored_sensors":summary.get("underexplored_sensors",[]),"updated":now}
+    e["opportunity_map"]={"underexplored_sensors":summary.get("underexplored_sensors",[]),"near_miss_sensors":summary.get("near_miss_sensors",[]),"updated":now}
     save(e);return e
 
 def strategy(e):
