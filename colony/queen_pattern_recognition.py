@@ -143,6 +143,22 @@ def mutate(g,rng,allowed_sensors=None,sensor_ranges=None,operator='standard'):
  if rng.random()<cfg['risk']:x['parameters']['take_profit_pct']=rng.choice(TAKE_PROFITS)
  return x
 
+def near_miss_fitness(parts):
+ """Continuous research-only gradient; NEVER finalist eligibility."""
+ import math
+ t,v=parts[:2]
+ def val(d,k,default=0):
+  try:
+   x=float(d.get(k,default) if d.get(k) is not None else default)
+   return x if math.isfinite(x) else default
+  except (ValueError,TypeError):return default
+ coverage=min(1,val(t,'n')/18,val(v,'n')/12)
+ edge=min(val(t,'avg_net_gbp',-10),val(v,'avg_net_gbp',-10))
+ median=min(val(t,'median_return_pct',-100),val(v,'median_return_pct',-100))
+ tail=min(val(t,'worst_return_pct',-100),val(v,'worst_return_pct',-100))
+ outlier=max(val(t,'outlier',1),val(v,'outlier',1))
+ return round(coverage*2 + max(-5,min(5,edge))*0.5 + max(-20,min(20,median))*0.025 + max(-100,min(0,tail))*0.005 - outlier,6)
+
 def selection_fitness(parts,genome=None):
  t,v=parts[:2]
  # Anti-loophole breadth floor: viable strategies must work across a meaningful
@@ -364,6 +380,17 @@ async def run(conn,wave_size=None,waves=None,seed=300933,checkpoint='/data/queen
    if phenos.get(sig,0)>=3: continue
    phenos[sig]=phenos.get(sig,0)+1;parents.append({'genome_id':x['genome_id'],'genome':x['genome'],'selection_score':x['selection_score']})
    if len(parents)>=300: break
+  if not parents and wave < waves:
+   # Research-only parents: rank failures on a continuous scale, never promote.
+   for x in sorted(ranked,key=lambda z:near_miss_fitness([z['train'],z['validation']]),reverse=True):
+    a,b=x['train'],x['validation']
+    if a.get('n',0)<8 or b.get('n',0)<8:continue
+    if near_miss_fitness([a,b]) < -3:continue
+    sig=_behaviour_key(x)
+    if sig in phenos:continue
+    phenos[sig]=1
+    parents.append({'genome_id':x['genome_id'],'genome':x['genome'],'selection_score':x['selection_score']})
+    if len(parents)>=60:break
   behaviour_groups=len(phenos)
   base_fresh=max(.20,min(.50,float(eco_plan.get('wild_scouts',.20))))
   fresh_rate=max(base_fresh,.50 if behaviour_groups<10 else (.40 if behaviour_groups<20 else (.30 if behaviour_groups<40 else base_fresh)))
