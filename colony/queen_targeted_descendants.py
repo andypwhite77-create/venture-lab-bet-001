@@ -37,6 +37,12 @@ async def run(family='wallet_convergence'):
   available=founders()
   if family not in available:raise ValueError('unknown_founder')
   rows=await load_rows(c);fee=await measured_roundtrip_network_fee_sol(c);rate,_=sol_gbp_rate();cost=fee*rate
+  await c.execute(SCHEMA)
+  data_mints=len({r['mint'] for r in rows})
+  previous=await c.fetchval("SELECT result FROM queen_targeted_descendant_runs WHERE family=$1 ORDER BY id DESC LIMIT 1",family)
+  if isinstance(previous,str):previous=json.loads(previous)
+  if previous and previous.get('data_mints')==data_mints:
+   return {'family':family,'status':'unchanged_evidence_no_repeat','tested':0,'baseline_score':previous.get('baseline_score'),'best_descendant_score':previous.get('best_descendant_score'),'breeding_authorized':False}
   parts=split_rows(rows)[:2];base=available[family]
   reference=[evaluate(base,s,TARGET_STAKE_GBP,cost) for s in parts]
   candidates=[]
@@ -45,7 +51,7 @@ async def run(family='wallet_convergence'):
    candidates.append({'score':score(metrics),'train_n':metrics[0].get('n',0),'validation_n':metrics[1].get('n',0),'train_net_gbp':metrics[0].get('avg_net_gbp'),'validation_net_gbp':metrics[1].get('avg_net_gbp'),'genome':g})
   best=max(candidates,key=lambda x:x['score']) if candidates else None
   base_score=score(reference)
-  report={'family':family,'tested':len(candidates),'baseline_score':base_score,
+  report={'family':family,'data_mints':data_mints,'tested':len(candidates),'baseline_score':base_score,
    'best_descendant_score':best['score'] if best else None,'best_descendant':best,
    'better_than_founder':bool(best and best['score']>base_score),
    'independent_proof':False,'holdout_untouched':True,'breeding_authorized':False,
