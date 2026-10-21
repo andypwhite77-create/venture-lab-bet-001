@@ -115,7 +115,6 @@ services:
         max-file: "3"
 
   paper:
-    profiles: ["paper-trading"]
     build: .
     restart: unless-stopped
     command: ["python", "-m", "colony.paper_daemon"]

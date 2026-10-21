@@ -17,7 +17,7 @@ def score(parts):
  med=min(float(t.get('median_return_pct') or -100),float(v.get('median_return_pct') or -100))
  return round(min(a,b)+0.01*med,5)
 
-def descendants(founder,seed=20261020,n=64):
+def descendants(founder,seed=20261020,n=256):
  rng=random.Random(seed);p=founder['parameters'];out=[]
  for _ in range(n):
   g=copy.deepcopy(founder);g['parameters']=dict(p)
